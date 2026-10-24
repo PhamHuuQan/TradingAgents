@@ -123,6 +123,7 @@ def test_builds_ratios_from_consistent_point_in_time_quarters():
         facts,
         AS_OF,
         source=SOURCE,
+        price_source="test-prices",
         price_unit="VND/share",
         currency_unit=CURRENCY,
     )
@@ -172,6 +173,7 @@ def test_excludes_facts_and_prices_not_available_by_cutoff():
         facts,
         AS_OF,
         source=SOURCE,
+        price_source="test-prices",
         price_unit="VND/share",
         currency_unit=CURRENCY,
     )
@@ -195,6 +197,7 @@ def test_does_not_sum_cumulative_or_gapped_periods_into_ttm():
         facts,
         AS_OF,
         source=SOURCE,
+        price_source="test-prices",
         price_unit="VND/share",
         currency_unit=CURRENCY,
     )
@@ -225,6 +228,7 @@ def test_does_not_mix_sources_or_accept_inconsistent_units():
         [*facts, *other_source],
         AS_OF,
         source=SOURCE,
+        price_source="test-prices",
         price_unit="VND/share",
         currency_unit=CURRENCY,
     )
@@ -237,6 +241,7 @@ def test_does_not_mix_sources_or_accept_inconsistent_units():
             facts,
             AS_OF,
             source=SOURCE,
+            price_source="test-prices",
             price_unit="USD/share",
             currency_unit=CURRENCY,
         )
@@ -263,6 +268,7 @@ def test_rejects_price_snapshot_without_availability_time_at_cutoff():
             facts,
             AS_OF,
             source=SOURCE,
+            price_source="test-prices",
             price_unit="VND/share",
             currency_unit=CURRENCY,
         )
