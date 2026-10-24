@@ -1,5 +1,10 @@
 """Vietnam-market data contracts, read-only adapters, and offline analytics."""
 
+from tradingagents.dataflows.vietnam_market.csv_io import (
+    CSVDataError,
+    read_fundamental_facts_csv,
+    read_market_bars_csv,
+)
 from tradingagents.dataflows.vietnam_market.backtest import (
     BacktestConfig,
     BacktestResult,
@@ -46,6 +51,7 @@ __all__ = [
     "BacktestResult",
     "BacktestTrade",
     "BacktestValidationError",
+    "CSVDataError",
     "EquityPoint",
     "FundamentalDataValidationError",
     "FundamentalFact",
@@ -64,6 +70,8 @@ __all__ = [
     "exponential_moving_average",
     "latest_fundamental_facts_as_of",
     "percentage_returns",
+    "read_fundamental_facts_csv",
+    "read_market_bars_csv",
     "relative_strength_index",
     "run_long_only_backtest",
     "simple_moving_average",
