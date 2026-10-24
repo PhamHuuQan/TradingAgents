@@ -82,7 +82,7 @@ The first implementation slice is read-only daily OHLCV through the official SSI
 SDK's MarketDataService interface. The low-level adapter does not request trading scopes,
 send orders, or authenticate. An optional context manager handles SDK market-data
 authentication using environment variables, without requesting OTP or creating a Trading
-client. Existing TradingAgents defaults remain unchanged; SSI can now be selected explicitly for current-date market analysis.
+client. Existing TradingAgents defaults remain unchanged; SSI can be selected explicitly for current-date prices/indicators, and Vnstock VCI can be selected explicitly for current-date financial statements.
 
 Relevant current official references:
 - V3 overview and market-data capabilities: https://developers.ssi.com.vn/docs/getting-started/overview

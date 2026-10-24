@@ -54,6 +54,39 @@ python -m tradingagents.dataflows.vietnam_market.fetch_vnstock_facts --symbol FP
 Use --overwrite only when you explicitly intend to replace an existing file.
 No broker credentials or trading permissions are required for this path.
 
+## Optional Vnstock source inside the TradingAgents graph
+
+Vnstock VCI can be selected explicitly for all four fundamentals tools without
+changing the default US-market sources. Install Vnstock from its official package
+index (see the installation instructions above), then pass a copied config to the
+graph:
+
+~~~python
+from copy import deepcopy
+from tradingagents.default_config import DEFAULT_CONFIG
+
+config = deepcopy(DEFAULT_CONFIG)
+config["data_vendors"]["fundamental_data"] = "vnstock"
+~~~
+
+Use `TradingAgentsGraph(..., config=config)`. The package is imported only when
+the Vnstock source is called, and the normal/default vendor chain never auto-selects
+it. The adapter calls VCI with `period="quarter"` or `period="year"`,
+`format="long"`, and validates available source/ticker/format metadata.
+
+The `get_fundamentals` summary derives TTM parent-company net income and operating
+cash flow only when four contiguous standalone-quarter facts exist. It reports
+the latest total equity as a point-in-time balance. It does not call the premium
+`ratio()` endpoint, infer weighted-average shares, shares outstanding, capex, EPS,
+P/E, P/B, ROE, or free cash flow. The detailed statement tools return source-tagged
+long-format CSV.
+
+Because these statement responses do not provide an exact historical first-
+publication timestamp, historical `as_of` requests are withheld before the API is
+called. Each response labels its fetch timestamp; it is for current-date research,
+not an historical point-in-time backtest feed. Existing default `fundamental_data`
+routing remains unchanged.
+
 ## Point-in-time valuation metrics
 
 build_valuation_metrics derives market capitalization, TTM P/E, P/B, EPS, ROE,
@@ -238,5 +271,5 @@ request has been made during development.
 - No validated Vietnamese calendar/tick-size/price-limit/corporate-action source.
 - No SSI historical first-availability timestamps, Vietnamese exchange calendar, or automatic corporate-action adjustment.
 
-Next: validate source-specific statement semantics and mapping for shares/capex, verify SSI historical-data/adjustment semantics, and only then consider a guarded integration into the agent graph. Main and upstream remain
+Next: verify SSI account entitlements and historical adjustment semantics, validate VCI coverage across banks/securities/insurance/regular-company taxonomies, and add share-count/capex mappings only when the official IDs and units are verified. Main and upstream remain
 unchanged; all changes are on the feature branch.

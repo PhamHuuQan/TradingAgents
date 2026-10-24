@@ -30,6 +30,12 @@ from tradingagents.dataflows.vendors.ssi_market import (
     get_ssi_indicators,
     get_ssi_stock_data,
 )
+from tradingagents.dataflows.vendors.vnstock_fundamentals import (
+    get_vnstock_balance_sheet,
+    get_vnstock_cashflow,
+    get_vnstock_fundamentals,
+    get_vnstock_income_statement,
+)
 from tradingagents.dataflows.vendors.yahoo.fundamentals import (
     get_balance_sheet as get_yfinance_balance_sheet,
     get_cashflow as get_yfinance_cashflow,
@@ -99,7 +105,7 @@ OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 
 # SSI must be explicitly selected. Its historical responses carry fetch-time
 # availability only, so it must not enter the implicit "default" vendor chain.
-EXPLICIT_ONLY_VENDORS = frozenset({"ssi"})
+EXPLICIT_ONLY_VENDORS = frozenset({"ssi", "vnstock"})
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
@@ -119,21 +125,25 @@ VENDOR_METHODS = {
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "vnstock": get_vnstock_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "sec_edgar": get_sec_edgar_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "vnstock": get_vnstock_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "sec_edgar": get_sec_edgar_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "vnstock": get_vnstock_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "sec_edgar": get_sec_edgar_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "vnstock": get_vnstock_income_statement,
     },
     # news_data
     "get_news": {

@@ -145,7 +145,10 @@ def get_fundamentals(
     Returns:
         str: A formatted report containing comprehensive fundamental data
     """
-    return route_to_vendor("get_fundamentals", ticker, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_fundamentals", ticker, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_fundamentals", exc)
 
 
 @tool
@@ -164,7 +167,10 @@ def get_balance_sheet(
     Returns:
         str: A formatted report containing balance sheet data
     """
-    return route_to_vendor("get_balance_sheet", ticker, freq, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_balance_sheet", ticker, freq, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_balance_sheet", exc)
 
 
 @tool
@@ -183,7 +189,10 @@ def get_cashflow(
     Returns:
         str: A formatted report containing cash flow statement data
     """
-    return route_to_vendor("get_cashflow", ticker, freq, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_cashflow", ticker, freq, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_cashflow", exc)
 
 
 @tool
@@ -202,7 +211,10 @@ def get_income_statement(
     Returns:
         str: A formatted report containing income statement data
     """
-    return route_to_vendor("get_income_statement", ticker, freq, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_income_statement", ticker, freq, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_income_statement", exc)
 
 
 @tool
