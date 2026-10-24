@@ -42,7 +42,6 @@ def _fixture():
         available = datetime.fromisoformat(end).replace(
             hour=16, minute=0, tzinfo=VN_TZ
         )
-        available = available.replace(month=available.month)  # preserve end-of-day date
         available = available.astimezone(UTC)
         facts.extend(
             [
