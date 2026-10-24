@@ -20,12 +20,12 @@ from tradingagents.dataflows.errors import (
     VendorNotConfiguredError,
     VendorUnavailableError,
 )
-from tradingagents.dataflows.vietnam_market.models import MarketBar
 from tradingagents.dataflows.vendors.ssi_market import (
     _SNAPSHOT_INDICATORS,
     _format_decimal,
     _indicator_series,
 )
+from tradingagents.dataflows.vietnam_market.models import MarketBar
 
 _MARKET_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 _FINAL_DAILY_BAR_TIME = time(15, 5)
