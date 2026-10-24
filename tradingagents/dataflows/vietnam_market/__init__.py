@@ -1,5 +1,14 @@
 """Vietnam-market data contracts, read-only adapters, and offline analytics."""
 
+from tradingagents.dataflows.vietnam_market.backtest import (
+    BacktestConfig,
+    BacktestResult,
+    BacktestTrade,
+    BacktestValidationError,
+    EquityPoint,
+    TargetExposureSignal,
+    run_long_only_backtest,
+)
 from tradingagents.dataflows.vietnam_market.fundamentals import (
     AmbiguousFundamentalFactError,
     FundamentalDataValidationError,
@@ -23,6 +32,11 @@ from tradingagents.dataflows.vietnam_market.technicals import (
 
 __all__ = [
     "AmbiguousFundamentalFactError",
+    "BacktestConfig",
+    "BacktestResult",
+    "BacktestTrade",
+    "BacktestValidationError",
+    "EquityPoint",
     "FundamentalDataValidationError",
     "FundamentalFact",
     "IndicatorPoint",
@@ -30,11 +44,13 @@ __all__ = [
     "MarketDataValidationError",
     "SSIAdapterError",
     "SSIMarketDataProvider",
+    "TargetExposureSignal",
     "authenticated_ssi_provider_from_env",
     "average_true_range",
     "exponential_moving_average",
     "latest_fundamental_facts_as_of",
     "percentage_returns",
     "relative_strength_index",
+    "run_long_only_backtest",
     "simple_moving_average",
 ]
