@@ -13,6 +13,7 @@ from tradingagents.dataflows.vietnam_market.csv_io import (
     CSVDataError,
     read_fundamental_facts_csv,
     read_market_bars_csv,
+    write_fundamental_facts_csv,
 )
 from tradingagents.dataflows.vietnam_market.fundamentals import (
     AmbiguousFundamentalFactError,
@@ -72,6 +73,7 @@ __all__ = [
     "percentage_returns",
     "read_fundamental_facts_csv",
     "read_market_bars_csv",
+    "write_fundamental_facts_csv",
     "relative_strength_index",
     "run_long_only_backtest",
     "simple_moving_average",
