@@ -130,6 +130,13 @@ config["data_vendors"]["core_stock_apis"] = "vnstock"
 config["data_vendors"]["technical_indicators"] = "vnstock"
 ~~~
 
+Domestic index tickers `VNINDEX`, `VN30`, `HNXINDEX`, and `UPCOMINDEX`
+are routed through Vnstock's `Market().index(symbol)` instead of `equity(symbol)`.
+Their values are measured in index points and are **not** multiplied by 1,000;
+only stock/ETF-style VCI OHLC values in thousand VND are converted to VND/share.
+The adapter deliberately recognizes only these explicitly documented domestic
+index identifiers and does not guess whether an unknown ticker is an index.
+
 The route is current-date-only. It fetches historical rows for current-date chart context, but their `available_at` is the retrieval time, not the historical first-publication time; the graph rejects backdated analysis dates for this source. Do not use this live route as point-in-time-safe backtest input. The default price source remains Yahoo, and Vnstock is never added to the implicit `default` vendor chain.
 
 ## Optional SSI source inside the TradingAgents graph

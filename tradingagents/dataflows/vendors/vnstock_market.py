@@ -1,7 +1,8 @@
 """Optional Vnstock VCI OHLCV vendor for current-date Vietnam-market research.
 
-V5 VCI OHLCV prices are documented in thousand VND; this adapter converts them
-to VND/share. VCI and KBS can have different corporate-action-adjusted values,
+V5 VCI stock OHLCV prices are documented in thousand VND; this adapter converts
+them to VND/share. Domestic index OHLCV is measured in index points and is not
+scaled. VCI and KBS can have different corporate-action-adjusted values,
 so source selection is explicit. This adapter is for current-date research only:
 all retrieved rows receive fetch-time availability, not historical first-publication
 timestamps, and backdated-as-of requests are rejected.
@@ -32,11 +33,18 @@ _FINAL_DAILY_BAR_TIME = time(15, 5)
 _PRICE_SCALE = Decimal(1000)
 _REQUIRED_COLUMNS = {"time", "open", "high", "low", "close", "volume"}
 _SOURCE = "vnstock-vci"
+_INDEX_SOURCE = "vnstock-vci-index"
+_INDEX_SYMBOLS = frozenset({"VNINDEX", "VN30", "HNXINDEX", "UPCOMINDEX"})
 _MAX_LOOKBACK_ROWS = 300
 
 
 def _now_market() -> datetime:
     return datetime.now(_MARKET_TZ)
+
+
+def _is_index(symbol: str) -> bool:
+    """Return whether symbol is a documented domestic Vnstock market index."""
+    return symbol.strip().upper() in _INDEX_SYMBOLS
 
 
 def _parse_date(value: str | date, field: str) -> date:
@@ -70,7 +78,10 @@ def _market_client(symbol: str):
             "Vnstock could not be imported. Check the installation for this Python environment."
         ) from exc
     try:
-        return Market().equity(symbol)
+        market = Market()
+        if _is_index(symbol):
+            return market.index(symbol)
+        return market.equity(symbol)
     except Exception as exc:
         raise VendorUnavailableError(
             f"Vnstock market client initialization failed ({type(exc).__name__})."
@@ -138,21 +149,25 @@ def _row_date(value: object) -> date:
         return dt.date()
 
 
-def _decimal(value: object, field: str) -> Decimal:
+def _decimal(
+    value: object, field: str, *, scale: Decimal, require_integral: bool
+) -> Decimal:
     try:
         result = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ValueError(f"Vnstock OHLCV {field} is not numeric") from exc
     if not result.is_finite():
         raise ValueError(f"Vnstock OHLCV {field} must be finite")
-    result *= _PRICE_SCALE
+    result *= scale
     if result <= 0:
         raise ValueError(f"Vnstock OHLCV {field} must be positive")
-    if result != result.to_integral_value():
-        raise ValueError(
-            f"Vnstock OHLCV {field} does not convert exactly to whole VND/share"
-        )
-    return result.quantize(Decimal("1"))
+    if require_integral:
+        if result != result.to_integral_value():
+            raise ValueError(
+                f"Vnstock OHLCV {field} does not convert exactly to whole VND/share"
+            )
+        return result.quantize(Decimal("1"))
+    return result
 
 
 def _volume(value: object) -> int:
@@ -195,6 +210,8 @@ def _fetch_current_bars(
             "requested range contains no completed daily bars at the current time",
         )
 
+    index_symbol = _is_index(normalized)
+    price_scale = Decimal(1) if index_symbol else _PRICE_SCALE
     client = _market_client(normalized)
     try:
         frame = client.ohlcv(
@@ -233,12 +250,24 @@ def _fetch_current_bars(
             bars.append(MarketBar(
                 symbol=normalized,
                 timestamp=datetime.combine(day, time(15, 0), tzinfo=_MARKET_TZ),
-                open=_decimal(row.get("open"), "open"),
-                high=_decimal(row.get("high"), "high"),
-                low=_decimal(row.get("low"), "low"),
-                close=_decimal(row.get("close"), "close"),
+                open=_decimal(
+                    row.get("open"), "open", scale=price_scale,
+                    require_integral=not index_symbol,
+                ),
+                high=_decimal(
+                    row.get("high"), "high", scale=price_scale,
+                    require_integral=not index_symbol,
+                ),
+                low=_decimal(
+                    row.get("low"), "low", scale=price_scale,
+                    require_integral=not index_symbol,
+                ),
+                close=_decimal(
+                    row.get("close"), "close", scale=price_scale,
+                    require_integral=not index_symbol,
+                ),
                 volume=_volume(row.get("volume")),
-                source=_SOURCE,
+                source=_INDEX_SOURCE if index_symbol else _SOURCE,
                 available_at=fetched_at,
             ))
         except (TypeError, ValueError) as exc:
@@ -254,30 +283,40 @@ def _fetch_current_bars(
 
 
 def _format_csv(bars: list[MarketBar], symbol: str, title: str, fetched_at: datetime) -> str:
+    is_index = _is_index(symbol)
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\n")
     writer.writerow(("Date", "Open", "High", "Low", "Close", "Volume"))
     for bar in bars:
+        price_digits = 2 if is_index else 0
         writer.writerow((
             bar.timestamp.date().isoformat(),
-            _format_decimal(bar.open, digits=0),
-            _format_decimal(bar.high, digits=0),
-            _format_decimal(bar.low, digits=0),
-            _format_decimal(bar.close, digits=0),
+            _format_decimal(bar.open, digits=price_digits),
+            _format_decimal(bar.high, digits=price_digits),
+            _format_decimal(bar.low, digits=price_digits),
+            _format_decimal(bar.close, digits=price_digits),
             bar.volume,
         ))
+    if is_index:
+        source_label = "Vnstock VCI domestic index"
+        unit_notice = "# Index OHLC values are measured in index points; no price scaling was applied.\n"
+        source_notice = "# Domestic index source: VCI; values from different sources may differ.\n"
+    else:
+        source_label = "Vnstock VCI equity"
+        unit_notice = "# OHLC prices converted from the source's thousand-VND unit to VND/share.\n"
+        source_notice = "# VCI's corporate-action-adjusted history can differ from KBS/Yahoo history.\n"
     return (
-        f"# {title} for {symbol} from Vnstock VCI\n"
+        f"# {title} for {symbol} from {source_label}\n"
         f"# Retrieved at: {fetched_at.isoformat()}\n"
-        "# OHLC prices converted from the source's thousand-VND unit to VND/share.\n"
-        "# VCI's corporate-action-adjusted history can differ from KBS/Yahoo history.\n"
-        "# Fetch-time availability is not historical first-publication time; do not use for historical PIT backtests.\n\n"
+        + unit_notice
+        + source_notice
+        + "# Fetch-time availability is not historical first-publication time; do not use for historical PIT backtests.\n\n"
         + output.getvalue()
     )
 
 
 def get_vnstock_stock_data(symbol: str, start_date: str, end_date: str) -> str:
-    """Router target for stock OHLCV, normalized to VND/share."""
+    """Router target for domestic-stock OHLCV or explicitly supported domestic indices."""
     bars, fetched_at = _fetch_current_bars(symbol, start_date, end_date)
     return _format_csv(bars, symbol.strip().upper(), "Read-only daily OHLCV", fetched_at)
 
@@ -338,18 +377,22 @@ def build_vnstock_market_snapshot(
         f"- Latest returned trading row: {latest.timestamp.date().isoformat()}",
         f"- Source: {latest.source}",
         f"- Retrieved at: {fetched_at.isoformat()}",
-        "- Daily prices are converted from thousand VND to VND/share.",
-        "- VCI and KBS history may differ due to corporate-action adjustment conventions.",
+        (
+            "- Index values are measured in points; no scale conversion applied."
+            if _is_index(symbol)
+            else "- Daily stock prices are converted from thousand VND to VND/share."
+        ),
+        "- VCI and KBS history may differ due to source-specific adjustment conventions.",
         "- Current-date only; historical first-publication time is unknown.",
         "",
         "### Latest verified OHLCV row",
         "",
         "| Field | Value |",
         "|---|---:|",
-        f"| Open | {_format_decimal(latest.open, digits=0)} |",
-        f"| High | {_format_decimal(latest.high, digits=0)} |",
-        f"| Low | {_format_decimal(latest.low, digits=0)} |",
-        f"| Close | {_format_decimal(latest.close, digits=0)} |",
+        f"| Open | {_format_decimal(latest.open, digits=2 if _is_index(symbol) else 0)} |",
+        f"| High | {_format_decimal(latest.high, digits=2 if _is_index(symbol) else 0)} |",
+        f"| Low | {_format_decimal(latest.low, digits=2 if _is_index(symbol) else 0)} |",
+        f"| Close | {_format_decimal(latest.close, digits=2 if _is_index(symbol) else 0)} |",
         f"| Volume | {latest.volume} |",
         "",
         "### Verified technical indicators (VCI OHLCV)",
@@ -358,8 +401,19 @@ def build_vnstock_market_snapshot(
         "|---|---:|",
     ]
     lines.extend(f"| {name} | {value} |" for name, value in indicator_values.items())
-    lines.extend(["", f"### Recent verified closes (last {len(recent)} rows)", "", "| Date | Close (VND/share) |", "|---|---:|"])
-    lines.extend(f"| {bar.timestamp.date().isoformat()} | {bar.close} |" for bar in recent)
+    close_unit = "index points" if _is_index(symbol) else "VND/share"
+    price_digits = 2 if _is_index(symbol) else 0
+    lines.extend([
+        "",
+        f"### Recent verified closes (last {len(recent)} rows)",
+        "",
+        f"| Date | Close ({close_unit}) |",
+        "|---|---:|",
+    ])
+    lines.extend(
+        f"| {bar.timestamp.date().isoformat()} | {_format_decimal(bar.close, digits=price_digits)} |"
+        for bar in recent
+    )
     lines.extend([
         "",
         "Use this snapshot for exact values when Vnstock VCI is the selected source. "

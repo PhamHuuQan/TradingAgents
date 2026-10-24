@@ -1,5 +1,7 @@
 import copy
+import sys
 from datetime import date, datetime, time, timedelta
+from types import ModuleType
 from unittest.mock import Mock
 from zoneinfo import ZoneInfo
 
@@ -157,3 +159,60 @@ def test_verified_snapshot_uses_vnstock_when_explicit_and_keeps_same_source(monk
     assert result == "verified VCI snapshot"
     snapshot.assert_called_once_with("FPT", "2026-10-25", 5)
     yahoo.assert_not_called()
+
+@pytest.mark.unit
+def test_domestic_vnstock_index_is_not_scaled_as_stock_price(monkeypatch):
+    monkeypatch.setattr(vnstock_market, "_now_market", lambda: NOW)
+    frame = FakeFrame(
+        [{
+            "time": datetime(2026, 10, 23, 7, 0, tzinfo=VN_TZ),
+            "open": 1740.54,
+            "high": 1745.00,
+            "low": 1730.00,
+            "close": 1739.25,
+            "volume": 911324549,
+        }],
+        symbol="VNINDEX",
+    )
+    equity = FakeEquity(frame)
+    monkeypatch.setattr(vnstock_market, "_market_client", lambda symbol: equity)
+
+    output = vnstock_market.get_vnstock_stock_data("VNINDEX", "2026-10-01", "2026-10-25")
+
+    assert "# Index OHLC values are measured in index points; no price scaling was applied." in output
+    assert "thousand-VND unit" not in output
+    assert "2026-10-23,1740.54,1745,1730,1739.25,911324549" in output
+    assert equity.calls == [("2026-10-01", "2026-10-25", "1D", "vci", None)]
+
+    snapshot = vnstock_market.build_vnstock_market_snapshot("VNINDEX", "2026-10-25", 3)
+    assert "Source: vnstock-vci-index" in snapshot
+    assert "Index values are measured in points" in snapshot
+    assert "| Close | 1739.25 |" in snapshot
+
+
+@pytest.mark.unit
+def test_vnstock_client_routes_known_domestic_indices_to_index_api(monkeypatch):
+    calls = []
+
+    class FakeMarket:
+        def equity(self, symbol):
+            calls.append(("equity", symbol))
+            return ("equity", symbol)
+
+        def index(self, symbol):
+            calls.append(("index", symbol))
+            return ("index", symbol)
+
+    fake_module = ModuleType("vnstock")
+    fake_module.Market = FakeMarket
+    monkeypatch.setitem(sys.modules, "vnstock", fake_module)
+    monkeypatch.setattr(vnstock_market.importlib.util, "find_spec", lambda name: object())
+
+    assert vnstock_market._market_client("VNINDEX") == ("index", "VNINDEX")
+    assert vnstock_market._market_client("HNXINDEX") == ("index", "HNXINDEX")
+    assert vnstock_market._market_client("FPT") == ("equity", "FPT")
+    assert calls == [
+        ("index", "VNINDEX"),
+        ("index", "HNXINDEX"),
+        ("equity", "FPT"),
+    ]
