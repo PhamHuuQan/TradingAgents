@@ -123,9 +123,9 @@ def test_vnstock_fundamentals_summary_only_derives_complete_ttm_flows(fake_vnsto
 @pytest.mark.unit
 def test_vnstock_rejects_wrong_source_metadata():
     client = FakeClient()
-    client.income = FakeFrame(client.income.rows, source="kbs")
+    client.income_frame = FakeFrame(client.income_frame.rows, source="kbs")
     with pytest.raises(VendorUnavailableError, match="expected 'vci'"):
-        vnstock_fundamentals._validate_frame(client.income, "FPT", "income_statement")
+        vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement")
 
 
 @pytest.mark.unit
