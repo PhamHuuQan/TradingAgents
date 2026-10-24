@@ -4,8 +4,8 @@
 
 This slice provides a validated OHLCV contract, a read-only SSI FastConnect V3 adapter,
 offline technical indicators, a point-in-time fundamental-fact model, a configurable
-long-only backtest simulator, a reference SMA-crossover signal generator, and portfolio
-performance statistics. It does not configure live credentials, change existing Yahoo
+long-only backtest simulator, a reference SMA-crossover signal generator, portfolio
+performance statistics, and point-in-time valuation metric derivation. It does not configure live credentials, change existing Yahoo
 Finance routing, alter the agent graph, or place orders.
 
 ## OHLCV and point-in-time facts
@@ -15,6 +15,24 @@ FundamentalFact stores a reported metric for one explicit period, unit, source, 
 available_at timestamp. latest_fundamental_facts_as_of selects revisions known by a
 cutoff and keeps sources separate. Neither data contract fetches statements or decides
 unit conversions/corporate-action treatment automatically.
+
+## Point-in-time valuation metrics
+
+build_valuation_metrics derives market capitalization, TTM P/E, P/B, EPS, ROE,
+free cash flow, and operating-cash-flow-to-net-income from explicitly normalized
+facts. All facts and price bars must be available by the as-of timestamp, and
+fundamentals are restricted to one named source and consistent units. TTM flow
+metrics require four complete, contiguous standalone quarterly periods; YTD
+cumulative records are not summed as if they were separate quarters. EPS also
+requires matching quarterly weighted-average-share facts. ROE requires opening
+and closing equity facts near the TTM endpoints. Missing, negative, or ambiguous
+inputs result in unavailable metrics and warnings, not guessed values.
+
+The valuation module consumes normalized facts only. It does not fetch filings,
+calculate vendor-specific TTM values from raw statements, or convert currencies.
+Before using results for investment decisions, verify whether the chosen source
+reports standalone-quarter values, per-share units, capex sign conventions,
+share counts, and accounting restatements as expected.
 
 ## Offline technical indicators and reference strategy
 
@@ -93,10 +111,9 @@ request has been made during development.
 
 - No guessed Yahoo suffix mapping for HOSE, HNX, or UPCoM.
 - No live SSI credentials or live-data request.
-- No statement/fundamental ingestion or historical valuation ratio calculation.
+- No statement/fundamental ingestion; valuation ratios require normalized facts supplied by a caller.
 - No validated Vietnamese calendar/tick-size/price-limit/corporate-action source.
 - No integration into the current agent graph or production deployment.
 
-Next: verify SSI account entitlements and historical-data/adjustment semantics, then build
-permitted source ingestion and corporate-action handling. Main and upstream remain
+Next: build a source-specific, point-in-time statement ingestion layer and verify SSI historical-data/adjustment semantics before connecting these primitives to the agent graph. Main and upstream remain
 unchanged; all changes are on the feature branch.
