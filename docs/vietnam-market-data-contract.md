@@ -2,9 +2,10 @@
 
 ## Status
 
-This isolated implementation slice adds a validated OHLCV data contract and a read-only
-SSI FastConnect V3 daily-OHLC adapter. It does **not** configure live credentials, change
-the existing Yahoo Finance routing, alter the agent graph, or place orders.
+This isolated implementation slice adds a validated OHLCV data contract, a read-only
+SSI FastConnect V3 daily-OHLC adapter, and deterministic technical-indicator functions.
+It does **not** configure live credentials, change the existing Yahoo Finance routing,
+alter the agent graph, or place orders.
 
 ## Contract
 
@@ -45,11 +46,31 @@ it is not the historical publication time and must not be used to claim point-in
 backtest validity. The smoke command requires a closed-day date range and will reject
 a bar whose close is later than the fetch timestamp.
 
+## Offline technical indicators
+
+The tradingagents.dataflows.vietnam_market.technicals module provides deterministic
+calculations over MarketBar data without a vendor call or LLM:
+
+- simple_moving_average(bars, period) and exponential_moving_average(bars, period);
+- relative_strength_index(bars, period=14) using Wilder smoothing;
+- average_true_range(bars, period=14) using the prior close;
+- percentage_returns(bars) for close-to-close price changes in percent.
+
+Each IndicatorPoint has a bar timestamp, Decimal value and available_at timestamp.
+Series must be strictly time-ordered and cannot mix symbols or data sources. The
+availability time is the latest availability of all inputs used by each point; EMA,
+RSI and ATR propagate availability across the history used by their recursive state.
+
+These are calculation primitives, not recommendations or trade signals. Returns are
+price returns, not dividend-inclusive total returns. Corporate-action adjustments are
+not applied by this module; research pipelines must document their adjustment policy
+before using the results for historical comparison or backtesting.
+
 ## Deliberately not included yet
 
 - no assumed Yahoo suffix mapping for HOSE, HNX, or UPCoM;
 - no live or paid vendor credentials;
-- no scraping, API calls, or network access;
+- no live data request was made during this implementation;
 - no changes to existing data vendor selection;
 - no portfolio simulation or trade execution.
 
