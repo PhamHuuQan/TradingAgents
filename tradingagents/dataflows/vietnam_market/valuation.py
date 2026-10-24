@@ -7,9 +7,9 @@ are rejected instead of being silently summed more than once.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Iterable
 
 from tradingagents.dataflows.vietnam_market.fundamentals import (
     FundamentalFact,
@@ -225,18 +225,32 @@ def build_valuation_metrics(
 
     eps = None
     if net_income_quarters:
-        weighted_shares = _sum_matching_quarters(
-            source_facts, "weighted_average_shares", "shares", net_income_quarters
-        )
-        if weighted_shares is not None:
+        matching_shares = [
+            next(
+                (
+                    share_fact for share_fact in source_facts
+                    if share_fact.metric == "weighted_average_shares"
+                    and share_fact.unit == "shares"
+                    and share_fact.period_start == quarter.period_start
+                    and share_fact.period_end == quarter.period_end
+                ),
+                None,
+            )
+            for quarter in net_income_quarters
+        ]
+        if all(fact is not None for fact in matching_shares):
+            share_facts = [fact for fact in matching_shares if fact is not None]
             total_days = sum(
                 (fact.period_end - fact.period_start).days + 1
                 for fact in net_income_quarters
             )
             weighted_average = sum(
                 (
-                    fact.value * Decimal((fact.period_end - fact.period_start).days + 1)
-                    for fact in net_income_quarters
+                    share_fact.value
+                    * Decimal((period.period_end - period.period_start).days + 1)
+                    for share_fact, period in zip(
+                        share_facts, net_income_quarters, strict=True
+                    )
                 ),
                 Decimal("0"),
             ) / Decimal(total_days)
