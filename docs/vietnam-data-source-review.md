@@ -79,8 +79,10 @@ No API key, OTP, consumer secret, or other credential should be committed to Git
 
 SSI FastConnect V3 is selected as the first Vietnamese-equity market-data integration.
 The first implementation slice is read-only daily OHLCV through the official SSI Python
-SDK's MarketDataService interface. The adapter deliberately does not request trading
-scopes, send orders, authenticate on its own, or alter the existing TradingAgents routing.
+SDK's MarketDataService interface. The low-level adapter does not request trading scopes,
+send orders, or authenticate. An optional context manager handles SDK market-data
+authentication using environment variables, without requesting OTP or creating a Trading
+client. Existing TradingAgents routing remains unchanged.
 
 Relevant current official references:
 - V3 overview and market-data capabilities: https://developers.ssi.com.vn/docs/getting-started/overview
