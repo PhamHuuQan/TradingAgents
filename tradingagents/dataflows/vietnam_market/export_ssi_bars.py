@@ -47,6 +47,8 @@ def write_market_bars_csv(
     """Atomically write validated normalized daily bars as CSV."""
     if not bars:
         raise ExportDataError("Refusing to write an empty SSI bar export")
+    if not isinstance(bars[0], MarketBar):
+        raise TypeError("bars[0] must be a MarketBar")
     symbol = bars[0].symbol
     source = bars[0].source
     previous_timestamp = None
