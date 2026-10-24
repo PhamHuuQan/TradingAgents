@@ -72,7 +72,9 @@ def test_vnstock_ohlcv_converts_thousand_vnd_to_vnd_and_marks_fetch_time(mocked_
     assert "not historical first-publication time" in output
     assert "Date,Open,High,Low,Close,Volume" in output
     assert "2026-10-23,69000,70000,68000,69500,100009" in output
-    assert mocked_vnstock.calls == [("2026-10-01", "2026-10-23", "1D", "vci", None)]
+    # Query through today's requested as-of date; the source returns only completed
+    # exchange sessions (the last available row in this fixture is Friday).
+    assert mocked_vnstock.calls == [("2026-10-01", "2026-10-25", "1D", "vci", None)]
 
 
 @pytest.mark.unit
