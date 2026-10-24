@@ -28,6 +28,7 @@ class ValuationMetrics:
 
     symbol: str
     as_of: datetime
+    price_source: str
     source: str
     price: Decimal
     price_unit: str
@@ -145,6 +146,7 @@ def build_valuation_metrics(
     facts: Iterable[FundamentalFact],
     as_of: datetime,
     *,
+    price_source: str,
     source: str,
     price_unit: str,
     currency_unit: str,
@@ -166,6 +168,9 @@ def build_valuation_metrics(
     if not isinstance(source, str) or not source.strip():
         raise ValuationDataError("source must be non-empty")
     source = source.strip()
+    if not isinstance(price_source, str) or not price_source.strip():
+        raise ValuationDataError("price_source must be non-empty")
+    price_source = price_source.strip()
     if not isinstance(currency_unit, str) or not currency_unit.strip():
         raise ValuationDataError("currency_unit must be non-empty")
     currency_unit = currency_unit.strip()
@@ -178,6 +183,7 @@ def build_valuation_metrics(
     usable_bars = [
         bar for bar in bars
         if isinstance(bar, MarketBar) and bar.symbol == normalized_symbol
+        and bar.source == price_source
         and bar.timestamp <= as_of and bar.available_at <= as_of
     ]
     if not usable_bars:
@@ -320,6 +326,7 @@ def build_valuation_metrics(
     return ValuationMetrics(
         symbol=normalized_symbol,
         as_of=as_of.astimezone(UTC),
+        price_source=price_source,
         source=source,
         price=latest_bar.close,
         price_unit=price_unit,
