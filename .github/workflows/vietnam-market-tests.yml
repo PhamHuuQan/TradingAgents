@@ -33,6 +33,6 @@ jobs:
       - name: Install project and optional test/SSI dependencies
         run: python -m pip install -e ".[dev,ssi]"
       - name: Run Vietnam market data unit tests
-        run: python -m pytest -q tests/test_vietnam_market_models.py tests/test_vietnam_market_ssi.py tests/test_vietnam_market_smoke.py tests/test_vietnam_market_technicals.py tests/test_vietnam_market_fundamentals.py tests/test_vietnam_market_backtest.py tests/test_vietnam_market_strategies.py tests/test_vietnam_market_performance.py
+        run: python -m pytest -q tests/test_vietnam_market_models.py tests/test_vietnam_market_ssi.py tests/test_vietnam_market_smoke.py tests/test_vietnam_market_technicals.py tests/test_vietnam_market_fundamentals.py tests/test_vietnam_market_backtest.py tests/test_vietnam_market_strategies.py tests/test_vietnam_market_performance.py tests/test_vietnam_market_valuation.py
       - name: Lint Vietnam market data code
         run: ruff check tradingagents/dataflows/vietnam_market tests/test_vietnam_market_models.py tests/test_vietnam_market_ssi.py tests/test_vietnam_market_smoke.py tests/test_vietnam_market_technicals.py tests/test_vietnam_market_fundamentals.py tests/test_vietnam_market_backtest.py tests/test_vietnam_market_strategies.py tests/test_vietnam_market_performance.py
