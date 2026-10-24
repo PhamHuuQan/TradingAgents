@@ -84,7 +84,7 @@ class FundamentalFact:
             _validate_aware_datetime(self.published_at, "published_at")
             if self.published_at > self.available_at:
                 raise FundamentalDataValidationError(
-                    "available_at cannot precede published_at"
+                    "available_at precedes published_at"
                 )
 
         if not isinstance(self.source, str) or not self.source.strip():
