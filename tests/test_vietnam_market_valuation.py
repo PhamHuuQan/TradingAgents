@@ -272,3 +272,32 @@ def test_rejects_price_snapshot_without_availability_time_at_cutoff():
             price_unit="VND/share",
             currency_unit=CURRENCY,
         )
+
+@pytest.mark.unit
+def test_future_reporting_period_cannot_leak_into_ttm_even_if_timestamped_early():
+    bars, facts = _fixture()
+    facts.append(
+        _fact(
+            "net_income",
+            999_000_000_000,
+            CURRENCY,
+            "2026-01-01",
+            "2026-03-31",
+            datetime(2026, 2, 28, tzinfo=UTC),
+        )
+    )
+
+    result = build_valuation_metrics(
+        "FPT",
+        bars,
+        facts,
+        AS_OF,
+        source=SOURCE,
+        price_source="test-prices",
+        price_unit="VND/share",
+        currency_unit=CURRENCY,
+    )
+
+    assert result.ttm_net_income is None
+    assert result.eps is None
+    assert result.pe is None
