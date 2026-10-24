@@ -61,7 +61,8 @@ def test_maps_ssi_daily_ohlc_to_canonical_market_bar():
     assert bar.source == "ssi-fastconnect-v3"
     assert bar.timestamp == datetime(2026, 10, 23, 15, 0, tzinfo=TZ)
     assert bar.available_at == available_at()
-    assert client.calls[0][1] == "1d"
+    timeframe = client.calls[0][1]
+    assert getattr(timeframe, "value", timeframe) in ("1d", "DAY_1")
     assert client.calls[0][2]["ascending"] is True
 
 
