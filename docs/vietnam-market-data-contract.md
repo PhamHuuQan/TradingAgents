@@ -13,8 +13,46 @@ Finance routing, alter the agent graph, or place orders.
 MarketBar stores normalized OHLCV, provenance, bar time, and data availability.
 FundamentalFact stores a reported metric for one explicit period, unit, source, and
 available_at timestamp. latest_fundamental_facts_as_of selects revisions known by a
-cutoff and keeps sources separate. Neither data contract fetches statements or decides
-unit conversions/corporate-action treatment automatically.
+cutoff and keeps sources separate. Neither contract by itself decides source semantics or corporate-action treatment.
+
+## Optional Vnstock VCI quarterly fundamentals
+
+The optional Vnstock fetch command retrieves quarterly income, balance-sheet and
+cash-flow tables through the read-only VCI source, normalizes only three explicitly
+mapped VAS fields, and writes them to the same normalized facts CSV contract:
+
+- Parent-company net profit attributable to shareholders, mapped to net_income.
+- Total equity (BS_EQUITY), mapped to total_equity.
+- Net cash from operating activities, mapped to operating_cash_flow.
+
+The quarterly VCI income-statement and cash-flow endpoints are documented as
+standalone-quarter data; the normalizer does not subtract cumulative quarters.
+Unknown metrics are ignored. It does not guess share counts, weighted-average
+shares, capital expenditure, or publication times, so EPS, P/E and free-cash-flow
+coverage may remain unavailable until those mappings are verified. available_at
+is the local fetch completion time, not the first date a historical filing was
+publicly available; do not use these exports as historical point-in-time inputs.
+
+Vnstock is installed from its own package index rather than the standard PyPI
+index. Its official documentation describes a personal-use licence and says
+third-party source data remains subject to the source provider's terms. Review
+the current licence and data-provider terms before use or redistribution. The
+adapter does not bundle Vnstock or add it to the base dependencies.
+
+Official references: [Vnstock v5 financial-statement API](https://www.vnstocks.com/docs/vnstock/co-ban-fundamental),
+[quarterly VCI value semantics](https://www.vnstocks.com/blog/phan-tich-bao-cao-tai-chinh-tu-cau-truc-du-lieu-vnstock),
+[installation](https://www.vnstocks.com/docs/vnstock/cai-dat),
+and [licensing and scope](https://www.vnstocks.com/docs/vnstock/gioi-thieu).
+
+Run the optional fetch after installing Vnstock in your own Python environment:
+
+~~~powershell
+py -m pip install -U --extra-index-url https://vnstocks.com/api/packages vnstock
+python -m tradingagents.dataflows.vietnam_market.fetch_vnstock_facts --symbol FPT --output data\fpt_facts.csv
+~~~
+
+Use --overwrite only when you explicitly intend to replace an existing file.
+No broker credentials or trading permissions are required for this path.
 
 ## Point-in-time valuation metrics
 
@@ -168,9 +206,9 @@ request has been made during development.
 
 - No guessed Yahoo suffix mapping for HOSE, HNX, or UPCoM.
 - No live SSI credentials or live-data request.
-- No statement/fundamental ingestion; valuation ratios require normalized facts supplied by a caller.
+- Partial Vnstock VCI statement ingestion is read-only and fetch-time stamped; no historical publication-time reconstruction, share-count/capex mapping, or audited completeness guarantee yet.
 - No validated Vietnamese calendar/tick-size/price-limit/corporate-action source.
 - No integration into the current agent graph or production deployment.
 
-Next: build a source-specific, point-in-time statement ingestion layer and verify SSI historical-data/adjustment semantics before connecting these primitives to the agent graph. Main and upstream remain
+Next: validate source-specific statement semantics and mapping for shares/capex, verify SSI historical-data/adjustment semantics, and only then consider a guarded integration into the agent graph. Main and upstream remain
 unchanged; all changes are on the feature branch.
