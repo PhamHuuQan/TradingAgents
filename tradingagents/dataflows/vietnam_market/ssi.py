@@ -8,9 +8,11 @@ history does not itself establish when each historical bar first became availabl
 
 from __future__ import annotations
 
+import os
+from contextlib import contextmanager
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
-from typing import Mapping
+from typing import Iterator, Mapping
 from zoneinfo import ZoneInfo
 
 from tradingagents.dataflows.vietnam_market.models import MarketBar
@@ -160,3 +162,41 @@ class SSIMarketDataProvider:
             )
 
         return sorted(bars, key=lambda bar: bar.timestamp)
+
+
+
+@contextmanager
+def authenticated_ssi_provider_from_env() -> Iterator[SSIMarketDataProvider]:
+    """Yield an SSI provider authenticated for market-data access only.
+
+    Required environment variables: SSI_CLIENT_ID, SSI_API_KEY, SSI_API_SECRET.
+    No OTP is requested because this helper only constructs the Data client.
+    The SDK contexts remain open for the duration of the with-block.
+    """
+    credentials = {
+        "SSI_CLIENT_ID": os.getenv("SSI_CLIENT_ID"),
+        "SSI_API_KEY": os.getenv("SSI_API_KEY"),
+        "SSI_API_SECRET": os.getenv("SSI_API_SECRET"),
+    }
+    missing = [name for name, value in credentials.items() if not value]
+    if missing:
+        raise RuntimeError(
+            "Missing SSI environment variable(s): " + ", ".join(missing)
+        )
+
+    try:
+        from ssi_sdk import Auth, Config, Data
+    except ImportError as exc:
+        raise RuntimeError(
+            'SSI SDK is not installed. Install the optional extra with: pip install "tradingagents[ssi]"'
+        ) from exc
+
+    config = Config(
+        client_id=credentials["SSI_CLIENT_ID"],
+        api_key=credentials["SSI_API_KEY"],
+        api_secret=credentials["SSI_API_SECRET"],
+    )
+    with Auth(config) as auth:
+        auth.authenticate()
+        with Data(auth) as data:
+            yield SSIMarketDataProvider(data.market_data)
