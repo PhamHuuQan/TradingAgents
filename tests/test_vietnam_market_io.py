@@ -9,7 +9,6 @@ from tradingagents.dataflows.vietnam_market.csv_io import (
     read_market_bars_csv,
 )
 
-
 BAR_HEADER = "symbol,timestamp,open,high,low,close,volume,source,available_at\n"
 BAR_ROW = "FPT,2026-10-23T15:00:00+07:00,49000,51000,48000,50000,1200,fixture,2026-10-23T15:05:00+07:00\n"
 
