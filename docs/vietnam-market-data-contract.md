@@ -21,6 +21,30 @@ the bar timestamp. Backtests must use available_at to avoid look-ahead bias.
 Daily-bar adapters must set this field to the actual time the data was published or
 otherwise accessible, not merely the beginning of the trading day.
 
+## Read-only SSI connectivity smoke test
+
+After the account owner has enabled SSI FastConnect **Market Data-only** access and
+installed the optional SDK, run the smoke command locally. It does not place orders
+or request trading permissions.
+
+```powershell
+python -m pip install -e ".[ssi]"
+$env:SSI_CLIENT_ID = "your-client-id"
+$env:SSI_API_KEY = "your-api-key"
+$env:SSI_API_SECRET = "your-api-secret"
+python -m tradingagents.dataflows.vietnam_market.smoke --symbol FPT --from-date 2026-10-20 --to-date 2026-10-23
+```
+
+Set these variables only in your own terminal or approved secret manager. Never paste
+the values into chat, screenshots, issues, logs, or Git. The smoke command prints a
+normalized row count and the latest returned OHLCV bar, but does not print credentials.
+
+**Important:** the command records the time the response was fetched as a conservative
+availability timestamp. That is suitable only for checking connectivity and parsing;
+it is not the historical publication time and must not be used to claim point-in-time
+backtest validity. The smoke command requires a closed-day date range and will reject
+a bar whose close is later than the fetch timestamp.
+
 ## Deliberately not included yet
 
 - no assumed Yahoo suffix mapping for HOSE, HNX, or UPCoM;
