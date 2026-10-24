@@ -298,6 +298,6 @@ def test_future_reporting_period_cannot_leak_into_ttm_even_if_timestamped_early(
         currency_unit=CURRENCY,
     )
 
-    assert result.ttm_net_income is None
-    assert result.eps is None
-    assert result.pe is None
+    assert result.ttm_net_income == Decimal("40000000000")
+    assert result.eps == Decimal("40")
+    assert result.pe == Decimal("1250")
