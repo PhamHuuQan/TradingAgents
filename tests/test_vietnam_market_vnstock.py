@@ -3,11 +3,11 @@ from decimal import Decimal
 
 import pytest
 
-from tradingagents.dataflows.vietnam_market.fundamentals import FundamentalFact
-from tradingagents.dataflows.vietnam_market.vnstock_adapter import (
-    VnstockNormalizationError,
-    normalize_vnstock_vci_statements,
-)
+from tradingagents.dataflows.vietnam_market import fundamentals, vnstock_adapter
+
+FundamentalFact = fundamentals.FundamentalFact
+VnstockNormalizationError = vnstock_adapter.VnstockNormalizationError
+normalize_vnstock_vci_statements = vnstock_adapter.normalize_vnstock_vci_statements
 
 
 FETCHED = datetime(2026, 10, 25, 9, 0, tzinfo=UTC)
