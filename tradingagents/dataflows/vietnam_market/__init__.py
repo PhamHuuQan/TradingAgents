@@ -21,6 +21,7 @@ from tradingagents.dataflows.vietnam_market.ssi import (
     SSIMarketDataProvider,
     authenticated_ssi_provider_from_env,
 )
+from tradingagents.dataflows.vietnam_market.strategies import sma_crossover_signals
 from tradingagents.dataflows.vietnam_market.technicals import (
     IndicatorPoint,
     average_true_range,
@@ -53,4 +54,5 @@ __all__ = [
     "relative_strength_index",
     "run_long_only_backtest",
     "simple_moving_average",
+    "sma_crossover_signals",
 ]

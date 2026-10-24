@@ -3,9 +3,10 @@
 ## Status
 
 This slice provides a validated OHLCV contract, a read-only SSI FastConnect V3 adapter,
-offline technical indicators, a point-in-time fundamental-fact model, and a configurable
-long-only backtest simulator. It does not configure live credentials, change existing
-Yahoo Finance routing, alter the agent graph, or place orders.
+offline technical indicators, a point-in-time fundamental-fact model, a configurable
+long-only backtest simulator, and a reference SMA-crossover signal generator. It does not
+configure live credentials, change existing Yahoo Finance routing, alter the agent graph,
+or place orders.
 
 ## OHLCV contract
 
@@ -33,13 +34,19 @@ This is a data contract, not a vendor ingestion pipeline. It does not calculate 
 ROE, P/E, P/B or TTM values; such calculations need consistent statement types, share
 counts, units/currencies, restatement treatment, and a clear point-in-time policy.
 
-## Offline technical indicators
+## Offline technical indicators and reference strategy
 
 The package exports deterministic calculations over MarketBar data: SMA, EMA, Wilder
 RSI, Wilder ATR, and close-to-close percentage returns. IndicatorPoint carries its bar
 timestamp, Decimal value, and conservative available_at. The calculations make no
 network calls. Returns exclude dividends, and corporate-action adjustments are not
 performed automatically.
+
+sma_crossover_signals creates long-only target-exposure signals when a fast SMA rises
+above or falls below a slower SMA. It emits only target changes after both averages
+are available; the initial target is established at the first aligned calculation.
+This is a reference implementation for validating the research plumbing, not an
+investment recommendation or evidence that the strategy is profitable.
 
 ## Configurable long-only backtest simulator
 
