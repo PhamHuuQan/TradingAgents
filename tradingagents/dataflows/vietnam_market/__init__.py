@@ -1,10 +1,5 @@
 """Vietnam-market data contracts, read-only adapters, and offline analytics."""
 
-from tradingagents.dataflows.vietnam_market.csv_io import (
-    CSVDataError,
-    read_fundamental_facts_csv,
-    read_market_bars_csv,
-)
 from tradingagents.dataflows.vietnam_market.backtest import (
     BacktestConfig,
     BacktestResult,
@@ -13,6 +8,11 @@ from tradingagents.dataflows.vietnam_market.backtest import (
     EquityPoint,
     TargetExposureSignal,
     run_long_only_backtest,
+)
+from tradingagents.dataflows.vietnam_market.csv_io import (
+    CSVDataError,
+    read_fundamental_facts_csv,
+    read_market_bars_csv,
 )
 from tradingagents.dataflows.vietnam_market.fundamentals import (
     AmbiguousFundamentalFactError,
