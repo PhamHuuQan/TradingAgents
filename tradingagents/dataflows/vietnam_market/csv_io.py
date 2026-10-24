@@ -46,7 +46,13 @@ def _rows(
         reader = csv.DictReader(handle)
         if not reader.fieldnames:
             raise CSVDataError(f"{file_path}: missing CSV header")
-        headers = {name.strip() for name in reader.fieldnames if name}
+        normalized_headers = [name.strip() if name else "" for name in reader.fieldnames]
+        if any(not name for name in normalized_headers):
+            raise CSVDataError(f"{file_path}: column names must be non-empty")
+        if len(set(normalized_headers)) != len(normalized_headers):
+            raise CSVDataError(f"{file_path}: duplicate column names after trimming whitespace")
+        reader.fieldnames = normalized_headers
+        headers = set(normalized_headers)
         missing = sorted(required - headers)
         if missing:
             raise CSVDataError(
