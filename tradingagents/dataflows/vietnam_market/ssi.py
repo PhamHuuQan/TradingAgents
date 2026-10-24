@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
+from collections.abc import Iterator, Mapping
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
-from typing import Iterator, Mapping
 from zoneinfo import ZoneInfo
 
 from tradingagents.dataflows.vietnam_market.models import MarketBar
@@ -151,10 +151,10 @@ class SSIMarketDataProvider:
                 MarketBar(
                     symbol=normalized_symbol,
                     timestamp=bar_timestamp,
-                    open=_as_decimal(_read_field(row, "open_price", "Open", "open")),
-                    high=_as_decimal(_read_field(row, "high_price", "High", "high")),
-                    low=_as_decimal(_read_field(row, "low_price", "Low", "low")),
-                    close=_as_decimal(_read_field(row, "close_price", "Close", "close")),
+                    open=_as_decimal(_read_field(row, "open_price", "Open", "open"), "open"),
+                    high=_as_decimal(_read_field(row, "high_price", "High", "high"), "high"),
+                    low=_as_decimal(_read_field(row, "low_price", "Low", "low"), "low"),
+                    close=_as_decimal(_read_field(row, "close_price", "Close", "close"), "close"),
                     volume=_as_volume(_read_field(row, "volume", "Volume")),
                     source=self.source,
                     available_at=available_at,
