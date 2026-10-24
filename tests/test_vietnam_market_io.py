@@ -77,3 +77,42 @@ def test_rejects_naive_fundamental_availability_timestamp(tmp_path):
 
     with pytest.raises(CSVDataError, match="timezone"):
         read_fundamental_facts_csv(path)
+
+@pytest.mark.unit
+def test_writes_normalized_facts_with_optional_provenance(tmp_path):
+    from tradingagents.dataflows.vietnam_market.csv_io import write_fundamental_facts_csv
+
+    path = tmp_path / "facts-out.csv"
+    source_facts = read_fundamental_facts_csv(
+        _write_input_facts(tmp_path / "facts-in.csv")
+    )
+    written = write_fundamental_facts_csv(source_facts, path)
+    round_trip = read_fundamental_facts_csv(written)
+
+    assert len(round_trip) == len(source_facts)
+    assert round_trip[0].source_record_id == source_facts[0].source_record_id
+    assert round_trip[0].published_at == source_facts[0].published_at
+
+
+def _write_input_facts(path):
+    path.write_text(
+        "symbol,metric,value,unit,period_start,period_end,source,available_at,published_at,source_record_id\\n"
+        "FPT,net_income,1250000000,VND,2026-07-01,2026-09-30,fixture,"
+        "2026-10-20T10:00:00+07:00,2026-10-20T09:00:00+07:00,record-17\\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.unit
+def test_writer_refuses_existing_facts_file_without_overwrite(tmp_path):
+    from tradingagents.dataflows.vietnam_market.csv_io import write_fundamental_facts_csv
+
+    facts_path = _write_input_facts(tmp_path / "facts-in.csv")
+    facts = read_fundamental_facts_csv(facts_path)
+    target = tmp_path / "facts-out.csv"
+    target.write_text("preserve", encoding="utf-8")
+
+    with pytest.raises(CSVDataError, match="Pass overwrite=True"):
+        write_fundamental_facts_csv(facts, target)
+    assert target.read_text(encoding="utf-8") == "preserve"
