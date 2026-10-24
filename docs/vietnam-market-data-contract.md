@@ -2,8 +2,8 @@
 
 ## Status
 
-This is the first isolated implementation slice for Vietnam-market support. It adds a
-validated OHLCV data contract only. It does **not** connect a live data vendor, change
+This isolated implementation slice adds a validated OHLCV data contract and a read-only
+SSI FastConnect V3 daily-OHLC adapter. It does **not** configure live credentials, change
 the existing Yahoo Finance routing, alter the agent graph, or place orders.
 
 ## Contract
@@ -31,13 +31,12 @@ otherwise accessible, not merely the beginning of the trading day.
 
 ## Next increments
 
-1. Compare candidate Vietnam data sources for coverage, historical depth, licensing,
-   adjustment policy, timestamps, and rate limits.
-2. Implement one adapter behind a source-neutral interface, with fixtures and tests.
-3. Add point-in-time fundamentals and corporate actions.
+1. Confirm SSI API account access, current terms, rate limits, and historical-data behavior.
+2. Run fixture tests and a separately opted-in read-only smoke test with Market Data-only scope.
+3. Verify corporate-action adjustment policy and add point-in-time fundamentals/corporate actions.
 4. Add a portfolio backtester with cash, position sizing, costs, liquidity constraints,
    benchmark comparisons, and explicit survivorship/look-ahead controls.
-5. Integrate the new provider into the graph only after tests and a reviewed design.
+5. Integrate SSI into the graph only after tests and a reviewed design.
 
 All development is on feature/vietnam-market-foundation; the upstream project and
 its main branch are left untouched.
