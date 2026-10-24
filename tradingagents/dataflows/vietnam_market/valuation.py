@@ -82,6 +82,7 @@ def _latest_quarters(
         (
             fact for fact in facts
             if fact.metric == metric and fact.unit == unit
+            and fact.period_end <= fact.available_at.date()
             and 80 <= (fact.period_end - fact.period_start).days + 1 <= 100
         ),
         key=lambda fact: (fact.period_end, fact.period_start),
@@ -113,7 +114,9 @@ def _sum_matching_quarters(
 ) -> Decimal | None:
     by_period = {
         (fact.period_start, fact.period_end): fact
-        for fact in facts if fact.metric == metric and fact.unit == unit
+        for fact in facts
+        if fact.metric == metric and fact.unit == unit
+        and fact.period_end <= fact.available_at.date()
     }
     matched = [by_period.get((fact.period_start, fact.period_end)) for fact in quarters]
     if any(fact is None for fact in matched):
