@@ -7,6 +7,8 @@ common data contracts.
 from __future__ import annotations
 
 import csv
+import os
+import tempfile
 from collections.abc import Iterator
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -29,6 +31,18 @@ _FACT_COLUMNS = {
     "period_end", "source", "available_at",
 }
 _FACT_OPTIONAL_COLUMNS = {"published_at", "source_record_id"}
+_FACT_CSV_COLUMNS = (
+    "symbol",
+    "metric",
+    "value",
+    "unit",
+    "period_start",
+    "period_end",
+    "source",
+    "available_at",
+    "published_at",
+    "source_record_id",
+)
 
 
 def _rows(
@@ -195,3 +209,93 @@ def read_fundamental_facts_csv(path: str | Path) -> list[FundamentalFact]:
     if not facts:
         raise CSVDataError(f"{path}: no fundamental facts found")
     return facts
+
+
+
+def write_fundamental_facts_csv(
+    facts: Iterator[FundamentalFact] | list[FundamentalFact],
+    path: str | Path,
+    *,
+    overwrite: bool = False,
+) -> Path:
+    """Atomically write normalized facts, preserving source/time provenance."""
+    rows = list(facts)
+    if not rows:
+        raise CSVDataError("Refusing to write an empty fundamentals export")
+    if any(not isinstance(fact, FundamentalFact) for fact in rows):
+        raise TypeError("facts must contain only FundamentalFact objects")
+    destination = Path(path)
+    if destination.exists() and not overwrite:
+        raise CSVDataError(
+            f"Output already exists: {destination}. Pass overwrite=True to replace it."
+        )
+
+    seen: set[tuple[str, str, str, str, str, datetime]] = set()
+    for fact in rows:
+        key = (
+            fact.symbol,
+            fact.metric,
+            fact.period_start.isoformat(),
+            fact.period_end.isoformat(),
+            fact.source,
+            fact.available_at,
+        )
+        if key in seen:
+            raise CSVDataError(
+                f"duplicate fact: {fact.symbol} {fact.metric} "
+                f"{fact.period_start}..{fact.period_end} from {fact.source}"
+            )
+        seen.add(key)
+
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=_FACT_CSV_COLUMNS)
+            writer.writeheader()
+            for fact in sorted(
+                rows,
+                key=lambda value: (
+                    value.symbol,
+                    value.metric,
+                    value.period_end,
+                    value.period_start,
+                    value.available_at,
+                ),
+            ):
+                writer.writerow(
+                    {
+                        "symbol": fact.symbol,
+                        "metric": fact.metric,
+                        "value": str(fact.value),
+                        "unit": fact.unit,
+                        "period_start": fact.period_start.isoformat(),
+                        "period_end": fact.period_end.isoformat(),
+                        "source": fact.source,
+                        "available_at": fact.available_at.isoformat(),
+                        "published_at": (
+                            fact.published_at.isoformat() if fact.published_at else ""
+                        ),
+                        "source_record_id": fact.source_record_id or "",
+                    }
+                )
+        if destination.exists() and not overwrite:
+            os.unlink(temporary_name)
+            raise CSVDataError(
+                f"Output appeared during export: {destination}. Nothing was replaced."
+            )
+        os.replace(temporary_name, destination)
+    except (OSError, csv.Error) as exc:
+        try:
+            if "temporary_name" in locals() and os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        except OSError:
+            pass
+        raise CSVDataError(f"Could not write facts export to {destination}: {exc}") from exc
+
+    validated = read_fundamental_facts_csv(destination)
+    if len(validated) != len(rows):
+        raise CSVDataError("Post-write validation returned a different fact count")
+    return destination
