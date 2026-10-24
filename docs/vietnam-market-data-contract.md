@@ -123,6 +123,23 @@ environment for the smoke command, then removes/restores those environment value
 It does not write credentials to Git, a .env file, or a local config file. The
 PowerShell execution-policy change is scoped to that terminal process.
 
+### Export SSI OHLCV to the normalized CSV format
+
+After credentials are set privately in your local PowerShell terminal, export bars
+without placing orders:
+
+~~~powershell
+python -m pip install -e ".[ssi]"
+python -m tradingagents.dataflows.vietnam_market.export_ssi_bars --symbol FPT --from-date 2025-10-01 --to-date 2026-10-23 --output data\fpt_bars.csv
+~~~
+
+The exporter writes the same strict OHLCV schema consumed by the offline valuation
+CLI. It refuses to overwrite an existing file unless `--overwrite` is passed.
+The `available_at` field is the time this export was fetched, not the historical
+first-availability time; use the result for current/as-fetched research only, not
+for historical point-in-time backtests. A request reaching the 1,000-row limit
+emits a possible-truncation warning.
+
 ### Direct command
 
 If the variables are already set in your own terminal:
