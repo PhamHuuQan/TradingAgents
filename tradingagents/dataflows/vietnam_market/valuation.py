@@ -224,6 +224,8 @@ def build_valuation_metrics(
     shares_period_end = shares_fact.period_end if shares_fact else None
     shares_available_at = shares_fact.available_at if shares_fact else None
     shares_outstanding = shares_fact.value if shares_fact else None
+    if shares_fact is None:
+        warnings.append("Missing shares_outstanding in unit shares; market capitalization and P/E are unavailable")
     if shares_fact is not None:
         shares_age = (valuation_date - shares_fact.period_end).days
         if shares_age < 0 or shares_age > MAX_SHARES_AGE_DAYS:
