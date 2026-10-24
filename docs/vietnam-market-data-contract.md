@@ -50,16 +50,19 @@ It may additionally include `published_at` and `source_record_id`. Timestamps
 must be ISO-8601 and timezone-aware. Values must already be normalized to one
 explicit currency/share unit and to standalone quarter periods for TTM metrics.
 
-Run from the repository root after installing the package:
+Run the bundled **synthetic demo** from the repository root after installing
+the project. These files are test values only, not real FPT market data:
 
 ~~~powershell
-python -m tradingagents.dataflows.vietnam_market.report --symbol FPT --as-of 2026-10-24T15:30:00+07:00 --bars .\data\fpt_bars.csv --facts .\data\fpt_facts.csv --price-source ssi-fastconnect-v3 --fundamental-source your-statement-source --price-unit VND/share --currency-unit VND
+python -m tradingagents.dataflows.vietnam_market.report --symbol FPT --as-of 2026-03-01T19:00:00+07:00 --bars examples/vietnam_market/synthetic_demo_bars.csv --facts examples/vietnam_market/synthetic_demo_facts.csv --price-source synthetic-demo-prices --fundamental-source synthetic-demo-statements --price-unit VND/share --currency-unit VND
 ~~~
 
 The CLI prints a JSON snapshot. Missing ratios are returned as `null` with
 warnings rather than guessed numbers. The price-source and fundamental-source
 must be selected separately and exactly; source names do not imply that the
-feed is authorized, complete, adjusted, or historically point-in-time.
+feed is authorized, complete, adjusted, or historically point-in-time. To use
+your own inputs, keep the same CSV headers and replace the demo files with
+normalized, sourced observations whose availability timestamps you have verified.
 
 ## Offline technical indicators and reference strategy
 
