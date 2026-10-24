@@ -9,8 +9,8 @@ history does not itself establish when each historical bar first became availabl
 from __future__ import annotations
 
 import os
-from contextlib import contextmanager
 from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
