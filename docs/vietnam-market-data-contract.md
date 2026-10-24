@@ -34,6 +34,33 @@ Before using results for investment decisions, verify whether the chosen source
 reports standalone-quarter values, per-share units, capex sign conventions,
 share counts, and accounting restatements as expected.
 
+## Offline CSV-to-valuation report
+
+The normalized CSV readers provide a no-network path for validating data and
+calculations before enabling any vendor access. Headers are strict so common
+misspellings do not silently drop data. The OHLCV file requires:
+
+`symbol,timestamp,open,high,low,close,volume,source,available_at`
+
+The fundamentals file requires:
+
+`symbol,metric,value,unit,period_start,period_end,source,available_at`
+
+It may additionally include `published_at` and `source_record_id`. Timestamps
+must be ISO-8601 and timezone-aware. Values must already be normalized to one
+explicit currency/share unit and to standalone quarter periods for TTM metrics.
+
+Run from the repository root after installing the package:
+
+~~~powershell
+python -m tradingagents.dataflows.vietnam_market.report --symbol FPT --as-of 2026-10-24T15:30:00+07:00 --bars .\data\fpt_bars.csv --facts .\data\fpt_facts.csv --price-source ssi-fastconnect-v3 --fundamental-source your-statement-source --price-unit VND/share --currency-unit VND
+~~~
+
+The CLI prints a JSON snapshot. Missing ratios are returned as `null` with
+warnings rather than guessed numbers. The price-source and fundamental-source
+must be selected separately and exactly; source names do not imply that the
+feed is authorized, complete, adjusted, or historically point-in-time.
+
 ## Offline technical indicators and reference strategy
 
 The package exports SMA, EMA, Wilder RSI, Wilder ATR, and close-to-close percentage
