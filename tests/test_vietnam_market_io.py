@@ -96,9 +96,9 @@ def test_writes_normalized_facts_with_optional_provenance(tmp_path):
 
 def _write_input_facts(path):
     path.write_text(
-        "symbol,metric,value,unit,period_start,period_end,source,available_at,published_at,source_record_id\\n"
+        "symbol,metric,value,unit,period_start,period_end,source,available_at,published_at,source_record_id\n"
         "FPT,net_income,1250000000,VND,2026-07-01,2026-09-30,fixture,"
-        "2026-10-20T10:00:00+07:00,2026-10-20T09:00:00+07:00,record-17\\n",
+        "2026-10-20T10:00:00+07:00,2026-10-20T09:00:00+07:00,record-17\n",
         encoding="utf-8",
     )
     return path
