@@ -142,3 +142,18 @@ def test_rejects_invalid_date_range_and_page_size():
             available_at_by_date={},
             page_size=1001,
         )
+
+
+
+@pytest.mark.parametrize("volume", [-1, 1.5, "bad"])
+def test_rejects_invalid_volume_instead_of_silently_truncating(volume):
+    bad_row = row()
+    bad_row["volume"] = volume
+    adapter, _ = provider([bad_row])
+    with pytest.raises(SSIAdapterError, match="volume"):
+        adapter.get_daily_bars(
+            "FPT",
+            date(2026, 10, 23),
+            date(2026, 10, 23),
+            available_at_by_date={date(2026, 10, 23): available_at()},
+        )
