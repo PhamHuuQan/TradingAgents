@@ -45,6 +45,10 @@ from tradingagents.dataflows.vietnam_market.valuation import (
     ValuationMetrics,
     build_valuation_metrics,
 )
+from tradingagents.dataflows.vietnam_market.vnstock_adapter import (
+    VnstockNormalizationError,
+    normalize_vnstock_vci_statements,
+)
 
 __all__ = [
     "AmbiguousFundamentalFactError",
@@ -65,6 +69,7 @@ __all__ = [
     "TargetExposureSignal",
     "ValuationDataError",
     "ValuationMetrics",
+    "VnstockNormalizationError",
     "authenticated_ssi_provider_from_env",
     "build_valuation_metrics",
     "average_true_range",
@@ -73,6 +78,7 @@ __all__ = [
     "percentage_returns",
     "read_fundamental_facts_csv",
     "read_market_bars_csv",
+    "normalize_vnstock_vci_statements",
     "write_fundamental_facts_csv",
     "relative_strength_index",
     "run_long_only_backtest",
