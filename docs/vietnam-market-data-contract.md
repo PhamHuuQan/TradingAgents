@@ -34,6 +34,16 @@ Before using results for investment decisions, verify whether the chosen source
 reports standalone-quarter values, per-share units, capex sign conventions,
 share counts, and accounting restatements as expected.
 
+Each snapshot returns the selected price bar's timestamp and availability time,
+the period end/availability time of the selected share count and equity facts,
+and the start/end dates of the TTM earnings window. These are input provenance,
+not a guarantee that a vendor's historical record is complete. The current
+conservative age limits are 180 days for balance-sheet equity and 365 days for
+shares outstanding; stale facts remain visible by period date but ratios
+depending on them are withheld with a warning. Review those policy limits
+before relying on a snapshot for an instrument/market with different filing
+cadence or corporate-action frequency.
+
 ## Offline CSV-to-valuation report
 
 The normalized CSV readers provide a no-network path for validating data and
