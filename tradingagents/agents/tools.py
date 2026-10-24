@@ -22,6 +22,7 @@ from tradingagents.dataflows.router import (
     vendor_unavailable,
 )
 from tradingagents.dataflows.vendors.ssi_market import build_ssi_market_snapshot
+from tradingagents.dataflows.vendors.vnstock_market import build_vnstock_market_snapshot
 from tradingagents.dataflows.vendors.yahoo.snapshot import build_verified_market_snapshot
 
 
@@ -109,20 +110,25 @@ def get_verified_market_snapshot(
         snapshot_date = as_of(curr_date, trade_date)
         configured = get_vendor("core_stock_apis", "get_stock_data").split(",")
         primary_vendor = configured[0].strip() if configured else "default"
-        if primary_vendor == "ssi":
+        if primary_vendor in {"ssi", "vnstock"}:
+            snapshot_builder = (
+                build_ssi_market_snapshot
+                if primary_vendor == "ssi"
+                else build_vnstock_market_snapshot
+            )
             try:
-                return build_ssi_market_snapshot(symbol, snapshot_date, look_back_days)
+                return snapshot_builder(symbol, snapshot_date, look_back_days)
             except (
                 NoMarketDataError,
                 VendorUnavailableError,
                 VendorNotConfiguredError,
-            ) as ssi_error:
-                # A configured fallback can provide the snapshot if SSI cannot
-                # serve it, including when its response contains no usable bars.
+            ) as source_error:
+                # A configured fallback can provide the snapshot if the selected
+                # source is unavailable, including a missing package or no bars.
                 if any(v.strip() == "yfinance" for v in configured[1:]):
                     return build_verified_market_snapshot(symbol, snapshot_date, look_back_days)
-                if isinstance(ssi_error, VendorNotConfiguredError):
-                    raise VendorUnavailableError(str(ssi_error)) from ssi_error
+                if isinstance(source_error, VendorNotConfiguredError):
+                    raise VendorUnavailableError(str(source_error)) from source_error
                 raise
         return build_verified_market_snapshot(symbol, snapshot_date, look_back_days)
     except VendorUnavailableError as exc:

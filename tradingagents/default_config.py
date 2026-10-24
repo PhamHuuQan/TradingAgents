@@ -156,8 +156,8 @@ def build_default_config() -> dict:
         # routed to vendors you didn't choose. For ordered fallback, list several,
         # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
         "data_vendors": {
-            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance, ssi (explicit/current-date only)
-            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance, ssi (same SSI OHLCV source)
+            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance, ssi/vnstock (explicit/current-date only)
+            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance, ssi/vnstock (same selected OHLCV source)
             # Statements come from SEC EDGAR as filed (US filers), then Yahoo; the
         # overview and insider tools, which SEC EDGAR does not serve, from Yahoo.
             "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance, vnstock (explicit/current-date only)

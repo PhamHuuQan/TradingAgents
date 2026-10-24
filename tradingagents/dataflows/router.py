@@ -36,6 +36,11 @@ from tradingagents.dataflows.vendors.vnstock_fundamentals import (
     get_vnstock_fundamentals,
     get_vnstock_income_statement,
 )
+from tradingagents.dataflows.vendors.vnstock_market import (
+    build_vnstock_market_snapshot,
+    get_vnstock_indicators,
+    get_vnstock_stock_data,
+)
 from tradingagents.dataflows.vendors.yahoo.fundamentals import (
     get_balance_sheet as get_yfinance_balance_sheet,
     get_cashflow as get_yfinance_cashflow,
@@ -114,12 +119,14 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
         "ssi": get_ssi_stock_data,
+        "vnstock": get_vnstock_stock_data,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
         "ssi": get_ssi_indicators,
+        "vnstock": get_vnstock_indicators,
     },
     # fundamental_data
     "get_fundamentals": {

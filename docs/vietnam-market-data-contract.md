@@ -115,6 +115,23 @@ depending on them are withheld with a warning. Review those policy limits
 before relying on a snapshot for an instrument/market with different filing
 cadence or corporate-action frequency.
 
+## Optional Vnstock VCI OHLCV route
+
+Vnstock V5 exposes daily historical bars with `Market().equity(symbol).ohlcv(start=..., end=..., interval="1D", source="vci")`. The published VCI example reports OHLC prices in thousand VND; the opt-in adapter validates source metadata and converts OHLC to VND/share before computing indicators or returning CSV. VCI and KBS price histories can differ because their corporate-action adjustments differ, so this adapter chooses VCI explicitly and never silently switches sources. See the [Vnstock V5 Market documentation](https://www.vnstocks.com/docs/vnstock/thi-truong-market) and [Vnstock data-source documentation](https://www.vnstocks.com/docs/vnstock/tham-khao/data-sources).
+
+Set both price and indicator categories to `vnstock` to use one provider for chart data, indicators, and verified snapshot:
+
+~~~python
+from copy import deepcopy
+from tradingagents.default_config import DEFAULT_CONFIG
+
+config = deepcopy(DEFAULT_CONFIG)
+config["data_vendors"]["core_stock_apis"] = "vnstock"
+config["data_vendors"]["technical_indicators"] = "vnstock"
+~~~
+
+The route is current-date-only. It fetches historical rows for current-date chart context, but their `available_at` is the retrieval time, not the historical first-publication time; the graph rejects backdated analysis dates for this source. Do not use this live route as point-in-time-safe backtest input. The default price source remains Yahoo, and Vnstock is never added to the implicit `default` vendor chain.
+
 ## Optional SSI source inside the TradingAgents graph
 
 SSI can be selected explicitly for both price data and technical indicators in the
@@ -267,7 +284,7 @@ request has been made during development.
 
 - No guessed Yahoo suffix mapping for HOSE, HNX, or UPCoM.
 - No live SSI credentials or live-data request.
-- Partial Vnstock VCI statement ingestion is read-only and fetch-time stamped; no historical publication-time reconstruction, share-count/capex mapping, or audited completeness guarantee yet.
+- Vnstock VCI OHLCV is opt-in and normalizes price units; historical first-availability and adjusted-price vintage are not reconstructed. Vnstock statements are partial, read-only and fetch-time stamped; no share-count/capex mapping or audited completeness guarantee yet.
 - No validated Vietnamese calendar/tick-size/price-limit/corporate-action source.
 - No SSI historical first-availability timestamps, Vietnamese exchange calendar, or automatic corporate-action adjustment.
 
