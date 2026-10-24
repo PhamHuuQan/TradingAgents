@@ -1,6 +1,6 @@
 """Tests for source-neutral Vietnam market data contracts."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -14,7 +14,7 @@ from tradingagents.dataflows.vietnam_market.models import (
 def valid_bar(**overrides):
     values = {
         "symbol": " fpt ",
-        "timestamp": datetime(2026, 10, 23, 9, 0, tzinfo=timezone.utc),
+        "timestamp": datetime(2026, 10, 23, 9, 0, tzinfo=UTC),
         "open": Decimal("100.0"),
         "high": Decimal("105.0"),
         "low": Decimal("98.0"),
