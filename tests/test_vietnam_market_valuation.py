@@ -332,7 +332,10 @@ def test_stale_equity_and_share_count_are_withheld_with_period_provenance():
 
     assert result.market_cap is None
     assert result.pb is None
-    assert result.pe is None
+    # P/E remains available from current price / TTM EPS because EPS has its
+    # own fresh weighted-average-share inputs; current shares are needed for
+    # market cap and P/B, not for this calculation path.
+    assert result.pe == Decimal("1250")
     assert result.shares_outstanding is None
     assert result.shares_period_end is None
     assert result.equity_period_end == date(2024, 12, 31)
