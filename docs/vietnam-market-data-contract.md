@@ -54,6 +54,31 @@ python -m tradingagents.dataflows.vietnam_market.fetch_vnstock_facts --symbol FP
 Use --overwrite only when you explicitly intend to replace an existing file.
 No broker credentials or trading permissions are required for this path.
 
+### Select Vnstock/SSI sources without editing Python code
+
+The same source selectors can be set before launching the CLI. For Vnstock prices,
+indicators, and the verified snapshot, run these in PowerShell from the project
+environment:
+
+~~~powershell
+$env:TRADINGAGENTS_CORE_STOCK_APIS = "vnstock"
+$env:TRADINGAGENTS_TECHNICAL_INDICATORS = "vnstock"
+tradingagents
+~~~
+
+To route the fundamentals tools to Vnstock too, add:
+
+~~~powershell
+$env:TRADINGAGENTS_FUNDAMENTAL_DATA = "vnstock"
+~~~
+
+To try SSI instead, set both `TRADINGAGENTS_CORE_STOCK_APIS` and
+`TRADINGAGENTS_TECHNICAL_INDICATORS` to `ssi`, and configure the three SSI
+Market Data credentials privately in that same shell. These environment
+overrides are read when the process starts; open a fresh CLI process after
+changing them. Blank variables do not override the defaults. Leaving the variables
+unset preserves existing Yahoo Finance / SEC EDGAR defaults.
+
 ## Optional Vnstock source inside the TradingAgents graph
 
 Vnstock VCI can be selected explicitly for all four fundamentals tools without

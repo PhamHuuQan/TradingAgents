@@ -137,3 +137,29 @@ def test_unknown_env_var_is_ignored(monkeypatch):
         TRADINGAGENTS_NONEXISTENT_KEY="oops",
     )
     assert "nonexistent_key" not in config
+
+
+def test_data_vendor_env_overrides(monkeypatch):
+    """Vietnam-specific sources can be selected without editing Python config."""
+    config = _config_with_env(
+        monkeypatch,
+        TRADINGAGENTS_CORE_STOCK_APIS="vnstock,yfinance",
+        TRADINGAGENTS_TECHNICAL_INDICATORS="vnstock",
+        TRADINGAGENTS_FUNDAMENTAL_DATA="vnstock",
+    )
+    assert config["data_vendors"]["core_stock_apis"] == "vnstock,yfinance"
+    assert config["data_vendors"]["technical_indicators"] == "vnstock"
+    assert config["data_vendors"]["fundamental_data"] == "vnstock"
+
+
+def test_blank_data_vendor_env_keeps_existing_defaults(monkeypatch):
+    config = _config_with_env(
+        monkeypatch,
+        TRADINGAGENTS_CORE_STOCK_APIS="   ",
+        TRADINGAGENTS_TECHNICAL_INDICATORS="",
+        TRADINGAGENTS_FUNDAMENTAL_DATA="",
+    )
+    assert config["data_vendors"]["core_stock_apis"] == "yfinance"
+    assert config["data_vendors"]["technical_indicators"] == "yfinance"
+    assert config["data_vendors"]["fundamental_data"] == "sec_edgar,yfinance"
+
