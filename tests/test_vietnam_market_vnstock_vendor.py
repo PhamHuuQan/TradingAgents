@@ -148,7 +148,7 @@ def test_vnstock_router_is_explicit_only_in_default_chain(monkeypatch):
 @pytest.mark.parametrize(
     ("metadata", "message"),
     [
-        ({}, "provenance metadata"),
+        ({}, "metadata source is None"),
         ({"source": "vci", "format": "long"}, "metadata ticker"),
         ({"source": "vci", "symbol": "FPT"}, "metadata format"),
         ({"source": "kbs", "symbol": "FPT", "format": "long"}, "expected 'vci'"),
