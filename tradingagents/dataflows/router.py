@@ -26,6 +26,11 @@ from tradingagents.dataflows.vendors.sec_edgar import (
     get_cashflow as get_sec_edgar_cashflow,
     get_income_statement as get_sec_edgar_income_statement,
 )
+from tradingagents.dataflows.vendors.ssi_market import (
+    build_ssi_market_snapshot,
+    get_ssi_indicators,
+    get_ssi_stock_data,
+)
 from tradingagents.dataflows.vendors.yahoo.fundamentals import (
     get_balance_sheet as get_yfinance_balance_sheet,
     get_cashflow as get_yfinance_cashflow,
@@ -93,17 +98,23 @@ TOOLS_CATEGORIES = {
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
 OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 
+# SSI must be explicitly selected. Its historical responses carry fetch-time
+# availability only, so it must not enter the implicit "default" vendor chain.
+EXPLICIT_ONLY_VENDORS = frozenset({"ssi"})
+
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "ssi": get_ssi_stock_data,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "ssi": get_ssi_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
@@ -222,7 +233,10 @@ def route_to_vendor(method: str, *args, **kwargs):
                 f"Available: {all_available_vendors}."
             )
     else:
-        vendor_chain = all_available_vendors
+        vendor_chain = [
+            vendor for vendor in all_available_vendors
+            if vendor not in EXPLICIT_ONLY_VENDORS
+        ]
 
     last_no_data: NoMarketDataError | None = None
     last_unavailable: VendorUnavailableError | None = None

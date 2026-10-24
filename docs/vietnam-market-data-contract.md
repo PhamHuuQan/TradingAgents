@@ -2,11 +2,11 @@
 
 ## Status
 
-This slice provides a validated OHLCV contract, a read-only SSI FastConnect V3 adapter,
-offline technical indicators, a point-in-time fundamental-fact model, a configurable
-long-only backtest simulator, a reference SMA-crossover signal generator, portfolio
-performance statistics, and point-in-time valuation metric derivation. It does not configure live credentials, change existing Yahoo
-Finance routing, alter the agent graph, or place orders.
+This slice provides validated OHLCV and fundamental-fact contracts, optional read-only SSI
+current-date market routing, optional Vnstock VCI statement normalization/export, offline
+technical indicators, valuation metrics, a cash-only backtest simulator, and performance
+statistics. Existing Yahoo Finance defaults remain unchanged; SSI is explicitly opt-in.
+The integration does not place orders and does not recover historical first-availability times.
 
 ## OHLCV and point-in-time facts
 
@@ -81,6 +81,34 @@ shares outstanding; stale facts remain visible by period date but ratios
 depending on them are withheld with a warning. Review those policy limits
 before relying on a snapshot for an instrument/market with different filing
 cadence or corporate-action frequency.
+
+## Optional SSI source inside the TradingAgents graph
+
+SSI can be selected explicitly for both price data and technical indicators in the
+existing `data_vendors` configuration. Leave the default source unchanged for other
+markets; for a Vietnam current-date snapshot, set both categories to `ssi`:
+
+~~~python
+from copy import deepcopy
+from tradingagents.default_config import DEFAULT_CONFIG
+
+config = deepcopy(DEFAULT_CONFIG)
+config["data_vendors"]["core_stock_apis"] = "ssi"
+config["data_vendors"]["technical_indicators"] = "ssi"
+~~~
+
+Pass `config` to `TradingAgentsGraph(..., config=config)`. SSI SDK installation
+and credentials are checked only when the SSI source is called. The special
+`default` vendor chain will never select SSI automatically. Configure
+`SSI_CLIENT_ID`, `SSI_API_KEY`, and `SSI_API_SECRET` locally or in an approved
+secret manager, never in Git.
+
+This route is deliberately current-date-only. It computes price and common indicators
+from the same SSI OHLCV response and uses an SSI-backed deterministic verification
+snapshot. Backdated requests are blocked because an old bar returned today does not
+prove when it first became available. The adapter is not a financial-statement source
+or a validated historical backtesting feed. No trading SDK or order-placement endpoint
+is used.
 
 ## Offline CSV-to-valuation report
 
@@ -208,7 +236,7 @@ request has been made during development.
 - No live SSI credentials or live-data request.
 - Partial Vnstock VCI statement ingestion is read-only and fetch-time stamped; no historical publication-time reconstruction, share-count/capex mapping, or audited completeness guarantee yet.
 - No validated Vietnamese calendar/tick-size/price-limit/corporate-action source.
-- No integration into the current agent graph or production deployment.
+- No SSI historical first-availability timestamps, Vietnamese exchange calendar, or automatic corporate-action adjustment.
 
 Next: validate source-specific statement semantics and mapping for shares/capex, verify SSI historical-data/adjustment semantics, and only then consider a guarded integration into the agent graph. Main and upstream remain
 unchanged; all changes are on the feature branch.

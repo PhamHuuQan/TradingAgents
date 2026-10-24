@@ -73,7 +73,7 @@ Risks and questions:
    values, timestamps, missing sessions, and corporate-action handling.
 5. Keep market-data access read-only. Trading API integration is out of scope for this phase.
 
-No API key, OTP, consumer secret, or other credential should be committed to Git.
+No API key, OTP, consumer secret, or other credential should be committed to Git. SSI routing is opt-in and blocks backdated snapshots.
 
 ## Decision — SSI selected for the first adapter (2026-10-24)
 
@@ -82,7 +82,7 @@ The first implementation slice is read-only daily OHLCV through the official SSI
 SDK's MarketDataService interface. The low-level adapter does not request trading scopes,
 send orders, or authenticate. An optional context manager handles SDK market-data
 authentication using environment variables, without requesting OTP or creating a Trading
-client. Existing TradingAgents routing remains unchanged.
+client. Existing TradingAgents defaults remain unchanged; SSI can now be selected explicitly for current-date market analysis.
 
 Relevant current official references:
 - V3 overview and market-data capabilities: https://developers.ssi.com.vn/docs/getting-started/overview
