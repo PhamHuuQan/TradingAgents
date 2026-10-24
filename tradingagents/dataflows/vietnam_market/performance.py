@@ -71,7 +71,7 @@ def summarize_backtest(
     exposures: list[Decimal] = []
     returns: list[Decimal] = []
 
-    for index, point in enumerate(curve):
+    for point in curve:
         if previous_timestamp is not None and point.timestamp <= previous_timestamp:
             raise ValueError("equity curve timestamps must be strictly increasing")
         if point.equity <= _ZERO:
