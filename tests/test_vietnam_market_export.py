@@ -5,13 +5,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from tradingagents.dataflows.vietnam_market.csv_io import read_market_bars_csv
-from tradingagents.dataflows.vietnam_market.export_ssi_bars import (
-    ExportDataError,
-    main,
-    write_market_bars_csv,
-)
-from tradingagents.dataflows.vietnam_market.models import MarketBar
+from tradingagents.dataflows.vietnam_market import csv_io, export_ssi_bars, models
+
+read_market_bars_csv = csv_io.read_market_bars_csv
+ExportDataError = export_ssi_bars.ExportDataError
+main = export_ssi_bars.main
+write_market_bars_csv = export_ssi_bars.write_market_bars_csv
+MarketBar = models.MarketBar
 
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
