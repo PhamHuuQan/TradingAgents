@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from tradingagents.dataflows.vietnam_market.ssi import (
     SSIAdapterError,
@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     # This timestamp records when this smoke-test client fetched the data.
     # It is deliberately conservative and must not be treated as historical
     # point-in-time availability for backtesting.
-    fetched_at = datetime.now(timezone.utc)
+    fetched_at = datetime.now(UTC)
     day_count = (args.to_date - args.from_date).days
     availability = {
         args.from_date + timedelta(days=offset): fetched_at
@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    print(f"SSI read-only connection: OK")
+    print("SSI read-only connection: OK")
     print(f"Symbol: {args.symbol.strip().upper()}")
     print(f"Requested range: {args.from_date} .. {args.to_date}")
     print(f"Normalized daily bars: {len(bars)}")
