@@ -1,4 +1,3 @@
-import json
 import sys
 from types import SimpleNamespace
 
@@ -97,7 +96,6 @@ def test_vnstock_cli_refuses_overwrite_before_loading_provider(tmp_path, monkeyp
 
 @pytest.mark.unit
 def test_vnstock_cli_rejects_export_from_wrong_source_metadata(tmp_path, monkeypatch, capsys):
-    fake = _fake_vnstock()
     wrong = _frame([
         {
             "period": "2025-Q4",
