@@ -41,6 +41,10 @@ dev = [
 bedrock = [
     "langchain-aws>=1.7.9",
 ]
+# Optional official SSI FastConnect SDK for Vietnam-market data (no trading integration).
+ssi = [
+    "ssi-sdk>=3.3.2",
+]
 
 [project.scripts]
 tradingagents = "cli.main:app"
