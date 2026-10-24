@@ -74,3 +74,28 @@ Risks and questions:
 5. Keep market-data access read-only. Trading API integration is out of scope for this phase.
 
 No API key, OTP, consumer secret, or other credential should be committed to Git.
+
+## Decision — SSI selected for the first adapter (2026-10-24)
+
+SSI FastConnect V3 is selected as the first Vietnamese-equity market-data integration.
+The first implementation slice is read-only daily OHLCV through the official SSI Python
+SDK's MarketDataService interface. The adapter deliberately does not request trading
+scopes, send orders, authenticate on its own, or alter the existing TradingAgents routing.
+
+Relevant current official references:
+- V3 overview and market-data capabilities: https://developers.ssi.com.vn/docs/getting-started/overview
+- Python SDK market-data methods, including historical OHLC and pagination:
+  https://developers.ssi.com.vn/docs/sdk/python/service-classes
+- API key and token security: https://developers.ssi.com.vn/docs/getting-started/api-keys
+- Current V3 release notes: https://developers.ssi.com.vn/docs/api-reference/release-notes
+
+The official portal states that an SSI brokerage account is required for FastConnect API
+access and that API keys can be scoped separately. Before a live smoke test, confirm the
+user's account has Market Data scope and verify current terms/rate limits in the portal.
+No credentials have been requested or added to this repository.
+
+Important limitation: the historical OHLC response does not establish the exact first
+availability time of each past bar. The adapter requires caller-supplied, verified
+availability timestamps and rejects missing or implausible timestamps. This is a safety
+guard, not evidence that SSI provides historical point-in-time timestamps. Do not use
+guessed availability times in a backtest.
