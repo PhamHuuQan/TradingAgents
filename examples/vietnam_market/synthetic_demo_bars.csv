@@ -1,0 +1,2 @@
+symbol,timestamp,open,high,low,close,volume,source,available_at
+FPT,2026-02-27T15:00:00+07:00,49000,51000,48000,50000,100000,synthetic-demo-prices,2026-02-27T15:05:00+07:00
