@@ -1,18 +1,17 @@
 from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from tradingagents.dataflows.vietnam_market.csv_io import read_market_bars_csv
+from tradingagents.dataflows.vietnam_market.models import MarketBar
 from tradingagents.dataflows.vietnam_market.export_ssi_bars import (
     ExportDataError,
     main,
     write_market_bars_csv,
 )
-from tradingagents.dataflows.vietnam_market.models import MarketBar
 
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
