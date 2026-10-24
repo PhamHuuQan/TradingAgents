@@ -216,3 +216,28 @@ def test_vnstock_client_routes_known_domestic_indices_to_index_api(monkeypatch):
         ("index", "HNXINDEX"),
         ("equity", "FPT"),
     ]
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("metadata", "message"),
+    [
+        ({}, "source is None"),
+        ({"source": "vci"}, "metadata ticker"),
+        ({"source": "kbs", "symbol": "FPT"}, "expected 'vci'"),
+    ],
+)
+def test_vnstock_ohlcv_requires_complete_source_and_symbol_metadata(metadata, message):
+    frame = FakeFrame([
+        {
+            "time": datetime(2026, 10, 23, 7, 0, tzinfo=VN_TZ),
+            "open": 60.0,
+            "high": 61.0,
+            "low": 59.0,
+            "close": 60.5,
+            "volume": 100000,
+        }
+    ])
+    frame.attrs = metadata
+
+    with pytest.raises(VendorUnavailableError, match=message):
+        vnstock_market._validate_frame(frame, "FPT")

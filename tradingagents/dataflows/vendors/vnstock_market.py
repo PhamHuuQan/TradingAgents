@@ -103,7 +103,7 @@ def _validate_frame(frame: object, symbol: str) -> list[dict[str, object]]:
             f"Vnstock OHLCV metadata source is {actual_source!r}; expected 'vci'."
         )
     actual_symbol = attrs.get("symbol")
-    if actual_symbol is not None and str(actual_symbol).strip().upper() != symbol:
+    if str(actual_symbol or "").strip().upper() != symbol:
         raise VendorUnavailableError(
             f"Vnstock OHLCV metadata ticker is {actual_symbol!r}; expected {symbol!r}."
         )

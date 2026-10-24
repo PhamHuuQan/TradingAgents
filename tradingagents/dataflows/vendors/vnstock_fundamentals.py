@@ -86,25 +86,28 @@ def _validate_frame(frame: object, symbol: str, report: str) -> None:
     if frame is None or bool(getattr(frame, "empty", False)):
         raise NoMarketDataError(symbol, symbol, f"Vnstock VCI returned no {report} rows")
     attrs = getattr(frame, "attrs", None)
-    if isinstance(attrs, Mapping):
-        source = attrs.get("source")
-        if source is not None and str(source).strip().lower() != "vci":
-            raise VendorUnavailableError(
-                f"Vnstock {report} metadata source is {source!r}; expected 'vci'"
-            )
-        frame_symbol = attrs.get("symbol")
-        if frame_symbol is not None and str(frame_symbol).strip().upper() != symbol:
-            raise VendorUnavailableError(
-                f"Vnstock {report} metadata ticker is {frame_symbol!r}; expected {symbol!r}"
-            )
-        frame_format = attrs.get("format")
-        if frame_format is not None and str(frame_format).strip().lower() != "long":
-            raise VendorUnavailableError(
-                f"Vnstock {report} metadata format is {frame_format!r}; expected 'long'"
-            )
+    if not isinstance(attrs, Mapping):
+        raise VendorUnavailableError(
+            f"Vnstock {report} response lacks provenance metadata; refusing to infer source."
+        )
+    source = attrs.get("source")
+    if str(source or "").strip().lower() != "vci":
+        raise VendorUnavailableError(
+            f"Vnstock {report} metadata source is {source!r}; expected 'vci'"
+        )
+    frame_symbol = attrs.get("symbol")
+    if str(frame_symbol or "").strip().upper() != symbol:
+        raise VendorUnavailableError(
+            f"Vnstock {report} metadata ticker is {frame_symbol!r}; expected {symbol!r}"
+        )
+    frame_format = attrs.get("format")
+    if str(frame_format or "").strip().lower() != "long":
+        raise VendorUnavailableError(
+            f"Vnstock {report} metadata format is {frame_format!r}; expected 'long'"
+        )
 
     columns = {str(name) for name in getattr(frame, "columns", ())}
-    if columns and not _REQUIRED_COLUMNS.issubset(columns):
+    if not _REQUIRED_COLUMNS.issubset(columns):
         missing = sorted(_REQUIRED_COLUMNS - columns)
         raise VendorUnavailableError(
             f"Vnstock {report} response is missing required long-format columns: {', '.join(missing)}"

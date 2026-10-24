@@ -143,3 +143,20 @@ def test_vnstock_router_is_explicit_only_in_default_chain(monkeypatch):
 
     assert result.startswith("NO_DATA_AVAILABLE")
     vnstock.assert_not_called()
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("metadata", "message"),
+    [
+        ({}, "provenance metadata"),
+        ({"source": "vci", "format": "long"}, "metadata ticker"),
+        ({"source": "vci", "symbol": "FPT"}, "metadata format"),
+        ({"source": "kbs", "symbol": "FPT", "format": "long"}, "expected 'vci'"),
+    ],
+)
+def test_vnstock_statement_response_requires_complete_matching_metadata(metadata, message):
+    client = FakeClient()
+    client.income_frame.attrs = metadata
+
+    with pytest.raises(VendorUnavailableError, match=message):
+        vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement")
