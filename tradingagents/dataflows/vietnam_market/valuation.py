@@ -261,12 +261,17 @@ def build_valuation_metrics(
                 "EPS unavailable: matching quarterly weighted_average_shares facts are required"
             )
 
+    # Use price / TTM EPS for P/E so it follows the weighted-average share
+    # count used in EPS. Market cap / net income can differ after issuance or
+    # buybacks, so it is not used as a silent substitute here.
     pe = None
-    if market_cap is not None and ttm_net_income is not None:
-        if ttm_net_income > 0:
-            pe = market_cap / ttm_net_income
+    if eps is not None:
+        if eps > 0:
+            pe = latest_bar.close / eps
         else:
-            warnings.append("TTM net income is non-positive; P/E is not meaningful")
+            warnings.append("TTM EPS is non-positive; P/E is not meaningful")
+    elif ttm_net_income is not None and ttm_net_income > 0:
+        warnings.append("P/E unavailable without matching TTM EPS and weighted-average shares")
 
     roe = None
     if net_income_quarters and ttm_net_income is not None:
