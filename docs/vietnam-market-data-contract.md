@@ -48,18 +48,19 @@ a bar whose close is later than the fetch timestamp.
 
 ## Offline technical indicators
 
-The tradingagents.dataflows.vietnam_market.technicals module provides deterministic
-calculations over MarketBar data without a vendor call or LLM:
+The tradingagents.dataflows.vietnam_market package publicly exports IndicatorPoint
+and five deterministic calculations over MarketBar data without vendor calls or an LLM:
 
 - simple_moving_average(bars, period) and exponential_moving_average(bars, period);
 - relative_strength_index(bars, period=14) using Wilder smoothing;
 - average_true_range(bars, period=14) using the prior close;
 - percentage_returns(bars) for close-to-close price changes in percent.
 
-Each IndicatorPoint has a bar timestamp, Decimal value and available_at timestamp.
-Series must be strictly time-ordered and cannot mix symbols or data sources. The
-availability time is the latest availability of all inputs used by each point; EMA,
-RSI and ATR propagate availability across the history used by their recursive state.
+Import the functions directly from tradingagents.dataflows.vietnam_market. Each
+IndicatorPoint has a bar timestamp, Decimal value and available_at timestamp. Series
+must be strictly time-ordered and cannot mix symbols or data sources. Availability is
+the latest availability of all inputs used by each point; EMA, RSI and ATR propagate
+availability across the history used by their recursive state.
 
 These are calculation primitives, not recommendations or trade signals. Returns are
 price returns, not dividend-inclusive total returns. Corporate-action adjustments are
