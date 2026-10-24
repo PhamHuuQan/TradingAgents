@@ -59,6 +59,12 @@ class FakeProvider:
 @pytest.fixture
 def configured_ssi(monkeypatch):
     monkeypatch.setattr(ssi_market, "_now_market", lambda: NOW)
+    original_find_spec = ssi_market.importlib.util.find_spec
+    monkeypatch.setattr(
+        ssi_market.importlib.util,
+        "find_spec",
+        lambda name: object() if name == "ssi_sdk" else original_find_spec(name),
+    )
     monkeypatch.setenv("SSI_CLIENT_ID", "test-client")
     monkeypatch.setenv("SSI_API_KEY", "test-key")
     monkeypatch.setenv("SSI_API_SECRET", "test-secret")
