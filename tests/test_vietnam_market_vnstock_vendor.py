@@ -10,7 +10,6 @@ from tradingagents.dataflows.vendors import vnstock_fundamentals
 from tradingagents.default_config import DEFAULT_CONFIG
 
 
-
 def _row(period, item_id, value, unit="VNĐ"):
     return {"period": period, "id": item_id, "level": 1, "unit": unit, "value": value}
 
