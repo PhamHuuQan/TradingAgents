@@ -130,6 +130,12 @@ def test_builds_ratios_from_consistent_point_in_time_quarters():
 
     assert result.symbol == "FPT"
     assert result.as_of == AS_OF
+    assert result.price_timestamp == datetime(2026, 2, 27, 15, 0, tzinfo=VN_TZ)
+    assert result.price_available_at == datetime(2026, 2, 27, 15, 5, tzinfo=VN_TZ)
+    assert result.shares_period_end == date(2025, 12, 31)
+    assert result.equity_period_end == date(2025, 12, 31)
+    assert result.ttm_period_start == date(2025, 1, 1)
+    assert result.ttm_period_end == date(2025, 12, 31)
     assert result.market_cap == Decimal("50000000000000")
     assert result.ttm_net_income == Decimal("40000000000")
     assert result.eps == Decimal("40")
@@ -301,3 +307,35 @@ def test_future_reporting_period_cannot_leak_into_ttm_even_if_timestamped_early(
     assert result.ttm_net_income == Decimal("40000000000")
     assert result.eps == Decimal("40")
     assert result.pe == Decimal("1250")
+
+@pytest.mark.unit
+def test_stale_equity_and_share_count_are_withheld_with_period_provenance():
+    bars, facts = _fixture()
+    facts = [
+        fact for fact in facts
+        if not (
+            (fact.metric == "total_equity" and fact.period_end == date(2025, 12, 31))
+            or fact.metric == "shares_outstanding"
+        )
+    ]
+
+    result = build_valuation_metrics(
+        "FPT",
+        bars,
+        facts,
+        AS_OF,
+        source=SOURCE,
+        price_source="test-prices",
+        price_unit="VND/share",
+        currency_unit=CURRENCY,
+    )
+
+    assert result.market_cap is None
+    assert result.pb is None
+    assert result.pe is None
+    assert result.shares_outstanding is None
+    assert result.shares_period_end is None
+    assert result.equity_period_end == date(2024, 12, 31)
+    assert result.latest_equity is None
+    assert any("Missing shares_outstanding" in warning for warning in result.warnings)
+    assert any("total_equity is stale" in warning for warning in result.warnings)
