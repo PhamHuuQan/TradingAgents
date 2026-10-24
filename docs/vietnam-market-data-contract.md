@@ -47,32 +47,47 @@ rules before using it on real history.
 ## Performance summary
 
 summarize_backtest reports total return, maximum drawdown, annualized volatility, Sharpe
-ratio, average exposure, execution count, fees, estimated slippage cost and turnover.
+ratio, average exposure, trade counts, fees, estimated slippage cost, and turnover.
 periods_per_year is mandatory so the annualization convention is not hidden. The annual
 risk-free rate is a fractional rate, such as 0.03 for 3%; Sharpe uses a simple annual-rate
-divided by periods_per_year approximation and sample volatility. Volatility and Sharpe
-are undefined for insufficient observations or zero variance as appropriate. Fees include
-only configured commission and sell-side fees; slippage cost is measured against reference
-prices. These summary values are only as reliable as the underlying price, calendar,
-adjustment and cost assumptions.
+divided by periods_per_year approximation and sample volatility. Fees include only
+configured commission and sell-side fees. Statistics are only as reliable as the price,
+calendar, adjustment, and cost assumptions.
 
 ## Read-only SSI connectivity smoke test
 
-After the account owner has enabled SSI FastConnect Market Data-only access and installed
-the optional SDK, run the command locally. It does not place orders.
+After the account owner enables SSI FastConnect **Market Data-only** access, there are
+two ways to run the check. Both are read-only and do not place orders.
+
+### PowerShell helper (Windows)
+
+From the repository root:
 
 ~~~powershell
 python -m pip install -e ".[ssi]"
-$env:SSI_CLIENT_ID = "your-client-id"
-$env:SSI_API_KEY = "your-api-key"
-$env:SSI_API_SECRET = "your-api-secret"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\ssi_readonly_smoke.ps1 -Symbol FPT -FromDate 2026-10-20 -ToDate 2026-10-23
+~~~
+
+The script securely prompts for any missing SSI_CLIENT_ID, SSI_API_KEY, and
+SSI_API_SECRET; typed inputs are hidden. It sets them only in the current process
+environment for the smoke command, then removes/restores those environment values.
+It does not write credentials to Git, a .env file, or a local config file. The
+PowerShell execution-policy change is scoped to that terminal process.
+
+### Direct command
+
+If the variables are already set in your own terminal:
+
+~~~powershell
+python -m pip install -e ".[ssi]"
 python -m tradingagents.dataflows.vietnam_market.smoke --symbol FPT --from-date 2026-10-20 --to-date 2026-10-23
 ~~~
 
-Set credentials only in your own terminal or an approved secret manager. Never paste
-secrets into chat, screenshots, issues, logs, or Git. The smoke command's fetched-at
-time is for connectivity/parsing validation only, not historical point-in-time data.
-No live SSI request has been made during development.
+Never paste credentials into chat, screenshots, issues, logs, or Git. The smoke command's
+fetched-at time is for connectivity/parsing validation only, not historical point-in-time
+data. It is not evidence of when historical SSI bars first became available. No live SSI
+request has been made during development.
 
 ## Remaining gaps
 
