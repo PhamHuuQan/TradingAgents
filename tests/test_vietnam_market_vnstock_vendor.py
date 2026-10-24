@@ -1,6 +1,4 @@
 import copy
-from datetime import UTC, datetime, date
-from decimal import Decimal
 from unittest.mock import Mock
 
 import pytest
@@ -9,11 +7,8 @@ from tradingagents.dataflows import config as config_module, router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
 from tradingagents.dataflows.vendors import vnstock_fundamentals
-from tradingagents.dataflows.vietnam_market.fundamentals import FundamentalFact
 from tradingagents.default_config import DEFAULT_CONFIG
 
-
-FETCHED = datetime(2026, 10, 24, 12, 0, tzinfo=UTC)
 
 
 def _row(period, item_id, value, unit="VNĐ"):
