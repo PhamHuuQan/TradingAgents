@@ -16,6 +16,10 @@ from tradingagents.dataflows.vietnam_market.fundamentals import (
     latest_fundamental_facts_as_of,
 )
 from tradingagents.dataflows.vietnam_market.models import MarketBar, MarketDataValidationError
+from tradingagents.dataflows.vietnam_market.performance import (
+    PerformanceSummary,
+    summarize_backtest,
+)
 from tradingagents.dataflows.vietnam_market.ssi import (
     SSIAdapterError,
     SSIMarketDataProvider,
@@ -43,6 +47,7 @@ __all__ = [
     "IndicatorPoint",
     "MarketBar",
     "MarketDataValidationError",
+    "PerformanceSummary",
     "SSIAdapterError",
     "SSIMarketDataProvider",
     "TargetExposureSignal",
@@ -55,4 +60,5 @@ __all__ = [
     "run_long_only_backtest",
     "simple_moving_average",
     "sma_crossover_signals",
+    "summarize_backtest",
 ]
