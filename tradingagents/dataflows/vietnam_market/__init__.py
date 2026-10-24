@@ -26,6 +26,11 @@ from tradingagents.dataflows.vietnam_market.ssi import (
     authenticated_ssi_provider_from_env,
 )
 from tradingagents.dataflows.vietnam_market.strategies import sma_crossover_signals
+from tradingagents.dataflows.vietnam_market.valuation import (
+    ValuationDataError,
+    ValuationMetrics,
+    build_valuation_metrics,
+)
 from tradingagents.dataflows.vietnam_market.technicals import (
     IndicatorPoint,
     average_true_range,
@@ -51,7 +56,10 @@ __all__ = [
     "SSIAdapterError",
     "SSIMarketDataProvider",
     "TargetExposureSignal",
+    "ValuationDataError",
+    "ValuationMetrics",
     "authenticated_ssi_provider_from_env",
+    "build_valuation_metrics",
     "average_true_range",
     "exponential_moving_average",
     "latest_fundamental_facts_as_of",
