@@ -63,3 +63,33 @@ def test_offline_report_cli_rejects_timezone_naive_as_of(tmp_path):
             ]
         )
     assert exc.value.code == 2
+
+@pytest.mark.unit
+def test_checked_in_synthetic_example_runs_end_to_end(capsys):
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    exit_code = main(
+        [
+            "--symbol", "FPT",
+            "--as-of", "2026-03-01T19:00:00+07:00",
+            "--bars", str(root / "examples/vietnam_market/synthetic_demo_bars.csv"),
+            "--facts", str(root / "examples/vietnam_market/synthetic_demo_facts.csv"),
+            "--price-source", "synthetic-demo-prices",
+            "--fundamental-source", "synthetic-demo-statements",
+            "--price-unit", "VND/share",
+            "--currency-unit", "VND",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0, captured.err
+    report = json.loads(captured.out)
+    assert report["price"] == "50000"
+    assert report["ttm_net_income"] == "40000000000"
+    assert report["eps"] == "40"
+    assert report["pe"] == "1250"
+    assert report["pb"] == "250"
+    assert report["ttm_operating_cash_flow"] == "48000000000"
+    assert report["free_cash_flow"] == "36000000000"
+    assert report["warnings"] == []
