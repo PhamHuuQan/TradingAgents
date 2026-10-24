@@ -27,7 +27,6 @@ from tradingagents.dataflows.vendors.sec_edgar import (
     get_income_statement as get_sec_edgar_income_statement,
 )
 from tradingagents.dataflows.vendors.ssi_market import (
-    build_ssi_market_snapshot,
     get_ssi_indicators,
     get_ssi_stock_data,
 )

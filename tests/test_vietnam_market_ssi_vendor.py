@@ -13,8 +13,8 @@ from tradingagents.dataflows.errors import (
     VendorNotConfiguredError,
     VendorUnavailableError,
 )
-from tradingagents.dataflows.vietnam_market.models import MarketBar
 from tradingagents.dataflows.vendors import ssi_market
+from tradingagents.dataflows.vietnam_market.models import MarketBar
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 AS_OF = date(2026, 10, 25)
