@@ -122,7 +122,7 @@ def relative_strength_index(
 
     gains: list[Decimal] = []
     losses: list[Decimal] = []
-    for previous, current in zip(items, items[1:]):
+    for previous, current in zip(items, items[1:], strict=False):
         change = current.close - previous.close
         gains.append(max(change, _ZERO))
         losses.append(max(-change, _ZERO))
@@ -166,7 +166,7 @@ def average_true_range(
         return []
 
     true_ranges: list[Decimal] = []
-    for previous, current in zip(items, items[1:]):
+    for previous, current in zip(items, items[1:], strict=False):
         true_ranges.append(
             max(
                 current.high - current.low,
