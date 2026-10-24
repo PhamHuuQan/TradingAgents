@@ -42,6 +42,16 @@ def _as_decimal(value: object, field: str) -> Decimal:
     return result
 
 
+def _as_volume(value: object) -> int:
+    try:
+        numeric = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise SSIAdapterError(f"Invalid SSI volume value: {value!r}") from exc
+    if not numeric.is_finite() or numeric < 0 or numeric != numeric.to_integral_value():
+        raise SSIAdapterError(f"SSI volume must be a non-negative integer: {value!r}")
+    return int(numeric)
+
+
 def _as_date(value: object) -> date:
     if isinstance(value, datetime):
         return value.date()
@@ -93,10 +103,17 @@ class SSIMarketDataProvider:
         if not 1 <= page_size <= 1000:
             raise ValueError("page_size must be between 1 and 1000")
 
-        # SSI Python SDK documents the daily timeframe as 1d.
+        # Prefer the SDK enum when installed; the documented API timeframe is 1d.
+        try:
+            from ssi_sdk.enums import Timeframe
+
+            daily_timeframe = Timeframe.DAY_1
+        except ImportError:
+            daily_timeframe = "1d"
+
         rows = self._market_data.get_ohlc_all(
             normalized_symbol,
-            "1d",
+            daily_timeframe,
             from_date=from_date.strftime("%Y/%m/%d"),
             to_date=to_date.strftime("%Y/%m/%d"),
             size=page_size,
@@ -136,7 +153,7 @@ class SSIMarketDataProvider:
                     high=_as_decimal(_read_field(row, "high_price", "High", "high")),
                     low=_as_decimal(_read_field(row, "low_price", "Low", "low")),
                     close=_as_decimal(_read_field(row, "close_price", "Close", "close")),
-                    volume=int(_read_field(row, "volume", "Volume")),
+                    volume=_as_volume(_read_field(row, "volume", "Volume")),
                     source=self.source,
                     available_at=available_at,
                 )
