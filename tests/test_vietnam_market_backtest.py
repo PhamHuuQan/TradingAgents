@@ -85,7 +85,7 @@ def test_signal_executes_at_next_open_not_same_bar_close():
     assert result.trades[0].quantity == 90
     assert result.equity_curve[0].shares == 0
     assert result.equity_curve[1].shares == 90
-    assert result.ending_equity == Decimal("1080")
+    assert result.ending_equity == Decimal("1090")
 
 
 def test_signal_not_available_by_open_waits_until_later_bar_open():

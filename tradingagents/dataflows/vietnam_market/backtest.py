@@ -239,6 +239,7 @@ def run_long_only_backtest(
 
         if eligible:
             selected = max(eligible, key=lambda signal: signal.timestamp)
+            last_applied_signal = selected.timestamp
             equity_at_open = cash + Decimal(shares) * bar.open
             target_shares = _floor_to_lot(
                 (equity_at_open * selected.target_exposure) / bar.open,
