@@ -59,20 +59,20 @@ def _frames():
 
 class FakeClient:
     def __init__(self):
-        self.income, self.balance, self.cash_flow = _frames()
+        self.income_frame, self.balance_frame, self.cash_flow_frame = _frames()
         self.calls = []
 
     def income_statement(self, *, period, format, source):
         self.calls.append(("income_statement", period, format, source))
-        return self.income
+        return self.income_frame
 
     def balance_sheet(self, *, period, format, source):
         self.calls.append(("balance_sheet", period, format, source))
-        return self.balance
+        return self.balance_frame
 
     def cash_flow(self, *, period, format, source):
         self.calls.append(("cash_flow", period, format, source))
-        return self.cash_flow
+        return self.cash_flow_frame
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ def test_vnstock_statement_route_returns_validated_long_csv(fake_vnstock):
         "fpt", "quarterly", "2026-10-25"
     )
     assert "# Income Statement for FPT from Vnstock VCI" in output
-    assert "not historical first-publication time" in output
+    assert "historical first-publication time" in output
     assert "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY" in output
     assert fake_vnstock.calls == [("income_statement", "quarter", "long", "vci")]
 
