@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -40,6 +40,8 @@ def _json_default(value: object) -> str:
     if isinstance(value, Decimal):
         return str(value)
     if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
         return value.isoformat()
     if isinstance(value, Path):
         return str(value)
