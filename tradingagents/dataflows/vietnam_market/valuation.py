@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from tradingagents.dataflows.vietnam_market.fundamentals import (
     FundamentalFact,
@@ -32,10 +33,18 @@ class ValuationMetrics:
     source: str
     price: Decimal
     price_unit: str
+    price_timestamp: datetime
+    price_available_at: datetime
     currency_unit: str
     shares_outstanding: Decimal | None
+    shares_period_end: date | None
+    shares_available_at: datetime | None
     market_cap: Decimal | None
     latest_equity: Decimal | None
+    equity_period_end: date | None
+    equity_available_at: datetime | None
+    ttm_period_start: date | None
+    ttm_period_end: date | None
     ttm_net_income: Decimal | None
     eps: Decimal | None
     pe: Decimal | None
@@ -46,6 +55,13 @@ class ValuationMetrics:
     free_cash_flow: Decimal | None
     cash_conversion: Decimal | None
     warnings: tuple[str, ...]
+
+
+# These thresholds are deliberately conservative for listed-company snapshots.
+# If a usable source has older facts, keep their dates visible but withhold ratios
+# that depend on them instead of quietly valuing with stale balance-sheet data.
+MAX_EQUITY_AGE_DAYS = 180
+MAX_SHARES_AGE_DAYS = 365
 
 
 def _aware(value: object, name: str) -> None:
@@ -202,18 +218,40 @@ def build_valuation_metrics(
     )
     warnings: list[str] = []
 
+    valuation_date = as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+
     shares_fact = _latest_point_fact(source_facts, "shares_outstanding", "shares")
+    shares_period_end = shares_fact.period_end if shares_fact else None
+    shares_available_at = shares_fact.available_at if shares_fact else None
     shares_outstanding = shares_fact.value if shares_fact else None
+    if shares_fact is not None:
+        shares_age = (valuation_date - shares_fact.period_end).days
+        if shares_age < 0 or shares_age > MAX_SHARES_AGE_DAYS:
+            warnings.append(
+                f"shares_outstanding is stale ({shares_age} days old; "
+                f"limit {MAX_SHARES_AGE_DAYS}); market capitalization and P/E are unavailable"
+            )
+            shares_outstanding = None
     if shares_outstanding is not None and shares_outstanding <= 0:
         warnings.append("shares_outstanding is non-positive; market cap and P/E are unavailable")
         shares_outstanding = None
     market_cap = latest_bar.close * shares_outstanding if shares_outstanding is not None else None
 
     equity_fact = _latest_point_fact(source_facts, "total_equity", currency_unit)
+    equity_period_end = equity_fact.period_end if equity_fact else None
+    equity_available_at = equity_fact.available_at if equity_fact else None
     latest_equity = equity_fact.value if equity_fact else None
-    if latest_equity is None:
+    if equity_fact is not None:
+        equity_age = (valuation_date - equity_fact.period_end).days
+        if equity_age < 0 or equity_age > MAX_EQUITY_AGE_DAYS:
+            warnings.append(
+                f"total_equity is stale ({equity_age} days old; "
+                f"limit {MAX_EQUITY_AGE_DAYS}); P/B is unavailable"
+            )
+            latest_equity = None
+    if latest_equity is None and equity_fact is None:
         warnings.append(f"Missing total_equity fact in {currency_unit}")
-    elif latest_equity <= 0:
+    elif latest_equity is not None and latest_equity <= 0:
         warnings.append("total_equity is non-positive; P/B is not meaningful")
     pb = (
         market_cap / latest_equity
@@ -222,6 +260,8 @@ def build_valuation_metrics(
     )
 
     net_income_quarters = _latest_quarters(source_facts, "net_income", currency_unit)
+    ttm_period_start = net_income_quarters[0].period_start if net_income_quarters else None
+    ttm_period_end = net_income_quarters[-1].period_end if net_income_quarters else None
     ttm_net_income = (
         sum((fact.value for fact in net_income_quarters), Decimal("0"))
         if net_income_quarters else None
@@ -333,10 +373,18 @@ def build_valuation_metrics(
         source=source,
         price=latest_bar.close,
         price_unit=price_unit,
+        price_timestamp=latest_bar.timestamp,
+        price_available_at=latest_bar.available_at,
         currency_unit=currency_unit,
         shares_outstanding=shares_outstanding,
+        shares_period_end=shares_period_end,
+        shares_available_at=shares_available_at,
         market_cap=market_cap,
         latest_equity=latest_equity,
+        equity_period_end=equity_period_end,
+        equity_available_at=equity_available_at,
+        ttm_period_start=ttm_period_start,
+        ttm_period_end=ttm_period_end,
         ttm_net_income=ttm_net_income,
         eps=eps,
         pe=pe,
