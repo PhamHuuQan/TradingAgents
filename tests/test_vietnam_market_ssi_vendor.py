@@ -1,3 +1,4 @@
+import copy
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -6,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from tradingagents.dataflows import router
+from tradingagents.dataflows import config as config_module, router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import (
     NoMarketDataError,
@@ -15,6 +16,7 @@ from tradingagents.dataflows.errors import (
 )
 from tradingagents.dataflows.vendors import ssi_market
 from tradingagents.dataflows.vietnam_market.models import MarketBar
+from tradingagents.default_config import DEFAULT_CONFIG
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 AS_OF = date(2026, 10, 25)
@@ -147,6 +149,8 @@ def test_ssi_snapshot_uses_ssi_prices_and_indicators(monkeypatch, configured_ssi
 
 @pytest.mark.unit
 def test_default_vendor_chain_never_auto_selects_ssi(monkeypatch):
+    # Isolate the process-wide config this test mutates from the rest of the suite.
+    monkeypatch.setattr(config_module, "_config", copy.deepcopy(DEFAULT_CONFIG))
     set_config({"data_vendors": {"core_stock_apis": "default"}})
     no_data = Mock(side_effect=NoMarketDataError("FPT", "FPT", "no rows"))
     ssi = Mock(return_value="SHOULD_NOT_BE_CALLED")
@@ -158,3 +162,65 @@ def test_default_vendor_chain_never_auto_selects_ssi(monkeypatch):
     result = router.route_to_vendor("get_stock_data", "FPT", "2026-10-01", "2026-10-25")
     assert result.startswith("NO_DATA_AVAILABLE")
     ssi.assert_not_called()
+
+@pytest.mark.unit
+def test_verified_snapshot_uses_explicit_yfinance_fallback_when_ssi_has_no_bars(monkeypatch):
+    from tradingagents.agents import tools as agent_tools
+
+    monkeypatch.setattr(agent_tools, "as_of", lambda curr_date, trade_date: curr_date)
+    monkeypatch.setattr(agent_tools, "get_vendor", lambda category, method: "ssi,yfinance")
+    monkeypatch.setattr(
+        agent_tools,
+        "build_ssi_market_snapshot",
+        Mock(side_effect=NoMarketDataError("FPT", "FPT", "no rows")),
+    )
+    yahoo = Mock(return_value="verified Yahoo fallback")
+    monkeypatch.setattr(agent_tools, "build_verified_market_snapshot", yahoo)
+
+    result = agent_tools.get_verified_market_snapshot.func(
+        "FPT", "2026-10-25", 5, "2026-10-25"
+    )
+
+    assert result == "verified Yahoo fallback"
+    yahoo.assert_called_once_with("FPT", "2026-10-25", 5)
+
+
+@pytest.mark.unit
+def test_verified_snapshot_does_not_fallback_to_unselected_yfinance(monkeypatch):
+    from tradingagents.agents import tools as agent_tools
+
+    monkeypatch.setattr(agent_tools, "as_of", lambda curr_date, trade_date: curr_date)
+    monkeypatch.setattr(agent_tools, "get_vendor", lambda category, method: "ssi")
+    monkeypatch.setattr(
+        agent_tools,
+        "build_ssi_market_snapshot",
+        Mock(side_effect=VendorNotConfiguredError("SSI SDK is missing")),
+    )
+    yahoo = Mock(return_value="must not be called")
+    monkeypatch.setattr(agent_tools, "build_verified_market_snapshot", yahoo)
+
+    result = agent_tools.get_verified_market_snapshot.func(
+        "FPT", "2026-10-25", 5, "2026-10-25"
+    )
+
+    assert result.startswith("DATA_UNAVAILABLE")
+    yahoo.assert_not_called()
+
+
+@pytest.mark.unit
+def test_ssi_missing_credentials_does_not_escape_stock_tool(monkeypatch):
+    from tradingagents.agents import tools as agent_tools
+
+    monkeypatch.setattr(agent_tools, "as_of_window", lambda start, end, trade: (start, end))
+    monkeypatch.setattr(
+        agent_tools,
+        "route_to_vendor",
+        Mock(side_effect=VendorNotConfiguredError("SSI credentials missing")),
+    )
+
+    result = agent_tools.get_stock_data.func(
+        "FPT", "2026-10-01", "2026-10-25", "2026-10-25"
+    )
+
+    assert result.startswith("DATA_UNAVAILABLE")
+    assert "SSI credentials missing" in result

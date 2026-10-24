@@ -45,7 +45,12 @@ def get_stock_data(
         start_date, end_date = as_of_window(start_date, end_date, trade_date)
     except ValueError as e:
         return str(e)
-    return route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    try:
+        return route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    except VendorNotConfiguredError as exc:
+        # A selected optional provider with missing local configuration must be
+        # reported as unavailable, not allowed to abort the analyst's graph run.
+        return vendor_unavailable("get_stock_data", exc)
 
 
 @tool
@@ -74,8 +79,10 @@ def get_indicators(
     for ind in indicators:
         try:
             results.append(route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days))
-        except ValueError as e:
-            results.append(str(e))
+        except VendorNotConfiguredError as exc:
+            results.append(vendor_unavailable("get_indicators", exc))
+        except ValueError as exc:
+            results.append(str(exc))
     return "\n\n".join(results)
 
 
@@ -105,7 +112,13 @@ def get_verified_market_snapshot(
         if primary_vendor == "ssi":
             try:
                 return build_ssi_market_snapshot(symbol, snapshot_date, look_back_days)
-            except (VendorUnavailableError, VendorNotConfiguredError) as ssi_error:
+            except (
+                NoMarketDataError,
+                VendorUnavailableError,
+                VendorNotConfiguredError,
+            ) as ssi_error:
+                # A configured fallback can provide the snapshot if SSI cannot
+                # serve it, including when its response contains no usable bars.
                 if any(v.strip() == "yfinance" for v in configured[1:]):
                     return build_verified_market_snapshot(symbol, snapshot_date, look_back_days)
                 if isinstance(ssi_error, VendorNotConfiguredError):
