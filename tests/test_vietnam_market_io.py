@@ -36,6 +36,7 @@ def test_reads_normalized_market_bars_and_preserves_timezone_and_decimal(tmp_pat
         (BAR_HEADER + BAR_ROW.replace("2026-10-23T15:05:00+07:00", "2026-10-23T15:05:00"), "timezone"),
         (BAR_HEADER + BAR_ROW + BAR_ROW, "duplicate bar revision"),
         (BAR_HEADER.replace("volume", "volumne") + BAR_ROW.replace(",1200,", ",1200,"), "missing required"),
+        (BAR_HEADER.replace("open", "close", 1) + BAR_ROW, "duplicate column names"),
     ],
 )
 def test_rejects_malformed_market_csv(tmp_path, content, message):
