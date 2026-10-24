@@ -6,8 +6,8 @@ are rejected instead of being silently summed more than once.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -98,7 +98,7 @@ def _latest_quarters(
     if len(quarters) < 4:
         return None
     last_four = tuple(quarters[-4:])
-    for previous, current in zip(last_four, last_four[1:]):
+    for previous, current in zip(last_four, last_four[1:], strict=False):
         if (current.period_start - previous.period_end).days != 1:
             return None
     return last_four
