@@ -1,9 +1,11 @@
-"""Vietnam-market data contracts.
-
-This package starts with validated, source-neutral data models. Concrete vendor
-adapters and graph integration are intentionally deferred to later changes.
-"""
+"""Vietnam-market data contracts and read-only source adapters."""
 
 from tradingagents.dataflows.vietnam_market.models import MarketBar, MarketDataValidationError
+from tradingagents.dataflows.vietnam_market.ssi import SSIAdapterError, SSIMarketDataProvider
 
-__all__ = ["MarketBar", "MarketDataValidationError"]
+__all__ = [
+    "MarketBar",
+    "MarketDataValidationError",
+    "SSIAdapterError",
+    "SSIMarketDataProvider",
+]
