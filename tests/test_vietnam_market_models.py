@@ -21,7 +21,7 @@ def valid_bar(**overrides):
         "close": Decimal("103.0"),
         "volume": 120000,
         "source": "  example-fixture  ",
-        "available_at": datetime(2026, 10, 23, 9, 5, tzinfo=timezone.utc),
+        "available_at": datetime(2026, 10, 23, 9, 5, tzinfo=UTC),
     }
     values.update(overrides)
     return MarketBar(**values)
@@ -42,7 +42,7 @@ def test_rejects_naive_timestamps(field):
 
 def test_rejects_data_that_was_not_available_at_bar_time():
     with pytest.raises(MarketDataValidationError, match="cannot precede"):
-        valid_bar(available_at=datetime(2026, 10, 23, 8, 59, tzinfo=timezone.utc))
+        valid_bar(available_at=datetime(2026, 10, 23, 8, 59, tzinfo=UTC))
 
 
 @pytest.mark.parametrize("field", ["open", "high", "low", "close"])
