@@ -163,6 +163,16 @@ index identifiers and does not guess whether an unknown ticker is an index.
 
 The route is current-date-only. It fetches historical rows for current-date chart context, but their `available_at` is the retrieval time, not the historical first-publication time; the graph rejects backdated analysis dates for this source. Do not use this live route as point-in-time-safe backtest input. The default price source remains Yahoo, and Vnstock is never added to the implicit `default` vendor chain.
 
+## SSI FastConnect REST authentication and OHLC endpoint
+
+The read-only integration uses the official REST API rather than the Python SDK:
+
+- Authenticate with `POST https://api.ssi.com.vn/api/v3/auth/token`, JSON body `{"apiKey":"...","apiSecret":"..."}`. For Market Data-only access, the documentation says `otp` is not required.
+- Fetch daily bars with `GET https://api.ssi.com.vn/api/v3/data/ohlc`, bearer token, and query parameters `symbol`, `from`, `to`, `timeFrame=1d`, `pageIndex`, and `pageSize`. Daily `from`/`to` dates use `YYYY/MM/DD`.
+- Official references: [auth-token](https://developers.ssi.com.vn/docs/api-reference/auth-token) and [data-ohlc](https://developers.ssi.com.vn/docs/api-reference/data-ohlc).
+
+The adapter requires only `SSI_API_KEY` and `SSI_API_SECRET`. Do not store credentials or bearer tokens in notebooks, source control, screenshots, or logs. The notebook prompts for credentials at runtime and clears local references after use.
+
 ## Optional SSI source inside the TradingAgents graph
 
 SSI can be selected explicitly for both price data and technical indicators in the
