@@ -27,7 +27,7 @@ class SSIAdapterError(ValueError):
 
 
 def _read_field(row: object, *names: str) -> object:
-    """Read a field from an SDK model or mapping, tolerating naming styles."""
+    """Read a field from a REST record, SDK model, or mapping, tolerating naming styles."""
     for name in names:
         if isinstance(row, Mapping) and name in row:
             return row[name]
@@ -86,7 +86,7 @@ class SSIMarketDataProvider:
 
     def __init__(self, market_data: object) -> None:
         if not callable(getattr(market_data, "get_ohlc_all", None)):
-            raise TypeError("market_data must expose the SSI SDK get_ohlc_all method")
+            raise TypeError("market_data must expose the get_ohlc_all method")
         self._market_data = market_data
 
     def get_daily_bars(
@@ -159,7 +159,6 @@ class SSIMarketDataProvider:
             )
 
         return sorted(bars, key=lambda bar: bar.timestamp)
-
 
 
 class _SSIRestMarketDataClient:
@@ -319,5 +318,6 @@ def authenticated_ssi_provider_from_env() -> Iterator[SSIMarketDataProvider]:
         if client is not None:
             client.clear()
         access_token = None
+        token_payload = None
         credentials = {}
         session.close()
