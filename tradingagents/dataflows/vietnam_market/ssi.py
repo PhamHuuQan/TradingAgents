@@ -71,11 +71,11 @@ def _as_date(value: object) -> date:
 
 
 class SSIMarketDataProvider:
-    """Normalize SSI SDK daily OHLC records to the shared MarketBar model.
+    """Normalize SSI REST OHLC records to the shared MarketBar model.
 
-    market_data is an authenticated SSI SDK MarketDataService instance.
-    Authentication remains the responsibility of the calling application, so
-    credentials can stay in environment variables or a secret manager.
+    market_data is an authenticated read-only Market Data client. Authentication
+    remains the responsibility of the context manager so credentials stay outside
+    this adapter and no trading methods are exposed.
 
     available_at_by_date is mandatory because historical OHLC responses do not
     prove when each bar was first available to a strategy. Do not guess these
