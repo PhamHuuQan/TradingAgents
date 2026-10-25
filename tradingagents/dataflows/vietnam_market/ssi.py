@@ -1,9 +1,9 @@
-"""Read-only adapter for SSI FastConnect V3 daily OHLC data.
+"""Read-only adapter for SSI FastConnect V3 daily OHLC data via documented REST API.
 
-Accepts an already-authenticated SSI SDK market-data service. It does not
-authenticate, store credentials, or expose trading methods. Historical
-availability timestamps must be supplied by the caller because SSI OHLC
-history does not itself establish when each historical bar first became available.
+Authentication uses SSI_API_KEY and SSI_API_SECRET to obtain a Market Data
+Bearer token. No SDK, Client ID, Private Key, OTP, or trading endpoint is needed.
+Historical availability timestamps must be supplied by the caller because SSI
+OHLC history does not establish when each historical bar first became available.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from contextlib import contextmanager
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
+
+import requests
 
 from tradingagents.dataflows.vietnam_market.models import MarketBar
 
@@ -105,13 +107,8 @@ class SSIMarketDataProvider:
         if not 1 <= page_size <= 1000:
             raise ValueError("page_size must be between 1 and 1000")
 
-        # Prefer the SDK enum when installed; the documented API timeframe is 1d.
-        try:
-            from ssi_sdk.enums import Timeframe
-
-            daily_timeframe = Timeframe.DAY_1
-        except ImportError:
-            daily_timeframe = "1d"
+        # The REST API documents "1d" for daily candles; no vendor SDK is required.
+        daily_timeframe = "1d"
 
         rows = self._market_data.get_ohlc_all(
             normalized_symbol,
@@ -165,16 +162,114 @@ class SSIMarketDataProvider:
 
 
 
+class _SSIRestMarketDataClient:
+    """Minimal read-only REST client compatible with SSIMarketDataProvider."""
+
+    _BASE_URL = "https://api.ssi.com.vn"
+    _MAX_ROWS = 1000
+
+    def __init__(self, access_token: str, session: requests.Session) -> None:
+        self._access_token = access_token
+        self._session = session
+
+    def clear(self) -> None:
+        """Release the token reference when the credential context exits."""
+        self._access_token = ""
+
+    def get_ohlc_all(
+        self,
+        symbol: str,
+        timeframe: object,
+        *,
+        from_date: str,
+        to_date: str,
+        size: int = 1000,
+        ascending: bool = False,
+    ) -> list[object]:
+        """Fetch documented OHLC pages with a conservative 1,000-row cap."""
+        if not 1 <= size <= self._MAX_ROWS:
+            raise ValueError(f"SSI page size must be between 1 and {self._MAX_ROWS}")
+
+        timeframe_value = getattr(timeframe, "value", timeframe)
+        timeframe_text = str(timeframe_value).strip().lower()
+        if timeframe_text in {"day_1", "timeframe.day_1"}:
+            timeframe_text = "1d"
+        if timeframe_text not in {"1d", "1m", "3m", "5m", "15m", "30m", "1h"}:
+            raise ValueError("Unsupported SSI OHLC timeframe")
+
+        rows: list[object] = []
+        max_pages = (self._MAX_ROWS + size - 1) // size
+        for page_index in range(1, max_pages + 1):
+            try:
+                response = self._session.get(
+                    f"{self._BASE_URL}/api/v3/data/ohlc",
+                    headers={
+                        "Authorization": f"Bearer {self._access_token}",
+                        "Content-Type": "application/json",
+                        "Accept-Language": "en",
+                    },
+                    params={
+                        "symbol": symbol,
+                        "from": from_date,
+                        "to": to_date,
+                        "timeFrame": timeframe_text,
+                        "pageIndex": page_index,
+                        "pageSize": size,
+                    },
+                    timeout=30,
+                )
+            except requests.RequestException as exc:
+                raise SSIAdapterError(
+                    f"SSI OHLC request failed ({type(exc).__name__})"
+                ) from None
+
+            if response.status_code == 204:
+                break
+            if response.status_code != 200:
+                raise SSIAdapterError(
+                    f"SSI OHLC request failed (HTTP {response.status_code})"
+                )
+            try:
+                payload = response.json()
+            except ValueError:
+                raise SSIAdapterError("SSI OHLC response was not valid JSON") from None
+            if not isinstance(payload, Mapping):
+                raise SSIAdapterError("SSI OHLC response had an unexpected shape")
+
+            page_rows = payload.get("data")
+            if page_rows is None and str(payload.get("code", "")) == "204":
+                page_rows = []
+            if not isinstance(page_rows, list):
+                raise SSIAdapterError("SSI OHLC response did not contain a data array")
+            if not page_rows:
+                break
+
+            rows.extend(page_rows)
+            if len(rows) >= self._MAX_ROWS:
+                raise SSIAdapterError(
+                    "SSI OHLC response reached the 1,000-row safety limit; narrow the date range"
+                )
+            if len(page_rows) < size:
+                break
+
+        if ascending:
+            rows.sort(
+                key=lambda row: _as_date(
+                    _read_field(row, "trading_date", "TradingDate", "tradingDate")
+                )
+            )
+        return rows
+
+
 @contextmanager
 def authenticated_ssi_provider_from_env() -> Iterator[SSIMarketDataProvider]:
-    """Yield an SSI provider authenticated for market-data access only.
+    """Yield an SSI REST-backed provider with Market Data-only authentication.
 
-    Required environment variables: SSI_CLIENT_ID, SSI_API_KEY, SSI_API_SECRET.
-    No OTP is requested because this helper only constructs the Data client.
-    The SDK contexts remain open for the duration of the with-block.
+    Required environment variables: SSI_API_KEY and SSI_API_SECRET. The
+    documented REST authentication call does not require a Client ID or OTP
+    for Market Data access. No trading client or order endpoint is instantiated.
     """
     credentials = {
-        "SSI_CLIENT_ID": os.getenv("SSI_CLIENT_ID"),
         "SSI_API_KEY": os.getenv("SSI_API_KEY"),
         "SSI_API_SECRET": os.getenv("SSI_API_SECRET"),
     }
@@ -184,19 +279,45 @@ def authenticated_ssi_provider_from_env() -> Iterator[SSIMarketDataProvider]:
             "Missing SSI environment variable(s): " + ", ".join(missing)
         )
 
+    session = requests.Session()
+    client: _SSIRestMarketDataClient | None = None
+    access_token: str | None = None
     try:
-        from ssi_sdk import Auth, Config, Data
-    except ImportError as exc:
-        raise RuntimeError(
-            'SSI SDK is not installed. Install the optional extra with: pip install "tradingagents[ssi]"'
-        ) from exc
+        try:
+            response = session.post(
+                "https://api.ssi.com.vn/api/v3/auth/token",
+                json={
+                    "apiKey": credentials["SSI_API_KEY"],
+                    "apiSecret": credentials["SSI_API_SECRET"],
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"SSI authentication request failed ({type(exc).__name__})"
+            ) from None
 
-    config = Config(
-        client_id=credentials["SSI_CLIENT_ID"],
-        api_key=credentials["SSI_API_KEY"],
-        api_secret=credentials["SSI_API_SECRET"],
-    )
-    with Auth(config) as auth:
-        auth.authenticate()
-        with Data(auth) as data:
-            yield SSIMarketDataProvider(data.market_data)
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"SSI authentication failed (HTTP {response.status_code}); "
+                "check key/secret, key status, and Market Data permissions"
+            )
+        try:
+            token_payload = response.json()
+        except ValueError:
+            raise RuntimeError("SSI authentication response was not valid JSON") from None
+        if not isinstance(token_payload, Mapping):
+            raise RuntimeError("SSI authentication response had an unexpected shape")
+        access_token = token_payload.get("accessToken")
+        if not isinstance(access_token, str) or not access_token:
+            raise RuntimeError("SSI authentication response did not contain accessToken")
+
+        client = _SSIRestMarketDataClient(access_token, session)
+        yield SSIMarketDataProvider(client)
+    finally:
+        if client is not None:
+            client.clear()
+        access_token = None
+        credentials = {}
+        session.close()

@@ -1,14 +1,13 @@
-"""Optional SSI FastConnect V3 vendor for current-date Vietnamese-equity research.
+"""Optional SSI FastConnect V3 REST vendor for current-date Vietnamese-equity research.
 
 This adapter is deliberately current-date-only. Historical SSI bars fetched today
 do not reveal when each observation first became available, so backdated requests
-are rejected rather than presented as point-in-time-safe. The provider is read-only
-and the optional SSI SDK is loaded only when a request is made.
+are rejected rather than presented as point-in-time-safe. It uses the documented
+read-only Market Data REST endpoints and requires only API Key and API Secret.
 """
 from __future__ import annotations
 
 import csv
-import importlib.util
 import io
 import os
 from datetime import date, datetime, time, timedelta
@@ -59,19 +58,11 @@ def _parse_date(value: str | date, field: str) -> date:
 
 
 def _check_configuration() -> None:
-    missing = [
-        name for name in ("SSI_CLIENT_ID", "SSI_API_KEY", "SSI_API_SECRET")
-        if not os.getenv(name)
-    ]
+    missing = [name for name in ("SSI_API_KEY", "SSI_API_SECRET") if not os.getenv(name)]
     if missing:
         raise VendorNotConfiguredError(
             "SSI was explicitly selected but required environment variable(s) are missing: "
-            f"{', '.join(missing)}. Configure them locally or in an approved secret manager; "
-            "never commit credentials to Git."
-        )
-    if importlib.util.find_spec("ssi_sdk") is None:
-        raise VendorNotConfiguredError(
-            'SSI SDK is not installed; run: python -m pip install -e ".[ssi]"'
+            f"{', '.join(missing)}. Configure these values privately; never commit credentials to Git."
         )
 
 

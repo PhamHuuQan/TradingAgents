@@ -6,7 +6,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from tradingagents.dataflows.vietnam_market.ssi import SSIAdapterError, SSIMarketDataProvider
+import tradingagents.dataflows.vietnam_market.ssi as ssi_module
+from tradingagents.dataflows.vietnam_market.ssi import (
+    SSIAdapterError,
+    SSIMarketDataProvider,
+    authenticated_ssi_provider_from_env,
+)
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -158,3 +163,113 @@ def test_rejects_invalid_volume_instead_of_silently_truncating(volume):
             date(2026, 10, 23),
             available_at_by_date={date(2026, 10, 23): available_at()},
         )
+
+
+
+class FakeHTTPResponse:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+class FakeHTTPSession:
+    def __init__(self):
+        self.posts = []
+        self.gets = []
+        self.closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
+    def close(self):
+        self.closed = True
+
+    def post(self, url, **kwargs):
+        self.posts.append((url, kwargs))
+        return FakeHTTPResponse(200, {"accessToken": "token-for-test"})
+
+    def get(self, url, **kwargs):
+        self.gets.append((url, kwargs))
+        return FakeHTTPResponse(
+            200,
+            {
+                "pageIndex": 1,
+                "pageSize": 100,
+                "data": [
+                    {
+                        "symbol": "FPT",
+                        "tradingDate": "2026/10/23",
+                        "open": "100",
+                        "high": "105",
+                        "low": "98",
+                        "close": "103",
+                        "volume": "120000",
+                    }
+                ],
+            },
+        )
+
+
+def test_rest_auth_and_ohlc_use_documented_api_without_client_id(monkeypatch):
+    monkeypatch.setenv("SSI_API_KEY", "test-api-key")
+    monkeypatch.setenv("SSI_API_SECRET", "test-api-secret")
+    monkeypatch.delenv("SSI_CLIENT_ID", raising=False)
+    session = FakeHTTPSession()
+    monkeypatch.setattr(ssi_module.requests, "Session", lambda: session)
+
+    with authenticated_ssi_provider_from_env() as adapter:
+        bars = adapter.get_daily_bars(
+            "FPT",
+            date(2026, 10, 23),
+            date(2026, 10, 23),
+            available_at_by_date={date(2026, 10, 23): available_at()},
+            page_size=100,
+        )
+
+    assert len(bars) == 1
+    assert bars[0].close == Decimal("103")
+    token_url, token_kwargs = session.posts[0]
+    assert token_url == "https://api.ssi.com.vn/api/v3/auth/token"
+    assert token_kwargs["json"] == {
+        "apiKey": "test-api-key",
+        "apiSecret": "test-api-secret",
+    }
+    ohlc_url, ohlc_kwargs = session.gets[0]
+    assert ohlc_url == "https://api.ssi.com.vn/api/v3/data/ohlc"
+    assert ohlc_kwargs["headers"]["Authorization"] == "Bearer token-for-test"
+    assert ohlc_kwargs["params"] == {
+        "symbol": "FPT",
+        "from": "2026/10/23",
+        "to": "2026/10/23",
+        "timeFrame": "1d",
+        "pageIndex": 1,
+        "pageSize": 100,
+    }
+    assert session.closed is True
+
+
+def test_rest_auth_failure_reports_status_without_response_body(monkeypatch):
+    monkeypatch.setenv("SSI_API_KEY", "test-api-key")
+    monkeypatch.setenv("SSI_API_SECRET", "test-api-secret")
+
+    class FailedSession(FakeHTTPSession):
+        def post(self, url, **kwargs):
+            self.posts.append((url, kwargs))
+            return FakeHTTPResponse(403, {"msg": "secret should never appear"})
+
+    session = FailedSession()
+    monkeypatch.setattr(ssi_module.requests, "Session", lambda: session)
+
+    with pytest.raises(RuntimeError, match="HTTP 403") as exc_info:
+        with authenticated_ssi_provider_from_env():
+            pass
+    assert "secret should never appear" not in str(exc_info.value)
+    assert session.closed is True

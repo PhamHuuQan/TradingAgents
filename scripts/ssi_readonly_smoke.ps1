@@ -13,7 +13,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$names = @("SSI_CLIENT_ID", "SSI_API_KEY", "SSI_API_SECRET")
+$names = @("SSI_API_KEY", "SSI_API_SECRET")
 $previous = @{}
 
 function Convert-SecureStringToPlainText([System.Security.SecureString]$SecureValue) {

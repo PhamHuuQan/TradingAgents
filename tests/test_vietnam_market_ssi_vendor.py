@@ -61,15 +61,9 @@ class FakeProvider:
 @pytest.fixture
 def configured_ssi(monkeypatch):
     monkeypatch.setattr(ssi_market, "_now_market", lambda: NOW)
-    original_find_spec = ssi_market.importlib.util.find_spec
-    monkeypatch.setattr(
-        ssi_market.importlib.util,
-        "find_spec",
-        lambda name: object() if name == "ssi_sdk" else original_find_spec(name),
-    )
-    monkeypatch.setenv("SSI_CLIENT_ID", "test-client")
     monkeypatch.setenv("SSI_API_KEY", "test-key")
     monkeypatch.setenv("SSI_API_SECRET", "test-secret")
+    monkeypatch.delenv("SSI_CLIENT_ID", raising=False)
 
 
 def _install_fake_provider(monkeypatch, provider):
@@ -114,8 +108,9 @@ def test_ssi_vendor_refuses_historical_as_of_date_before_network_or_auth(
 
 @pytest.mark.unit
 def test_ssi_vendor_requires_credentials_only_when_selected(monkeypatch):
-    for name in ("SSI_CLIENT_ID", "SSI_API_KEY", "SSI_API_SECRET"):
+    for name in ("SSI_API_KEY", "SSI_API_SECRET"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("SSI_CLIENT_ID", raising=False)
     monkeypatch.setattr(ssi_market, "_now_market", lambda: NOW)
     with pytest.raises(VendorNotConfiguredError, match="missing"):
         ssi_market.get_ssi_stock_data("FPT", "2026-10-01", "2026-10-25")
@@ -194,7 +189,7 @@ def test_verified_snapshot_does_not_fallback_to_unselected_yfinance(monkeypatch)
     monkeypatch.setattr(
         agent_tools,
         "build_ssi_market_snapshot",
-        Mock(side_effect=VendorNotConfiguredError("SSI SDK is missing")),
+        Mock(side_effect=VendorNotConfiguredError("SSI REST API credentials are missing")),
     )
     yahoo = Mock(return_value="must not be called")
     monkeypatch.setattr(agent_tools, "build_verified_market_snapshot", yahoo)

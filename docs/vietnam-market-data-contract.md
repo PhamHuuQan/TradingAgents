@@ -73,8 +73,7 @@ $env:TRADINGAGENTS_FUNDAMENTAL_DATA = "vnstock"
 ~~~
 
 To try SSI instead, set both `TRADINGAGENTS_CORE_STOCK_APIS` and
-`TRADINGAGENTS_TECHNICAL_INDICATORS` to `ssi`, and configure the three SSI
-Market Data credentials privately in that same shell. These environment
+`TRADINGAGENTS_TECHNICAL_INDICATORS` to `ssi`, and configure `SSI_API_KEY` and `SSI_API_SECRET` privately in that same shell. These environment
 overrides are read when the process starts; open a fresh CLI process after
 changing them. Blank variables do not override the defaults. Leaving the variables
 unset preserves existing Yahoo Finance / SEC EDGAR defaults.
@@ -179,11 +178,7 @@ config["data_vendors"]["core_stock_apis"] = "ssi"
 config["data_vendors"]["technical_indicators"] = "ssi"
 ~~~
 
-Pass `config` to `TradingAgentsGraph(..., config=config)`. SSI SDK installation
-and credentials are checked only when the SSI source is called. The special
-`default` vendor chain will never select SSI automatically. Configure
-`SSI_CLIENT_ID`, `SSI_API_KEY`, and `SSI_API_SECRET` locally or in an approved
-secret manager, never in Git.
+Pass `config` to `TradingAgentsGraph(..., config=config)`. SSI API Key and Secret are checked only when the SSI source is called. The special `default` vendor chain will never select SSI automatically. Configure `SSI_API_KEY` and `SSI_API_SECRET` locally or in an approved secret manager, never in Git.
 
 This route is deliberately current-date-only. It computes price and common indicators
 from the same SSI OHLCV response and uses an SSI-backed deterministic verification
@@ -270,24 +265,23 @@ two ways to run the check. Both are read-only and do not place orders.
 From the repository root:
 
 ~~~powershell
-python -m pip install -e ".[ssi]"
+python -m pip install -e .
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\ssi_readonly_smoke.ps1 -Symbol FPT -FromDate 2026-10-20 -ToDate 2026-10-23
 ~~~
 
-The script securely prompts for any missing SSI_CLIENT_ID, SSI_API_KEY, and
-SSI_API_SECRET; typed inputs are hidden. It sets them only in the current process
+The script securely prompts for any missing SSI_API_KEY and SSI_API_SECRET; typed inputs are hidden. It sets them only in the current process
 environment for the smoke command, then removes/restores those environment values.
 It does not write credentials to Git, a .env file, or a local config file. The
 PowerShell execution-policy change is scoped to that terminal process.
 
 ### Export SSI OHLCV to the normalized CSV format
 
-After credentials are set privately in your local PowerShell terminal, export bars
+After `SSI_API_KEY` and `SSI_API_SECRET` are set privately in your local PowerShell terminal, export bars
 without placing orders:
 
 ~~~powershell
-python -m pip install -e ".[ssi]"
+python -m pip install -e .
 python -m tradingagents.dataflows.vietnam_market.export_ssi_bars --symbol FPT --from-date 2025-10-01 --to-date 2026-10-23 --output data\fpt_bars.csv
 ~~~
 
@@ -303,7 +297,7 @@ emits a possible-truncation warning.
 If the variables are already set in your own terminal:
 
 ~~~powershell
-python -m pip install -e ".[ssi]"
+python -m pip install -e .
 python -m tradingagents.dataflows.vietnam_market.smoke --symbol FPT --from-date 2026-10-20 --to-date 2026-10-23
 ~~~
 
