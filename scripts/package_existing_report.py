@@ -1,15 +1,10 @@
-"""Package an existing TradingAgents report in Colab. Does not call any model/API.
+"""Package an existing TradingAgents report and download it in Colab.
 
-In an already-running Colab runtime, run this in a new code cell:
+This helper does NOT call Gemini, SSI, or rerun the analysis. Intended usage in
+an already-running Colab notebook that still has its report files.
 
-    import urllib.request
-    url = "https://raw.githubusercontent.com/PhamHuuQan/TradingAgents/feature/vietnam-market-foundation/scripts/package_existing_report.py"
-    exec(compile(urllib.request.urlopen(url).read().decode("utf-8"),
-                 "package_existing_report.py", "exec"),
-         {"__name__": "__main__"})
-
-It locates the latest FPT complete_report.md in the runtime, validates the ZIP,
-and invokes Colab's browser download. It will never rerun TradingAgents.
+If notebook variables report_path/report_dir exist, they are reused. Otherwise
+the helper searches the usual TradingAgents report directories.
 """
 from __future__ import annotations
 
@@ -24,30 +19,36 @@ DEFAULT_REPORT_ROOTS = (
 DEFAULT_ARCHIVE = Path("/content/TradingAgents_FPT_report.zip")
 
 
-def find_report_file(candidate=None, roots=DEFAULT_REPORT_ROOTS, ticker="FPT") -> Path:
-    """Find a completed Markdown report from a run directory, report file, or reports root."""
+def _looks_like_report_dir(path: Path) -> bool:
+    return path.is_dir() and (
+        (path / "complete_report.md").is_file()
+        or any(path.glob("*.md"))
+    )
+
+
+def find_report_file(candidate: str | Path | None = None,
+                     roots: tuple[Path, ...] = DEFAULT_REPORT_ROOTS,
+                     ticker: str = "FPT") -> Path:
+    """Find a report Markdown file from either a file path or a directory."""
     if candidate:
         path = Path(candidate).expanduser()
         if path.is_file():
-            if path.suffix.lower() == ".md":
+            if path.name.lower() == "complete_report.md" or path.suffix.lower() == ".md":
                 return path.resolve()
-            raise FileNotFoundError(f"Given file is not a Markdown report: {path}")
+            raise FileNotFoundError(f"The given file is not a Markdown report: {path}")
+        if _looks_like_report_dir(path):
+            preferred = path / "complete_report.md"
+            if preferred.is_file():
+                return preferred.resolve()
+            md_files = sorted(path.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if md_files:
+                return md_files[0].resolve()
         if not path.is_dir():
             raise FileNotFoundError(f"Report path does not exist: {path}")
-        preferred = path / "complete_report.md"
-        if preferred.is_file():
-            return preferred.resolve()
-        markdown_files = sorted(
-            (p for p in path.glob("*.md") if p.is_file()),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if markdown_files and path.name.startswith(ticker.upper() + "_"):
-            return markdown_files[0].resolve()
-        roots = (path, *tuple(roots))
+        roots = (path, *roots)
 
+    matches: list[Path] = []
     prefix = ticker.upper() + "_"
-    matches = []
     for root in roots:
         root = Path(root).expanduser()
         if not root.exists():
@@ -71,16 +72,17 @@ def find_report_file(candidate=None, roots=DEFAULT_REPORT_ROOTS, ticker="FPT") -
         searched = ", ".join(str(Path(p)) for p in roots)
         raise FileNotFoundError(
             f"No completed {ticker} report found. Searched: {searched}. "
-            "The Colab runtime containing the report may have been reset."
+            "The original report may have been lost if its Colab runtime was reset."
         )
     return max(unique, key=lambda p: p.stat().st_mtime)
 
 
-def package_report(report_file, archive=DEFAULT_ARCHIVE) -> dict:
-    """Package report plus sibling report assets; verify before replacing the ZIP."""
+def package_report(report_file: str | Path,
+                   archive: str | Path = DEFAULT_ARCHIVE) -> dict:
+    """Package a report and its sibling artifacts; validate before replacing ZIP."""
     report_file = Path(report_file).resolve()
     archive = Path(archive).resolve()
-    if not report_file.is_file() or report_file.stat().st_size <= 0:
+    if not report_file.is_file() or report_file.stat().st_size == 0:
         raise FileNotFoundError(f"Report is missing or empty: {report_file}")
 
     report_dir = report_file.parent
@@ -108,8 +110,10 @@ def package_report(report_file, archive=DEFAULT_ARCHIVE) -> dict:
             expected = f"{report_dir.name}/{report_file.relative_to(report_dir)}"
             if not names or corrupt:
                 raise RuntimeError(f"ZIP verification failed: empty={not names}; corrupt={corrupt}")
-            if expected not in names or zf.getinfo(expected).file_size <= 0:
-                raise RuntimeError("ZIP verification failed: report is missing or empty")
+            if expected not in names:
+                raise RuntimeError("ZIP verification failed: complete report is missing")
+            if zf.getinfo(expected).file_size <= 0:
+                raise RuntimeError("ZIP verification failed: complete report entry is empty")
         temp_archive.replace(archive)
     finally:
         temp_archive.unlink(missing_ok=True)
@@ -124,32 +128,31 @@ def package_report(report_file, archive=DEFAULT_ARCHIVE) -> dict:
     }
 
 
-def main():
-    # Look at the two possible outputs from the original notebook, where
-    # report_dir was mistakenly assigned to the complete_report.md file.
+def main() -> dict:
     namespace = globals()
-    candidate = namespace.get("report_path") or namespace.get("report_dir")
+    candidate = namespace.get("report_path")
+    if candidate is None:
+        candidate = namespace.get("report_dir")
     try:
         report_file = find_report_file(candidate)
     except FileNotFoundError:
-        # If a stale global path points to something unavailable, retry using
-        # only the standard report root. This still never starts the analysis.
         report_file = find_report_file()
 
     result = package_report(report_file)
-    print(f"REPORT: {result['report_file']}")
-    print(f"REPORT_BYTES: {result['report_bytes']}")
-    print(f"ZIP_OK: {result['file_count']} files; {result['archive_bytes']:,} bytes")
+    print(f"Report found: {result['report_file']}")
+    print(f"Report size: {result['report_bytes']:,} bytes")
+    print(f"ZIP verified: {result['file_count']} files, {result['archive_bytes']:,} bytes")
+    print("Files inside ZIP:")
     for name in result["files"]:
-        print(f"  - {name}")
+        print(f" - {name}")
 
     try:
-        from google.colab import files
+        from google.colab import files as colab_files
     except ImportError:
-        print(f"ZIP saved at: {result['archive']}")
+        print(f"Archive created locally at: {result['archive']}")
         return result
-    print("Downloading ZIP now. No Gemini/SSI/model calls were made.")
-    files.download(result["archive"])
+    print("Starting browser download. No model/API calls will be made.")
+    colab_files.download(result["archive"])
     return result
 
 
