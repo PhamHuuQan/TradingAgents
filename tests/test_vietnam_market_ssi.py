@@ -247,8 +247,8 @@ def test_rest_auth_and_ohlc_use_documented_api_without_client_id(monkeypatch):
     assert ohlc_kwargs["headers"]["Authorization"] == "Bearer token-for-test"
     assert ohlc_kwargs["params"] == {
         "symbol": "FPT",
-        "from": "2026/10/23",
-        "to": "2026/10/23",
+        "from": "2026/10/23 00:00:00",
+        "to": "2026/10/23 23:59:59",
         "timeFrame": "1d",
         "pageIndex": 1,
         "pageSize": 100,
