@@ -11,10 +11,7 @@ import tradingagents.default_config as default_config_module
 
 def _config_with_env(monkeypatch, **overrides):
     """The defaults as the environment given here would set them."""
-    for key in list(default_config_module._ENV_OVERRIDES) + [
-        "TRADINGAGENTS_CORE_STOCK_VENDOR",
-        "TRADINGAGENTS_TECHNICAL_INDICATORS_VENDOR",
-    ]:
+    for key in list(default_config_module._ENV_OVERRIDES):
         monkeypatch.delenv(key, raising=False)
     for key, val in overrides.items():
         monkeypatch.setenv(key, val)
@@ -29,20 +26,6 @@ def test_no_env_uses_built_in_defaults(monkeypatch):
     assert config["backend_url"] is None
     assert config["max_debate_rounds"] == 1
     assert config["checkpoint_enabled"] is False
-
-
-def test_ssi_vendor_overrides_are_opt_in(monkeypatch):
-    defaults = _config_with_env(monkeypatch)
-    assert defaults["data_vendors"]["core_stock_apis"] == "yfinance"
-    assert defaults["data_vendors"]["technical_indicators"] == "yfinance"
-
-    config = _config_with_env(
-        monkeypatch,
-        TRADINGAGENTS_CORE_STOCK_VENDOR="ssi",
-        TRADINGAGENTS_TECHNICAL_INDICATORS_VENDOR="ssi",
-    )
-    assert config["data_vendors"]["core_stock_apis"] == "ssi"
-    assert config["data_vendors"]["technical_indicators"] == "ssi"
 
 
 def test_string_overrides(monkeypatch):
