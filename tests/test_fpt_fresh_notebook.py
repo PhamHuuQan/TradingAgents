@@ -79,6 +79,12 @@ class FreshNotebookTests(unittest.TestCase):
         self.assertIn('config["data_vendors"]["fundamental_data"] = "vnstock"', run_cell)
         self.assertIn("TradingAgentsGraph(selected_analysts=ANALYSTS", run_cell)
 
+    def test_model_candidates_start_with_flash_lite_fallbacks(self):
+        run_cell = self.source[4]
+        self.assertLess(run_cell.index('"gemini-3.1-flash-lite"'), run_cell.index('"gemini-3.5-flash-lite"'))
+        self.assertIn('"gemini-3.6-flash"', run_cell)
+        self.assertIn('"gemini-3.8-flash"', run_cell)
+
     def test_runtime_503_switches_once_and_keeps_using_fallback(self):
         state = {"active_index": 0}
         primary = FakeModel("primary", ["503 UNAVAILABLE"])
