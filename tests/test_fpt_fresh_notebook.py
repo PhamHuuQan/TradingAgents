@@ -72,7 +72,7 @@ class FreshNotebookTests(unittest.TestCase):
                 compile("".join(cell["source"]), f"cell-{index}", "exec")
 
     def test_graph_keeps_all_default_analysts_and_vietnam_sources(self):
-        run_cell = self.source[4]
+        run_cell = self.source[5]
         self.assertIn('ANALYSTS = ["market", "social", "news", "fundamentals"]', run_cell)
         self.assertIn('config["data_vendors"]["core_stock_apis"] = "ssi"', run_cell)
         self.assertIn('config["data_vendors"]["technical_indicators"] = "ssi"', run_cell)
@@ -80,10 +80,17 @@ class FreshNotebookTests(unittest.TestCase):
         self.assertIn("TradingAgentsGraph(selected_analysts=ANALYSTS", run_cell)
 
     def test_model_candidates_start_with_flash_lite_fallbacks(self):
-        run_cell = self.source[4]
+        run_cell = self.source[5]
         self.assertLess(run_cell.index('"gemini-3.1-flash-lite"'), run_cell.index('"gemini-3.5-flash-lite"'))
         self.assertIn('"gemini-3.6-flash"', run_cell)
         self.assertIn('"gemini-3.8-flash"', run_cell)
+
+    def test_offline_self_test_has_no_api_credentials_or_network_calls(self):
+        offline_cell = self.source[4]
+        self.assertIn("OFFLINE SELF-TEST PASSED: 4/4 cases", offline_cell)
+        self.assertNotIn("GOOGLE_API_KEY", offline_cell)
+        self.assertNotIn("ChatGoogleGenerativeAI", offline_cell)
+        self.assertNotIn("requests.", offline_cell)
 
     def test_runtime_503_switches_once_and_keeps_using_fallback(self):
         state = {"active_index": 0}
@@ -142,7 +149,7 @@ class FreshNotebookTests(unittest.TestCase):
             chain.invoke("test")
 
     def test_download_cell_validates_archive_without_running_model(self):
-        download_cell = self.source[5]
+        download_cell = self.source[6]
         self.assertIn("zf.testzip()", download_cell)
         self.assertIn("complete_report.md missing or empty", download_cell)
         self.assertIn("colab_files.download(str(archive))", download_cell)
