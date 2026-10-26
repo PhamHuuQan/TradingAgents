@@ -225,6 +225,8 @@ def check_mocked_runtime() -> list[str]:
     return [
         "PASS: actual notebook cells map fake SDK OHLC bars into the expected DataFrame",
         "PASS: duplicate dates fail loudly",
+        "PASS: invalid OHLC relationships fail loudly",
+        "PASS: empty result is not reported as success",
         "PASS: API error output includes status/code but redacts credentials and JWT-like tokens",
     ]
 
