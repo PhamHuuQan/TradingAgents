@@ -80,7 +80,7 @@ def build_default_config() -> dict:
     Read when the package is imported, as DEFAULT_CONFIG; call it again to see
     the environment as it is now.
     """
-    config = _apply_env_overrides({
+    return _apply_env_overrides({
         "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR") or os.path.join(_TRADINGAGENTS_HOME, "logs"),
         "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR") or os.path.join(_TRADINGAGENTS_HOME, "cache"),
         "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH") or os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md"),
@@ -156,8 +156,8 @@ def build_default_config() -> dict:
         # routed to vendors you didn't choose. For ordered fallback, list several,
         # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
         "data_vendors": {
-            "core_stock_apis": "yfinance",       # Options: ssi, alpha_vantage, yfinance
-            "technical_indicators": "yfinance",  # Options: ssi, alpha_vantage, yfinance
+            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
+            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
             # Statements come from SEC EDGAR as filed (US filers), then Yahoo; the
         # overview and insider tools, which SEC EDGAR does not serve, from Yahoo.
         "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance
@@ -204,19 +204,6 @@ def build_default_config() -> dict:
         },
 
     })
-
-    # SSI can be enabled explicitly for Vietnamese daily prices and indicators
-    # without changing the framework's defaults or affecting other categories.
-    vendor_env = {
-        "TRADINGAGENTS_CORE_STOCK_VENDOR": "core_stock_apis",
-        "TRADINGAGENTS_TECHNICAL_INDICATORS_VENDOR": "technical_indicators",
-    }
-    for env_var, category in vendor_env.items():
-        value = os.getenv(env_var, "").strip()
-        if value:
-            config["data_vendors"][category] = value
-
-    return config
 
 
 DEFAULT_CONFIG = build_default_config()
