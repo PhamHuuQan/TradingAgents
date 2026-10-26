@@ -31,6 +31,10 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":   "google_thinking_level",
     "TRADINGAGENTS_OPENAI_REASONING_EFFORT": "openai_reasoning_effort",
     "TRADINGAGENTS_ANTHROPIC_EFFORT":        "anthropic_effort",
+    # Nested data-vendor selectors. SSI/Vnstock remain explicit opt-in sources.
+    "TRADINGAGENTS_CORE_STOCK_APIS":         "data_vendors.core_stock_apis",
+    "TRADINGAGENTS_TECHNICAL_INDICATORS":    "data_vendors.technical_indicators",
+    "TRADINGAGENTS_FUNDAMENTAL_DATA":        "data_vendors.fundamental_data",
 }
 
 
@@ -62,13 +66,35 @@ def _coerce(value: str, reference):
 
 
 def _apply_env_overrides(config: dict) -> dict:
-    """Apply TRADINGAGENTS_* env vars to the config dict in-place."""
-    for env_var, key in _ENV_OVERRIDES.items():
+    """Apply TRADINGAGENTS_* env vars to the config dict in-place.
+
+    Mapping targets may be top-level keys or dot-separated nested keys such as
+    `data_vendors.core_stock_apis`. Empty/whitespace-only values are ignored,
+    preserving the built-in default for commented or blank .env entries.
+    """
+    for env_var, key_path in _ENV_OVERRIDES.items():
         raw = os.environ.get(env_var)
-        if raw is None or raw == "":
+        if raw is None or raw.strip() == "":
             continue
+
+        target = config
+        key_parts = key_path.split(".")
+        for part in key_parts[:-1]:
+            child = target.get(part)
+            if not isinstance(child, dict):
+                raise ValueError(
+                    f"Invalid override target {key_path!r} for {env_var}: "
+                    f"{part!r} is not a config section"
+                )
+            target = child
+        key = key_parts[-1]
+        if key not in target:
+            raise ValueError(
+                f"Invalid override target {key_path!r} for {env_var}: "
+                f"{key!r} is not a known config key"
+            )
         try:
-            config[key] = _coerce(raw, config.get(key))
+            target[key] = _coerce(raw.strip() if "." in key_path else raw, target.get(key))
         except ValueError as exc:
             raise ValueError(f"Invalid value for {env_var}: {exc}") from exc
     return config
@@ -156,11 +182,11 @@ def build_default_config() -> dict:
         # routed to vendors you didn't choose. For ordered fallback, list several,
         # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
         "data_vendors": {
-            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
+            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance, ssi/vnstock (explicit/current-date only)
+            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance, ssi/vnstock (same selected OHLCV source)
             # Statements come from SEC EDGAR as filed (US filers), then Yahoo; the
         # overview and insider tools, which SEC EDGAR does not serve, from Yahoo.
-        "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance
+            "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance, vnstock (explicit/current-date only)
             "news_data": "yfinance",             # Options: alpha_vantage, yfinance
             "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
             "prediction_markets": "polymarket",  # Options: polymarket (keyless)

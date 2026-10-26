@@ -1,0 +1,162 @@
+import copy
+from unittest.mock import Mock
+
+import pytest
+
+from tradingagents.dataflows import config as config_module, router
+from tradingagents.dataflows.config import set_config
+from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
+from tradingagents.dataflows.vendors import vnstock_fundamentals
+from tradingagents.default_config import DEFAULT_CONFIG
+
+
+def _row(period, item_id, value, unit="VNĐ"):
+    return {"period": period, "id": item_id, "level": 1, "unit": unit, "value": value}
+
+
+class FakeFrame:
+    def __init__(self, rows, symbol="FPT", source="vci"):
+        self.rows = rows
+        self.columns = tuple(rows[0].keys()) if rows else ("period", "id", "level", "unit", "value")
+        self.empty = not rows
+        self.attrs = {"source": source, "symbol": symbol, "format": "long"}
+
+    def to_dict(self, orient):
+        assert orient == "records"
+        return self.rows
+
+    def to_csv(self, index=False):
+        assert index is False
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=self.columns, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(self.rows)
+        return output.getvalue()
+
+
+def _frames():
+    income = [
+        _row("2025-Q1", "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY", 10_000_000_000),
+        _row("2025-Q2", "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY", 11_000_000_000),
+        _row("2025-Q3", "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY", 12_000_000_000),
+        _row("2025-Q4", "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY", 13_000_000_000),
+    ]
+    balance = [
+        _row("2024-Q4", "BS_EQUITY", 150_000_000_000),
+        _row("2025-Q4", "BS_EQUITY", 200_000_000_000),
+    ]
+    cash_flow = [
+        _row("2025-Q1", "CF_NET_CASH_FLOWS_FROM_OPERATING_ACTIVITIES", 12_000_000_000),
+        _row("2025-Q2", "CF_NET_CASH_FLOWS_FROM_OPERATING_ACTIVITIES", 13_000_000_000),
+        _row("2025-Q3", "CF_NET_CASH_FLOWS_FROM_OPERATING_ACTIVITIES", 14_000_000_000),
+        _row("2025-Q4", "CF_NET_CASH_FLOWS_FROM_OPERATING_ACTIVITIES", 15_000_000_000),
+    ]
+    return FakeFrame(income), FakeFrame(balance), FakeFrame(cash_flow)
+
+
+class FakeClient:
+    def __init__(self):
+        self.income_frame, self.balance_frame, self.cash_flow_frame = _frames()
+        self.calls = []
+
+    def income_statement(self, *, period, format, source):
+        self.calls.append(("income_statement", period, format, source))
+        return self.income_frame
+
+    def balance_sheet(self, *, period, format, source):
+        self.calls.append(("balance_sheet", period, format, source))
+        return self.balance_frame
+
+    def cash_flow(self, *, period, format, source):
+        self.calls.append(("cash_flow", period, format, source))
+        return self.cash_flow_frame
+
+
+@pytest.fixture
+def fake_vnstock(monkeypatch):
+    client = FakeClient()
+    monkeypatch.setattr(vnstock_fundamentals, "_fundamental_client", lambda symbol: client)
+    # Current CI host date may be UTC while our synthetic statements are dated in 2025.
+    monkeypatch.setattr(vnstock_fundamentals, "get_current_date", lambda: "2026-10-25")
+    return client
+
+
+@pytest.mark.unit
+def test_vnstock_statement_route_returns_validated_long_csv(fake_vnstock):
+    output = vnstock_fundamentals.get_vnstock_income_statement(
+        "fpt", "quarterly", "2026-10-25"
+    )
+    assert "# Income Statement for FPT from Vnstock VCI" in output
+    assert "historical first-publication time" in output
+    assert "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY" in output
+    assert fake_vnstock.calls == [("income_statement", "quarter", "long", "vci")]
+
+
+@pytest.mark.unit
+def test_vnstock_statement_withholds_historical_request_before_loading_client(monkeypatch):
+    client = Mock()
+    loader = Mock(return_value=client)
+    monkeypatch.setattr(vnstock_fundamentals, "_fundamental_client", loader)
+    monkeypatch.setattr(vnstock_fundamentals, "get_current_date", lambda: "2026-10-25")
+
+    output = vnstock_fundamentals.get_vnstock_income_statement(
+        "FPT", "quarterly", "2026-10-01"
+    )
+
+    assert "withheld" in output.lower() or "point-in-time" in output.lower()
+    loader.assert_not_called()
+
+
+@pytest.mark.unit
+def test_vnstock_fundamentals_summary_only_derives_complete_ttm_flows(fake_vnstock):
+    output = vnstock_fundamentals.get_vnstock_fundamentals("FPT", "2026-10-25")
+    assert "TTM parent-company net income: 46,000,000,000 VND" in output
+    assert "TTM operating cash flow: 54,000,000,000 VND" in output
+    assert "Latest total equity: 200,000,000,000 VND" in output
+    assert "does not currently validate shares outstanding" in output
+    assert all(call[2:] == ("long", "vci") for call in fake_vnstock.calls)
+
+
+@pytest.mark.unit
+def test_vnstock_rejects_wrong_source_metadata():
+    client = FakeClient()
+    client.income_frame = FakeFrame(client.income_frame.rows, source="kbs")
+    with pytest.raises(VendorUnavailableError, match="expected 'vci'"):
+        vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement")
+
+
+@pytest.mark.unit
+def test_vnstock_router_is_explicit_only_in_default_chain(monkeypatch):
+    monkeypatch.setattr(config_module, "_config", copy.deepcopy(DEFAULT_CONFIG))
+    set_config({"data_vendors": {"fundamental_data": "default"}})
+    unavailable = Mock(side_effect=NoMarketDataError("FPT", "FPT", "no VCI rows"))
+    vnstock = Mock(return_value="SHOULD_NOT_BE_CALLED")
+    monkeypatch.setitem(
+        router.VENDOR_METHODS,
+        "get_fundamentals",
+        {"yfinance": unavailable, "vnstock": vnstock},
+    )
+
+    result = router.route_to_vendor("get_fundamentals", "FPT", "2026-10-25")
+
+    assert result.startswith("NO_DATA_AVAILABLE")
+    vnstock.assert_not_called()
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("metadata", "message"),
+    [
+        ({}, "metadata source is None"),
+        ({"source": "vci", "format": "long"}, "metadata ticker"),
+        ({"source": "vci", "symbol": "FPT"}, "metadata format"),
+        ({"source": "kbs", "symbol": "FPT", "format": "long"}, "expected 'vci'"),
+    ],
+)
+def test_vnstock_statement_response_requires_complete_matching_metadata(metadata, message):
+    client = FakeClient()
+    client.income_frame.attrs = metadata
+
+    with pytest.raises(VendorUnavailableError, match=message):
+        vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement")

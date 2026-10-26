@@ -1,0 +1,38 @@
+name: Vietnam market data tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tradingagents/dataflows/vietnam_market/**"
+      - "tests/test_vietnam_market_*.py"
+      - "pyproject.toml"
+      - ".github/workflows/vietnam-market-tests.yml"
+  push:
+    branches: ["feature/vietnam-market-foundation"]
+    paths:
+      - "tradingagents/dataflows/vietnam_market/**"
+      - "tests/test_vietnam_market_*.py"
+      - "pyproject.toml"
+      - ".github/workflows/vietnam-market-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-vietnam-market:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install project and optional test/SSI dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Run Vietnam market data unit tests
+        run: python -m pytest -q tests/test_vietnam_market_models.py tests/test_vietnam_market_ssi.py tests/test_vietnam_market_smoke.py tests/test_vietnam_market_technicals.py tests/test_vietnam_market_fundamentals.py tests/test_vietnam_market_backtest.py tests/test_vietnam_market_strategies.py tests/test_vietnam_market_performance.py tests/test_vietnam_market_valuation.py tests/test_vietnam_market_io.py tests/test_vietnam_market_report.py tests/test_vietnam_market_export.py tests/test_vietnam_market_vnstock.py tests/test_vietnam_market_vnstock_cli.py tests/test_vietnam_market_ssi_vendor.py tests/test_vietnam_market_vnstock_vendor.py tests/test_vietnam_market_vnstock_market.py
+      - name: Lint Vietnam market data code
+        run: ruff check tradingagents/dataflows/vietnam_market tradingagents/dataflows/vendors/ssi_market.py tradingagents/dataflows/vendors/vnstock_fundamentals.py tradingagents/dataflows/vendors/vnstock_market.py tests/test_vietnam_market_models.py tests/test_vietnam_market_ssi.py tests/test_vietnam_market_smoke.py tests/test_vietnam_market_technicals.py tests/test_vietnam_market_fundamentals.py tests/test_vietnam_market_backtest.py tests/test_vietnam_market_strategies.py tests/test_vietnam_market_performance.py tests/test_vietnam_market_valuation.py tests/test_vietnam_market_io.py tests/test_vietnam_market_report.py tests/test_vietnam_market_export.py tests/test_vietnam_market_vnstock.py tests/test_vietnam_market_vnstock_cli.py tests/test_vietnam_market_ssi_vendor.py tests/test_vietnam_market_vnstock_vendor.py tests/test_vietnam_market_vnstock_market.py

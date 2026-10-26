@@ -10,8 +10,19 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
 from tradingagents.dataflows.date_window import as_of, as_of_window
-from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
-from tradingagents.dataflows.router import no_data_available, route_to_vendor, vendor_unavailable
+from tradingagents.dataflows.errors import (
+    NoMarketDataError,
+    VendorNotConfiguredError,
+    VendorUnavailableError,
+)
+from tradingagents.dataflows.router import (
+    get_vendor,
+    no_data_available,
+    route_to_vendor,
+    vendor_unavailable,
+)
+from tradingagents.dataflows.vendors.ssi_market import build_ssi_market_snapshot
+from tradingagents.dataflows.vendors.vnstock_market import build_vnstock_market_snapshot
 from tradingagents.dataflows.vendors.yahoo.snapshot import build_verified_market_snapshot
 
 
@@ -35,7 +46,12 @@ def get_stock_data(
         start_date, end_date = as_of_window(start_date, end_date, trade_date)
     except ValueError as e:
         return str(e)
-    return route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    try:
+        return route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    except VendorNotConfiguredError as exc:
+        # A selected optional provider with missing local configuration must be
+        # reported as unavailable, not allowed to abort the analyst's graph run.
+        return vendor_unavailable("get_stock_data", exc)
 
 
 @tool
@@ -64,8 +80,10 @@ def get_indicators(
     for ind in indicators:
         try:
             results.append(route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days))
-        except ValueError as e:
-            results.append(str(e))
+        except VendorNotConfiguredError as exc:
+            results.append(vendor_unavailable("get_indicators", exc))
+        except ValueError as exc:
+            results.append(str(exc))
     return "\n\n".join(results)
 
 
@@ -85,9 +103,34 @@ def get_verified_market_snapshot(
     price levels, Bollinger bands, RSI, MACD, moving averages, support /
     resistance, or historical comparisons, and treat it as the source of truth.
     """
-    # An exception out of a tool would end the run.
+    # Keep exact-price verification on the configured primary price source.
+    # SSI is current-date only because the first-availability time of historical
+    # rows cannot be reconstructed from a response fetched now.
     try:
-        return build_verified_market_snapshot(symbol, as_of(curr_date, trade_date), look_back_days)
+        snapshot_date = as_of(curr_date, trade_date)
+        configured = get_vendor("core_stock_apis", "get_stock_data").split(",")
+        primary_vendor = configured[0].strip() if configured else "default"
+        if primary_vendor in {"ssi", "vnstock"}:
+            snapshot_builder = (
+                build_ssi_market_snapshot
+                if primary_vendor == "ssi"
+                else build_vnstock_market_snapshot
+            )
+            try:
+                return snapshot_builder(symbol, snapshot_date, look_back_days)
+            except (
+                NoMarketDataError,
+                VendorUnavailableError,
+                VendorNotConfiguredError,
+            ) as source_error:
+                # A configured fallback can provide the snapshot if the selected
+                # source is unavailable, including a missing package or no bars.
+                if any(v.strip() == "yfinance" for v in configured[1:]):
+                    return build_verified_market_snapshot(symbol, snapshot_date, look_back_days)
+                if isinstance(source_error, VendorNotConfiguredError):
+                    raise VendorUnavailableError(str(source_error)) from source_error
+                raise
+        return build_verified_market_snapshot(symbol, snapshot_date, look_back_days)
     except VendorUnavailableError as exc:
         return vendor_unavailable("get_verified_market_snapshot", exc)
     except NoMarketDataError as exc:
@@ -108,7 +151,10 @@ def get_fundamentals(
     Returns:
         str: A formatted report containing comprehensive fundamental data
     """
-    return route_to_vendor("get_fundamentals", ticker, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_fundamentals", ticker, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_fundamentals", exc)
 
 
 @tool
@@ -127,7 +173,10 @@ def get_balance_sheet(
     Returns:
         str: A formatted report containing balance sheet data
     """
-    return route_to_vendor("get_balance_sheet", ticker, freq, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_balance_sheet", ticker, freq, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_balance_sheet", exc)
 
 
 @tool
@@ -146,7 +195,10 @@ def get_cashflow(
     Returns:
         str: A formatted report containing cash flow statement data
     """
-    return route_to_vendor("get_cashflow", ticker, freq, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_cashflow", ticker, freq, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_cashflow", exc)
 
 
 @tool
@@ -165,7 +217,10 @@ def get_income_statement(
     Returns:
         str: A formatted report containing income statement data
     """
-    return route_to_vendor("get_income_statement", ticker, freq, as_of(curr_date, trade_date))
+    try:
+        return route_to_vendor("get_income_statement", ticker, freq, as_of(curr_date, trade_date))
+    except VendorNotConfiguredError as exc:
+        return vendor_unavailable("get_income_statement", exc)
 
 
 @tool
