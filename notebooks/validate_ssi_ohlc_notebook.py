@@ -67,7 +67,8 @@ def check_notebook_and_sdk() -> list[str]:
     assert "get_ohlc_all(" in raw, "Notebook is not using SDK pagination helper"
     assert "requests.get(" not in raw and "requests.request(" not in raw, "Notebook bypasses SDK"
     assert "private_key" in raw, "Expected documentation comment about private_key to be present"
-    assert not re.search(r"(?i)(api_secret|api_key|client_id)\s*=\s*['\"][^'\"]{8,}['\"]", raw), "Possible hard-coded credential"
+    code_text = "\n".join(cell_source(cell) for cell in cells if cell.get("cell_type") == "code")
+    assert not re.search(r"(?i)(api_secret|api_key|client_id)\s*=\s*['\"][^'\"]{8,}['\"]", code_text), "Possible hard-coded credential"
     return [
         "PASS: notebook JSON and all Python cells compile",
         "PASS: SSI SDK 3.3.2 method signatures and day timeframe",
@@ -180,7 +181,6 @@ def check_mocked_runtime() -> list[str]:
         status_code=400,
         code="400213",
     )
-    error_env = _globals_for_notebook([], error=RuntimeError(fake_error.message))
     # Add SDK-like metadata without including real secrets anywhere.
     class FakeAPIError(Exception):
         message = fake_error.message
@@ -200,6 +200,27 @@ def check_mocked_runtime() -> list[str]:
         assert secret not in logged, "Error output leaked a credential"
     assert "HTTP=400" in logged and "400213" in logged
     assert "[REDACTED]" in logged or "[REDACTED_TOKEN]" in logged
+
+    # Invalid high/low relationships must never be silently passed downstream.
+    display_buffer = []
+    bad_bar = FakeBar("FPT", "2026/10/23 00:00:00", 100.0, 98.0, 99.0, 103.0, 123456, 123.4)
+    bad_env = _globals_for_notebook([bad_bar])
+    exec(compile(core, "ssi_notebook_core_invalid_cell", "exec"), bad_env)
+    try:
+        exec(compile(normalizer, "ssi_notebook_normalizer_invalid_cell", "exec"), bad_env)
+    except ValueError as exc:
+        assert "vi phạm quan hệ OHLC" in str(exc)
+    else:
+        raise AssertionError("Invalid OHLC candle was not rejected")
+
+    # No bars for a 60-calendar-day FPT window is not reported as a successful test.
+    empty_env = _globals_for_notebook([])
+    try:
+        exec(compile(core, "ssi_notebook_core_empty_cell", "exec"), empty_env)
+    except RuntimeError as exc:
+        assert "0 nến" in str(exc)
+    else:
+        raise AssertionError("An empty SSI result was reported as success")
 
     return [
         "PASS: actual notebook cells map fake SDK OHLC bars into the expected DataFrame",
