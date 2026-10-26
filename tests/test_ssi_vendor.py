@@ -8,7 +8,11 @@ import pandas as pd
 import pytest
 
 from tradingagents.dataflows import router
-from tradingagents.dataflows.errors import NoMarketDataError, VendorNotConfiguredError
+from tradingagents.dataflows.errors import (
+    NoMarketDataError,
+    VendorNotConfiguredError,
+    VendorUnavailableError,
+)
 from tradingagents.dataflows.vendors import ssi
 
 
@@ -57,12 +61,12 @@ def test_maps_official_sdk_bars_to_clean_ohlcv_frame():
 @pytest.mark.unit
 def test_invalid_candles_and_wrong_symbols_are_rejected():
     today = date.today()
-    with pytest.raises(Exception, match="invalid OHLC"):
+    with pytest.raises(VendorUnavailableError, match="invalid OHLC"):
         ssi._frame_from_bars(
             "FPT",
             [_bar(today, open_=110, high=105, low=99, close=103)],
         )
-    with pytest.raises(Exception, match="different from requested"):
+    with pytest.raises(VendorUnavailableError, match="different from requested"):
         ssi._frame_from_bars("FPT", [_bar(today, symbol="VNM")])
 
 
@@ -138,15 +142,10 @@ def test_router_registers_ssi_for_prices_and_indicators():
 
 
 @pytest.mark.unit
-def test_empty_ssi_history_is_not_treated_as_valid_data(monkeypatch):
+def test_empty_ssi_history_is_not_treated_as_valid_data(monkeypatch, tmp_path):
     today = date.today()
-    monkeypatch.setattr(ssi, "get_config", lambda: {"data_cache_dir": str(tmp_path_placeholder())})
+    monkeypatch.setattr(ssi, "get_config", lambda: {"data_cache_dir": str(tmp_path)})
     monkeypatch.setattr(ssi, "_fetch_from_ssi", lambda *args: pd.DataFrame(columns=list(ssi._REQUIRED_COLUMNS)))
     with pytest.raises(NoMarketDataError, match="no OHLCV rows"):
         ssi._get_history("FPT", today.isoformat(), today.isoformat())
 
-
-def tmp_path_placeholder():
-    # A separate directory per process keeps this no-data test from colliding with a real cache.
-    import tempfile
-    return tempfile.mkdtemp(prefix="tradingagents-ssi-test-")
