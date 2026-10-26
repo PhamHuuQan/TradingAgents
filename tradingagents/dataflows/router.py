@@ -21,10 +21,6 @@ from tradingagents.dataflows.vendors.fred import get_macro_data as get_fred_macr
 from tradingagents.dataflows.vendors.polymarket import (
     get_prediction_markets as get_polymarket_prediction_markets,
 )
-from tradingagents.dataflows.vendors.ssi import (
-    get_stock_data as get_ssi_stock_data,
-    get_indicators as get_ssi_indicators,
-)
 from tradingagents.dataflows.vendors.sec_edgar import (
     get_balance_sheet as get_sec_edgar_balance_sheet,
     get_cashflow as get_sec_edgar_cashflow,
@@ -101,13 +97,11 @@ OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {
-        "ssi": get_ssi_stock_data,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
     },
     # technical_indicators
     "get_indicators": {
-        "ssi": get_ssi_indicators,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
     },
