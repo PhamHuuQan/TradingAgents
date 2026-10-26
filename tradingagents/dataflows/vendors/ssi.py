@@ -14,6 +14,7 @@ import re
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -222,7 +223,7 @@ def _get_history(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
         raise ValueError(f"start_date ({start}) must not be after end_date ({end}).")
 
     path = _cache_path(symbol)
-    today = date.today()
+    today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
     recent_request = end >= today - timedelta(days=1)
 
     # Serialize read/extend/write: the analysts can request the same symbol in parallel.
@@ -323,7 +324,7 @@ def get_indicators(
     data = load_ssi_ohlcv(symbol, as_of_date, fill_gaps=True)
     data = data[data["Date"] <= pd.Timestamp(as_of_date)].copy()
     data = data.sort_values("Date").reset_index(drop=True)
-    frame = wrap(data)
+    frame = wrap(data[["Date", "Open", "High", "Low", "Close", "Volume"]].copy())
     frame["Date"] = pd.to_datetime(frame["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
     frame[indicator]  # trigger stockstats calculation
     values = {}
