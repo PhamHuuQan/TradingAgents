@@ -21,7 +21,7 @@ from ssi_sdk.enums import Timeframe
 from ssi_sdk.services.market_data import MarketDataService
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK = ROOT / "SSI_FastConnect_OHLC_FPT_Fixed.ipynb"
+NOTEBOOK = ROOT / "notebooks" / "SSI_FastConnect_OHLC_FPT_Fixed.ipynb"
 
 
 def cell_source(cell: dict) -> str:
