@@ -25,6 +25,23 @@ _MARKET_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 class SSIAdapterError(ValueError):
     """Raised when SSI data cannot be normalized safely."""
 
+def _ohlc_timestamp_arg(value: str, *, end_of_day: bool) -> str:
+    """Expand a date-only OHLC argument to SSI's required full timestamp.
+
+    The SSI OHLC endpoint rejects bare YYYY/MM/DD dates (400213). Preserve
+    explicit timestamps unchanged, but use the full trading-day bounds for dates.
+    """
+    text = value.strip()
+    if len(text) == 10:
+        try:
+            parsed = date.fromisoformat(text.replace("/", "-"))
+        except ValueError:
+            return text
+        clock = "23:59:59" if end_of_day else "00:00:00"
+        return f"{parsed:%Y/%m/%d} {clock}"
+    return text
+
+
 
 def _read_field(row: object, *names: str) -> object:
     """Read a field from a REST record, SDK model, or mapping, tolerating naming styles."""
@@ -209,8 +226,8 @@ class _SSIRestMarketDataClient:
                     },
                     params={
                         "symbol": symbol,
-                        "from": from_date,
-                        "to": to_date,
+                        "from": _ohlc_timestamp_arg(from_date, end_of_day=False),
+                        "to": _ohlc_timestamp_arg(to_date, end_of_day=True),
                         "timeFrame": timeframe_text,
                         "pageIndex": page_index,
                         "pageSize": size,
