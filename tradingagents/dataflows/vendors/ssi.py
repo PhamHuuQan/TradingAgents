@@ -238,11 +238,15 @@ def _get_history(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
             cache_end = cached["Date"].max().date()
             age_seconds = max(0.0, time.time() - path.stat().st_mtime)
             needs_current_refresh = recent_request and age_seconds > CACHE_TTL_SECONDS
-            if start < cache_start and end > cache_end:
+            # Boundaries are calendar dates, not all of which are trading days.
+            # A ten-day tolerance avoids repeat fetches for weekend/holiday boundaries.
+            missing_before = start < cache_start - timedelta(days=CACHE_REFRESH_OVERLAP_DAYS)
+            missing_after = end > cache_end + timedelta(days=CACHE_REFRESH_OVERLAP_DAYS)
+            if missing_before and missing_after:
                 fetch_start, fetch_end = start, end
-            elif start < cache_start:
+            elif missing_before:
                 fetch_start, fetch_end = start, min(end, cache_start)
-            elif end > cache_end:
+            elif missing_after:
                 fetch_start = max(start, cache_end - timedelta(days=CACHE_REFRESH_OVERLAP_DAYS))
                 fetch_end = end
             elif needs_current_refresh:
