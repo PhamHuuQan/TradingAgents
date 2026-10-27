@@ -13,7 +13,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
-from tradingagents.dataflows.date_window import get_current_date, withhold_live_profile
+from tradingagents.dataflows.date_window import get_current_date, is_historical
 from tradingagents.dataflows.errors import VendorUnavailableError
 from tradingagents.dataflows.symbols import normalize_symbol
 
@@ -216,9 +216,13 @@ def get_fpt_ir_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
             f"FPT IR source covers FPT only; received {canonical!r}"
         )
 
-    withheld = withhold_live_profile(as_of_date, canonical)
-    if withheld:
-        return withheld
+    if is_historical(as_of_date):
+        return (
+            f"# FPT IR fundamentals withheld for historical run: {as_of_date}\n\n"
+            "- This adapter discovers the latest public FPT IR earnings release at retrieval time. "
+            "It does not reconstruct the exact release set available on a past analysis date. "
+            "Using it would risk look-ahead bias; use a point-in-time filings source instead."
+        )
 
     home_html = _fetch_html(_IR_HOME)
     _title, source_url, period = _find_latest_9m_release(home_html)
