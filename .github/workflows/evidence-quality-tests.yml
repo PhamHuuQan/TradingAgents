@@ -32,6 +32,7 @@ on:
       - "tests/test_report_html.py"
       - "tests/test_reporting.py"
       - ".github/workflows/evidence-quality-tests.yml"
+      - "notebooks/TradingAgents_FPT_Evidence_Quality_And_Report.ipynb"
   pull_request:
     branches:
       - feature/vietnam-market-foundation
@@ -63,6 +64,7 @@ on:
       - "tests/test_report_html.py"
       - "tests/test_reporting.py"
       - ".github/workflows/evidence-quality-tests.yml"
+      - "notebooks/TradingAgents_FPT_Evidence_Quality_And_Report.ipynb"
   workflow_dispatch:
 
 permissions:
