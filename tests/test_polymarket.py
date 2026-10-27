@@ -180,9 +180,6 @@ class PolymarketRoutingTests(unittest.TestCase):
         self.assertEqual(out, "POLY_OK")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 
 def test_tool_filters_unrelated_sports_topics_for_equity_before_provider_query():
@@ -215,3 +212,7 @@ def test_tool_still_queries_financially_relevant_prediction_markets():
 
     assert out == "POLYMARKET_RESULT"
     route.assert_called_once_with("get_prediction_markets", "Fed rate cut 2026", 6, "2026-10-27")
+
+
+if __name__ == "__main__":
+    unittest.main()
