@@ -162,6 +162,10 @@ def test_fpt_ir_summary_metrics_are_partial_not_fully_unavailable():
     assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
     assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
+    guardrails = build_decision_evidence_guardrails(state)
+    assert "PARTIAL FUNDAMENTALS COVERAGE" in guardrails
+    assert "Do not infer operating/free cash flow" in guardrails
+    assert "FUNDAMENTALS LIMITATION:" not in guardrails
 
 
 def test_missing_company_fundamentals_are_not_a_blocker_for_crypto():
