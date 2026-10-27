@@ -54,7 +54,8 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     r"|(?:nền tảng|sức khỏe|tình hình)\s+tài chính.{0,35}(?:[\"'“”‘’]?\s*)(?:thép|vững(?: mạnh| chắc)?|mạnh|tốt|xuất sắc|ổn định)"
     r"|tài chính\s+[\"'“”‘’]?(?:thép|vững mạnh|vững chắc|mạnh|xuất sắc)"
     r"|(?:dòng tiền|biên lợi nhuận|khả năng sinh lời|năng lực tài chính).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt|bền vững)"
-    r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)",
+    r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)"
+    r"|cỗ máy in tiền.{0,30}(?:mạnh|bền vững|ổn định|đều đặn)",
     re.IGNORECASE,
 )
 _INSIDER_ABSENCE_RE = re.compile(
