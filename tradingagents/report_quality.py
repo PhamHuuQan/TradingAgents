@@ -101,6 +101,12 @@ def _downstream_text(state: dict[str, Any]) -> str:
     return "\n".join(piece for piece in pieces if piece)
 
 
+def _requires_fundamentals(state: dict[str, Any]) -> bool:
+    """Stock/equity reports need fundamental coverage; crypto narratives need not."""
+    asset_type = str(state.get("asset_type") or "stock").strip().casefold()
+    return asset_type not in {"crypto", "cryptocurrency", "forex", "fx", "commodity"}
+
+
 def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
     """Return concise prompt instructions grounded in the reports already collected."""
     fundamentals = _text(state.get("fundamentals_report"))
@@ -113,7 +119,11 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Label interpretation as inference. Never invent financial values, citations, publication dates, market probabilities, or insider-activity conclusions.",
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
     ]
-    if not fundamentals.strip() or _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals):
+    if _requires_fundamentals(state) and (
+        not fundamentals.strip()
+        or _UNAVAILABLE_RE.search(fundamentals)
+        or _NO_DATA_RE.search(fundamentals)
+    ):
         guardrails.append(
             "- FUNDAMENTALS LIMITATION: financial statements/ratios are unavailable or not usable in the supplied fundamentals report. "
             "Do not assert strong/weak cash flow, margins, solvency, valuation ratios, EPS/ROE, or a strong financial position "
@@ -155,7 +165,9 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     combined_news = news + "\n" + sentiment
     findings: list[dict[str, str]] = []
 
-    if source_statuses["Fundamentals report"] in {"MISSING", "LIMITED / SOURCE UNAVAILABLE", "NO USABLE DATA RETURNED"}:
+    if _requires_fundamentals(final_state) and source_statuses["Fundamentals report"] in {
+        "MISSING", "LIMITED / SOURCE UNAVAILABLE", "NO USABLE DATA RETURNED"
+    }:
         findings.append({
             "severity": "HIGH",
             "code": "FUNDAMENTALS_UNAVAILABLE",
