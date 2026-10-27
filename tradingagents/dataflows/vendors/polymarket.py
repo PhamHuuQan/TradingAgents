@@ -174,7 +174,7 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
 
     if not candidates:
         return header + (
-            f"No open, topic-relevant prediction markets matched '{topic}'. Polymarket coverage "
+            f"No open prediction markets relevant to '{topic}' matched. Polymarket coverage "
             f"is concentrated in macro, political, geopolitical, and crypto "
             f"events; a specific equity may have none."
         )
