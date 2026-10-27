@@ -128,6 +128,44 @@ def test_missing_company_fundamentals_are_not_a_blocker_for_crypto():
     assert not any(item["code"] == "FUNDAMENTALS_UNAVAILABLE" for item in audit["findings"])
 
 
+def test_fundamentals_without_a_source_url_are_flagged_when_values_are_present():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Revenue (TTM): VND 40,023 billion. PBT: VND 8,770 billion. "
+        "Reporting period: 9M2026."
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "FUNDAMENTALS_CITATIONS_MISSING" for item in audit["findings"])
+    assert audit["fundamentals_url_count"] == 0
+
+
+def test_news_item_without_publication_date_is_flagged_even_with_a_url():
+    state = _sample_state()
+    state["news_report"] = (
+        "### FPT announcement\nPublication date: unavailable from the provider\n"
+        "Source URL: https://example.test/fpt-news"
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "NEWS_PUBLICATION_DATES_MISSING" for item in audit["findings"])
+
+
+def test_portfolio_price_target_is_checked_when_trader_plan_has_no_entry_levels():
+    state = _sample_state()
+    state["trader_investment_plan"] = "Action: SELL"
+    state["final_trade_decision"] = "Rating: Underweight\n**Price Target**: not provided"
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "TRADE_PLAN_LEVELS_MISSING" for item in audit["findings"])
+
+
+def test_opposing_research_and_trader_directions_are_flagged():
+    state = _sample_state()
+    state["investment_plan"] = "Recommendation: Underweight"
+    state["trader_investment_plan"] = "Action: BUY"
+    state["final_trade_decision"] = "Rating: Underweight"
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "DECISION_DIRECTION_MISMATCH" for item in audit["findings"])
+
+
 def test_rendered_quality_section_never_claims_external_fact_check():
     rendered = render_report_quality_markdown(build_report_quality_audit(_sample_state()))
     assert "REVIEW REQUIRED" in rendered
