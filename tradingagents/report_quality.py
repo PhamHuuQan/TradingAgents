@@ -106,7 +106,10 @@ _INSIDER_QUALIFIER_RE = re.compile(
     r"|không phải bằng chứng rằng không có|không chứng minh không có"
     r"|không đồng nghĩa(?: với việc)? không có"
     r"|không thể kết luận(?: rằng| là)? không có"
-    r"|không phải là bằng chứng khẳng định",
+    r"|không phải là bằng chứng khẳng định"
+    r"|kết quả trống từ một nguồn cung cấp dữ liệu duy nhất"
+    r"|không phải là bằng chứng(?: xác thực)?(?: tuyệt đối)?[\s\S]{0,120}(?:không có|không diễn ra)"
+    r"|không chứng minh(?: được)?(?: rằng)? không có",
     re.IGNORECASE,
 )
 _MISSING_TRADE_LEVEL_RE = re.compile(
@@ -262,11 +265,14 @@ def _urls(text: str) -> list[str]:
 
 def _has_source_linked_summary_metrics(text: str) -> bool:
     """True when a report supplies a source URL and at least two numeric earnings-summary metrics."""
+    # The analyst may put the value in the next Markdown bullet (e.g. a metric
+    # heading followed by "- Giá trị: 40.023 tỷ VND"). Allow that layout while
+    # still requiring at least two distinct financial metric families and a URL.
     metric_patterns = (
-        r"(?:\brevenue\b|doanh thu).{0,180}\d[\d,.]*",
-        r"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế).{0,180}\d[\d,.]*",
-        r"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế).{0,180}\d[\d,.]*",
-        r"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu).{0,180}\d[\d,.]*",
+        r"(?:\brevenue\b|doanh thu(?: hợp nhất| thuần)?).{0,420}\d[\d,.]*",
+        r"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế|profit before tax).{0,420}\d[\d,.]*",
+        r"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế|profit after tax).{0,420}\d[\d,.]*",
+        r"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu|lợi nhuận trên mỗi cổ phiếu|earnings per share).{0,420}\d[\d,.]*",
     )
     metric_count = sum(
         bool(re.search(pattern, text or "", re.IGNORECASE | re.DOTALL))
@@ -289,12 +295,12 @@ def _downstream_text(state: dict[str, Any]) -> str:
     for key in ("investment_debate_state", "risk_debate_state"):
         value = state.get(key) or {}
         if isinstance(value, dict):
-            pieces.extend(_text(value.get(name)) for name in (
-                "history", "bull_history", "bear_history",
-                "aggressive_history", "conservative_history", "neutral_history",
-                "current_response", "current_aggressive_response",
-                "current_conservative_response", "current_neutral_response",
-            ))
+            # State schemas can add/rename debate fields across graph revisions.
+            # Include all textual values so the audit does not miss an unsupported
+            # claim simply because it moved to a newly named history/response key.
+            for name, nested in value.items():
+                if isinstance(nested, (str, dict, list, tuple)):
+                    pieces.append(f"{name}: {_text(nested)}")
         else:
             pieces.append(_text(value))
     return "\n".join(piece for piece in pieces if piece)
@@ -611,6 +617,27 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
+    asset_type = str(final_state.get("asset_type") or "stock").strip().casefold()
+    sports_market_mention = re.search(
+        r"(?is)(?:polymarket|prediction market|thị trường dự báo).{0,260}"
+        r"(?:afc asian cup|world cup|champions league|premier league|nba|nfl|mlb|nhl|"
+        r"olympics?|grand prix|football|soccer|basketball|tennis|sports event|sự kiện thể thao)"
+        r"|(?:afc asian cup|world cup|champions league|premier league|nba|nfl|mlb|nhl|"
+        r"olympics?|grand prix|football|soccer|basketball|tennis|sports event|sự kiện thể thao)"
+        r".{0,260}(?:polymarket|prediction market|thị trường dự báo)",
+        news,
+    ) if news.strip() else None
+    if sports_market_mention and asset_type not in {"sports", "sports event"}:
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "PREDICTION_MARKET_RELEVANCE_UNVERIFIED",
+            "finding": (
+                "The news report includes a sports/entertainment prediction market in an investment analysis. "
+                "Unless the event has a documented transmission channel to the analyzed instrument, exclude it "
+                "from the thesis and source summary rather than treating a search result as relevant evidence."
+            ),
+        })
+
     if news.strip() and _FRED_SOURCE_CLAIM_RE.search(news) and not re.search(
         r"https?://fred\.stlouisfed\.org/series/", news, re.IGNORECASE
     ):
@@ -668,7 +695,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         _text(final_state.get("trader_investment_plan")),
         _text(final_state.get("final_trade_decision")),
     ))
-    if _MISSING_TRADE_LEVEL_RE.search(execution_text):
+    trader_action_for_missing_levels = _TRADER_ACTION_RE.search(
+        _text(final_state.get("trader_investment_plan"))
+    )
+    # A Hold/no-new-order plan does not need a new entry price or upside target.
+    # Keep the check strict for actionable Buy/Sell plans and for a missing action.
+    requires_execution_levels = (
+        trader_action_for_missing_levels is None
+        or trader_action_for_missing_levels.group(1).casefold() != "hold"
+    )
+    if requires_execution_levels and _MISSING_TRADE_LEVEL_RE.search(execution_text):
         findings.append({
             "severity": "MEDIUM",
             "code": "TRADE_PLAN_LEVELS_MISSING",
