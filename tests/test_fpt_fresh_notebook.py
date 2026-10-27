@@ -77,7 +77,7 @@ class FreshNotebookTests(unittest.TestCase):
         self.assertIn('ANALYSTS = ["market", "social", "news", "fundamentals"]', run_cell)
         self.assertIn('config["data_vendors"]["core_stock_apis"] = "ssi"', run_cell)
         self.assertIn('config["data_vendors"]["technical_indicators"] = "ssi"', run_cell)
-        self.assertIn('config["data_vendors"]["fundamental_data"] = "vnstock"', run_cell)
+        self.assertIn('config["data_vendors"]["fundamental_data"] = "vnstock,yfinance"', run_cell)
         self.assertIn("TradingAgentsGraph(selected_analysts=ANALYSTS", run_cell)
 
     def test_model_candidates_start_with_flash_lite_fallbacks(self):
