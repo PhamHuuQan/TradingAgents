@@ -719,7 +719,9 @@ def test_fpt_insider_empty_result_with_explicit_nonproof_language_is_qualified()
         "This is an empty result from one provider and is not definitive evidence that no insider transactions occurred. "
         "https://finance.yahoo.com/quote/FPT/insider-transactions/"
     )
-    state["investment_debate_state"] = {"history": "No insider activity was confirmed."}
+    state["investment_debate_state"] = {
+        "history": "The provider query returned no records; underlying activity remains unknown."
+    }
 
     audit = build_report_quality_audit(state)
     assert not any(item["code"] == "INSIDER_ABSENCE_UNVERIFIED" for item in audit["findings"])
