@@ -13,7 +13,7 @@ _URL_RE = re.compile(r"https?://[^\s)\]>]+", re.IGNORECASE)
 _UNAVAILABLE_RE = re.compile(
     r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|EntitlementError|VendorUnavailableError)\b"
     r"|data\s+(?:is\s+)?unavailable|not available|unavailable via (?:the )?api"
-    r"|tạm thời không khả dụng|không thể trích xuất|không lấy được dữ liệu"
+    r"|temporarily unavailable|currently unavailable|tạm thời (?:chưa )?khả dụng|không thể trích xuất|không lấy được dữ liệu"
     r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)",
     re.IGNORECASE,
 )
@@ -49,7 +49,7 @@ _INSIDER_QUALIFIER_RE = re.compile(
     re.IGNORECASE,
 )
 _MISSING_TRADE_LEVEL_RE = re.compile(
-    r"(?:entry price|stop[\s-]?loss|price target)\s*[:：]\s*(?:not provided|not specified|n/?a|chưa có|không có)",
+    r"(?:\*\*)?(?:entry price|stop[\s-]?loss|price target)(?:\*\*)?\s*[:：]\s*(?:not provided|not specified|n/?a|chưa có|không có)",
     re.IGNORECASE,
 )
 
