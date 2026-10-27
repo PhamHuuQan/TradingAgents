@@ -49,6 +49,14 @@ _INSIDER_ABSENCE_RE = re.compile(
     r"|no insider trades",
     re.IGNORECASE,
 )
+_UNSUPPORTED_FINANCIAL_METRIC_RE = re.compile(
+    r"\b(?:free cash flow|operating cash flow|cash flow|P/E|P/B|ROE|return on equity|"
+    r"current ratio|debt[- ]to[- ]equity|solvency|liquidity|operating margin|profit margin|net margin)\b"
+    r".{0,40}\b(?:is|was|of|at|reached|stood at|equals?|around|approximately|improved to|rose to)?\s*"
+    r"(?:VND|USD|EUR|GBP)?\s*\d[\d,.]*(?:\s*%|\s*x|\s*(?:billion|million|trillion))?"
+    r"|\b\d[\d,.]*\s*%\s*(?:ROE|return on equity|P/E|P/B|operating margin|profit margin|net margin)\b",
+    re.IGNORECASE,
+)
 _INSIDER_QUALIFIER_RE = re.compile(
     r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not proof of (?:no|absence of) insider"
@@ -98,7 +106,9 @@ def _status(text: str) -> str:
 
 
 def _urls(text: str) -> list[str]:
-    return list(dict.fromkeys(_URL_RE.findall(text or "")))
+    # Narrative punctuation is not part of the URL.
+    values = (url.rstrip(".,;:!?") for url in _URL_RE.findall(text or ""))
+    return list(dict.fromkeys(url for url in values if url))
 
 
 def _downstream_text(state: dict[str, Any]) -> str:
@@ -240,6 +250,22 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Downstream debate/decision text asserts financial strength while the fundamentals report "
                 "contains an unavailable-data marker. Remove the assertion or attach a separately verified source."
+            ),
+        })
+
+    fundamentals_limitations = (
+        not fundamentals.strip()
+        or _UNAVAILABLE_RE.search(fundamentals)
+        or _NO_DATA_RE.search(fundamentals)
+        or fundamentals_are_partial
+    )
+    if _requires_fundamentals(final_state) and fundamentals_limitations and _UNSUPPORTED_FINANCIAL_METRIC_RE.search(downstream):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_FINANCIAL_METRIC",
+            "finding": (
+                "Downstream report assigns a numeric value to a financial metric that is not substantiated by the supplied "
+                "fundamentals data. Remove the value or cite a separate source with metric definition, unit and reporting period."
             ),
         })
 
