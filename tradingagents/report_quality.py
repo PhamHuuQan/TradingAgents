@@ -696,24 +696,45 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             return -1
         return 0
 
+    # A market analyst and the trader can disagree; expose direct Buy-vs-Underweight
+    # contradictions rather than letting the portfolio manager's final label hide them.
+    market_rating_match = _RATING_RE.search(market)
+    if trader_action_match and market_rating_match:
+        trader_direction = _direction(trader_action_match.group(1))
+        market_direction = _direction(market_rating_match.group(1))
+        if trader_direction != 0 and market_direction != 0 and trader_direction != market_direction:
+            findings.append({
+                "severity": "HIGH",
+                "code": "MARKET_TRADER_DIRECTION_MISMATCH",
+                "finding": (
+                    f"Market Analyst rating ({market_rating_match.group(1)}) conflicts with "
+                    f"Trader action ({trader_action_match.group(1)}). Reconcile the technical view "
+                    "and proposed execution before relying on the signal."
+                ),
+            })
+
     # Underweight and Sell share a negative direction but are not identical in
-    # strength. Flag opposing directions, not the normal rating/action mapping.
+    # strength. Flag opposing directional ratings; a neutral label is not a direct opposition.
     if trader_action_match:
         trader_direction = _direction(trader_action_match.group(1))
-        for label, match in (
-            ("Research Manager", research_rating_match),
-            ("Portfolio Manager", final_rating_match),
-        ):
-            if match and _direction(match.group(1)) != trader_direction:
-                findings.append({
-                    "severity": "HIGH",
-                    "code": "DECISION_DIRECTION_MISMATCH",
-                    "finding": (
-                        f"Trader action ({trader_action_match.group(1)}) points in a different direction "
-                        f"from {label} rating ({match.group(1)}). Reconcile before relying on the signal."
-                    ),
-                })
-                break
+        if trader_direction != 0:
+            for label, match in (
+                ("Research Manager", research_rating_match),
+                ("Portfolio Manager", final_rating_match),
+            ):
+                if not match:
+                    continue
+                other_direction = _direction(match.group(1))
+                if other_direction != 0 and other_direction != trader_direction:
+                    findings.append({
+                        "severity": "HIGH",
+                        "code": "DECISION_DIRECTION_MISMATCH",
+                        "finding": (
+                            f"Trader action ({trader_action_match.group(1)}) points in a different direction "
+                            f"from {label} rating ({match.group(1)}). Reconcile before relying on the signal."
+                        ),
+                    })
+                    break
 
     high_count = sum(item["severity"] == "HIGH" for item in findings)
     overall = "REVIEW REQUIRED" if findings else "NO AUTOMATED FLAGS"
