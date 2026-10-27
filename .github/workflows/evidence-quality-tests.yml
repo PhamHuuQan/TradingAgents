@@ -35,6 +35,8 @@ on:
       - "tradingagents/dataflows/vendors/fpt_ir.py"
       - "tradingagents/dataflows/vendors/yahoo/fundamentals.py"
       - "tradingagents/dataflows/vendors/yahoo/news.py"
+      - "tradingagents/dataflows/vendors/fred.py"
+      - "tradingagents/dataflows/vendors/polymarket.py"
       - "tradingagents/dataflows/router.py"
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
@@ -44,6 +46,8 @@ on:
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
       - "tests/test_news_lookahead.py"
+      - "tests/test_fred.py"
+      - "tests/test_polymarket.py"
       - "tests/test_report_html.py"
       - "tests/test_reporting.py"
       - ".github/workflows/evidence-quality-tests.yml"
@@ -102,5 +106,7 @@ jobs:
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
             tests/test_news_lookahead.py \
+            tests/test_fred.py \
+            tests/test_polymarket.py \
             tests/test_report_html.py \
             tests/test_reporting.py
