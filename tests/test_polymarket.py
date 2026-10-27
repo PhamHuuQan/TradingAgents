@@ -78,6 +78,21 @@ class PolymarketFormatTests(unittest.TestCase):
         self.assertIn("resolves 2030-12-31", out)
         self.assertIn("1-week -4.5pp", out)  # -0.045 -> -4.5pp
 
+    def test_market_source_url_and_observation_timestamp_are_rendered(self):
+        data = copy.deepcopy(_SEARCH)
+        data["events"][0]["slug"] = "fed-rate-cut-2026"
+        with mock.patch.object(polymarket, "_request", return_value=data):
+            out = polymarket.get_prediction_markets("Fed rate cut", limit=10)
+        self.assertIn("Retrieved at (UTC):", out)
+        self.assertIn("Market URL: https://polymarket.com/event/fed-rate-cut-2026", out)
+        self.assertIn("- API endpoint: https://gamma-api.polymarket.com/public-search", out)
+
+    def test_missing_provider_market_slug_is_not_replaced_with_a_guessed_url(self):
+        with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
+            out = polymarket.get_prediction_markets("anything", limit=10)
+        self.assertIn("Market URL: unavailable from the provider", out)
+        self.assertNotIn("https://polymarket.com/event/", out)
+
     def test_weekly_change_omitted_when_absent(self):
         # "Open small?" has wk=None -> no 1-week clause on its line.
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
