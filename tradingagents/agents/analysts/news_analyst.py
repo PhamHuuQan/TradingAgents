@@ -66,7 +66,7 @@ def _append_news_tool_evidence(report: str, messages) -> str:
     lines = ["", heading, "", "- The following records were copied from the news tools' returned blocks; their presence does not independently validate the article or claim.", ""]
     if records:
         for title, publisher, pub_date, url in records[:20]:
-            suffix = f"; URL: {url}" if url else "; direct URL not supplied"
+            suffix = f"; URL: {url}" if url else "; Source URL unavailable from the provider"
             lines.append(f"- {title} — {publisher}; publication date: {pub_date}{suffix}")
         if len(records) > 20:
             lines.append(f"- {len(records) - 20} additional tool-returned news records omitted from this index.")
