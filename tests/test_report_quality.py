@@ -152,7 +152,7 @@ def test_individual_news_item_without_url_is_flagged_even_when_other_urls_exist(
 def test_verified_market_snapshot_requires_provider_and_retrieval_metadata():
     state = _sample_state()
     state["market_report"] = (
-        "## Verified market data snapshot for FPT\\n"
+        "## Verified market data snapshot for FPT\n"
         "| Close | 56,900 |\\n"
         "| rsi | 43.2 |"
     )
@@ -165,9 +165,9 @@ def test_market_snapshot_with_source_and_retrieval_time_passes_metadata_check():
     state = _sample_state()
     state["market_report"] = (
         "## Verified market data snapshot for FPT\\n"
-        "- Source: Yahoo Finance chart history (yfinance)\\n"
-        "- Source URL: https://finance.yahoo.com/quote/FPT/history/\\n"
-        "- Retrieved at (UTC): 2026-10-27T02:00:00+00:00\\n"
+        "- Source: Yahoo Finance chart history (yfinance)\n"
+        "- Source URL: https://finance.yahoo.com/quote/FPT/history/\n"
+        "- Retrieved at (UTC): 2026-10-27T02:00:00+00:00\n"
         "| Close | 56,900 |"
     )
     audit = build_report_quality_audit(state)
