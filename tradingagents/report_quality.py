@@ -54,6 +54,18 @@ _MISSING_TRADE_LEVEL_RE = re.compile(
 )
 
 
+_RATING_RE = re.compile(
+    r"(?im)^\s*(?:\*\*)?(?:recommendation|rating)(?:\*\*)?\s*[:：]\s*(buy|overweight|hold|underweight|sell)\b"
+)
+_TRADER_ACTION_RE = re.compile(
+    r"(?im)^\s*(?:\*\*)?action(?:\*\*)?\s*[:：]\s*(buy|hold|sell)\b"
+)
+_MISSING_NEWS_DATE_RE = re.compile(
+    r"publication date:\s*unavailable|no publication date|undated (?:source|article)",
+    re.IGNORECASE,
+)
+
+
 def _text(value: Any) -> str:
     """Normalize optional report values without assuming their type."""
     if value is None:
@@ -143,6 +155,13 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- SENTIMENT PROVENANCE LIMITATION: the supplied sentiment report contains no direct URLs; treat source-specific social/news "
             "claims as unverified and describe the sample size/window or missing coverage when available."
         )
+    if fundamentals.strip() and not _urls(fundamentals) and not (
+        _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
+    ):
+        guardrails.append(
+            "- FUNDAMENTALS PROVENANCE LIMITATION: the supplied fundamentals report has no direct source URL. "
+            "Name the provider and reporting period, but do not describe its financial claims as independently verified."
+        )
     return "\n".join(guardrails)
 
 
@@ -208,6 +227,18 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
+    if fundamentals.strip() and not _urls(fundamentals) and not (
+        _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "FUNDAMENTALS_CITATIONS_MISSING",
+            "finding": (
+                "Fundamentals report contains no direct source URL. Financial statements and ratios cannot "
+                "be traced from the generated report alone."
+            ),
+        })
+
     if news.strip() and not _urls(news):
         findings.append({
             "severity": "MEDIUM",
@@ -215,6 +246,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "News report contains no direct source URLs. Named company events and macro claims are not "
                 "auditable from the generated report alone."
+            ),
+        })
+
+    if news.strip() and _urls(news) and _MISSING_NEWS_DATE_RE.search(news):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "NEWS_PUBLICATION_DATES_MISSING",
+            "finding": (
+                "One or more news items lack a source publication date. Keep them visibly undated and do not "
+                "use them in time-sensitive or point-in-time claims."
             ),
         })
 
@@ -228,7 +269,11 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if _MISSING_TRADE_LEVEL_RE.search(_text(final_state.get("trader_investment_plan"))):
+    execution_text = "\n".join((
+        _text(final_state.get("trader_investment_plan")),
+        _text(final_state.get("final_trade_decision")),
+    ))
+    if _MISSING_TRADE_LEVEL_RE.search(execution_text):
         findings.append({
             "severity": "MEDIUM",
             "code": "TRADE_PLAN_LEVELS_MISSING",
@@ -254,12 +299,44 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
+    research_rating_match = _RATING_RE.search(_text(final_state.get("investment_plan")))
+    trader_action_match = _TRADER_ACTION_RE.search(_text(final_state.get("trader_investment_plan")))
+    final_rating_match = _RATING_RE.search(decision_text)
+
+    def _direction(label: str) -> int:
+        normalized = label.strip().casefold()
+        if normalized in {"buy", "overweight"}:
+            return 1
+        if normalized in {"sell", "underweight"}:
+            return -1
+        return 0
+
+    # Underweight and Sell share a negative direction but are not identical in
+    # strength. Flag opposing directions, not the normal rating/action mapping.
+    if trader_action_match:
+        trader_direction = _direction(trader_action_match.group(1))
+        for label, match in (
+            ("Research Manager", research_rating_match),
+            ("Portfolio Manager", final_rating_match),
+        ):
+            if match and _direction(match.group(1)) != trader_direction:
+                findings.append({
+                    "severity": "HIGH",
+                    "code": "DECISION_DIRECTION_MISMATCH",
+                    "finding": (
+                        f"Trader action ({trader_action_match.group(1)}) points in a different direction "
+                        f"from {label} rating ({match.group(1)}). Reconcile before relying on the signal."
+                    ),
+                })
+                break
+
     high_count = sum(item["severity"] == "HIGH" for item in findings)
     overall = "REVIEW REQUIRED" if findings else "NO AUTOMATED FLAGS"
     return {
         "overall_status": overall,
         "analysis_date": _text(final_state.get("trade_date")) or "not recorded",
         "source_statuses": source_statuses,
+        "fundamentals_url_count": len(_urls(fundamentals)),
         "news_url_count": len(_urls(news)),
         "sentiment_url_count": len(_urls(sentiment)),
         "findings": findings,
@@ -284,6 +361,7 @@ def render_report_quality_markdown(audit: dict[str, Any]) -> str:
         lines.append(f"| {label} | {status} |")
     lines.extend([
         "",
+        f"- Direct URLs in Fundamentals report: {audit['fundamentals_url_count']}",
         f"- Direct URLs in News report: {audit['news_url_count']}",
         f"- Direct URLs in Sentiment report: {audit['sentiment_url_count']}",
         "",
