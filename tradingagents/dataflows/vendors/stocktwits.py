@@ -19,7 +19,8 @@ import html
 import http.client
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from tradingagents.dataflows.date_window import coverage_gap, in_window
@@ -99,6 +100,7 @@ def fetch_stocktwits_messages(
     try:
         with urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())
+        retrieved_at = datetime.now(UTC).isoformat()
     except (OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
         # OSError covers URLError/TimeoutError/connection resets; HTTPException
         # covers chunked-transfer errors (IncompleteRead/BadStatusLine, #1024).
@@ -106,6 +108,11 @@ def fetch_stocktwits_messages(
         return f"<stocktwits unavailable: {type(exc).__name__}>"
 
     fetched = data.get("messages", []) if isinstance(data, dict) else []
+    source_header = (
+        "Source: StockTwits public symbol stream\\n"
+        f"Source URL: {url}\\n"
+        f"Retrieved at (UTC): {retrieved_at}\\n"
+    )
     messages = _within_window(fetched, start_date, end_date)
     if not messages:
         if start_date and end_date:
@@ -113,11 +120,11 @@ def fetch_stocktwits_messages(
                 (_created_at(m) for m in fetched), start_date, end_date,
                 "StockTwits", f"messages about ${ticker.upper()}",
             )
-            return gap or (
+            return source_header + (gap or (
                 f"<no StockTwits messages for ${ticker.upper()} within "
                 f"{start_date}..{end_date}>"
-            )
-        return f"<no StockTwits messages found for ${ticker.upper()}>"
+            ))
+        return source_header + f"<no StockTwits messages found for ${ticker.upper()}>"
 
     note = ""
     if screen:
@@ -148,7 +155,18 @@ def fetch_stocktwits_messages(
         else:
             unlabeled += 1
             tag = "no-label"
-        lines.append(f"[{created} · @{user} · {tag}] {body}")
+        # Keep only the post permalink supplied by StockTwits; never synthesize
+        # one from a user name or a message ID that may be absent.
+        raw_url = m.get("url")
+        message_url = ""
+        if isinstance(raw_url, str) and raw_url.strip():
+            parsed_url = urlparse(raw_url.strip())
+            if parsed_url.scheme == "https" and parsed_url.hostname in {"stocktwits.com", "www.stocktwits.com"}:
+                message_url = raw_url.strip()
+        lines.append(
+            f"[{created} · @{user} · {tag}] {body}\\n"
+            + (f"  Source URL: {message_url}" if message_url else "  Source URL unavailable from the provider")
+        )
 
     total = bullish + bearish + unlabeled
     bull_pct = round(100 * bullish / total) if total else 0
