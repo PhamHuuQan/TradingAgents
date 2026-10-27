@@ -13,7 +13,8 @@ from tradingagents.reporting import write_report_tree
 
 SETTINGS = {"version": "1.2.3", "llm_provider": "openai", "deep_think_llm": "gpt-6-sol",
             "quick_think_llm": "gpt-6-luna", "analysts": ["market", "news"], "max_debate_rounds": 1,
-            "max_risk_discuss_rounds": 1, "data_vendors": {"core_stock_apis": "yfinance"}}
+            "max_risk_discuss_rounds": 1, "data_vendors": {"core_stock_apis": "yfinance"},
+            "code_branch": "feature/test-revision", "code_commit": "0123456789abcdef0123456789abcdef01234567"}
 
 
 def _state(**overrides):
@@ -99,7 +100,8 @@ def test_run_details_show_each_value_as_its_own_field(tmp_path):
     page = (tmp_path / "complete_report.html").read_text(encoding="utf-8")
     header = page[page.index("<header"):page.index("</header>")]
     for value in ("anthropic", "claude-opus-5-5", "openai", "gpt-6-luna", "market", "news",
-                  "sec_edgar", "yfinance"):
+                  "sec_edgar", "yfinance", "feature/test-revision",
+                  "0123456789abcdef0123456789abcdef01234567"):
         assert value in _fields(header)
     # Vendors are named by what they serve, and a chain keeps its order.
     assert "Prices" in header and "Fundamentals" in header and "fundamental_data" not in header
