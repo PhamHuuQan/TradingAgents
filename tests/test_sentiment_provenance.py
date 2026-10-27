@@ -62,8 +62,8 @@ def test_sentiment_provenance_does_not_invent_links_for_unavailable_sources():
     assert "Direct source URLs preserved in this index: 0" in actual
 
 
-def test_existing_sentiment_provenance_section_is_not_duplicated():
-    report = "Report\n\n### Source URLs and coverage supplied to sentiment analysis\nExisting index."
+def test_existing_sentiment_provenance_section_is_replaced_with_tool_grounded_index():
+    report = "Report\n\n### Source URLs and coverage supplied to sentiment analysis\nModel-invented URL: https://example.com"
     actual = _append_sentiment_source_provenance(
         report,
         ticker="FPT",
@@ -73,4 +73,6 @@ def test_existing_sentiment_provenance_section_is_not_duplicated():
         stocktwits_block="",
         reddit_block="",
     )
-    assert actual == report
+    assert actual.count("### Source URLs and coverage supplied to sentiment analysis") == 1
+    assert "Model-invented URL" not in actual
+    assert "Direct source URLs preserved in this index: 0" in actual
