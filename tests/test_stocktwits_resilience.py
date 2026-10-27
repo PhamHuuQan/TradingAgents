@@ -113,7 +113,8 @@ class TestStockTwitsScreening:
     def test_screened_out_messages_leave_the_block_and_its_counts(self):
         with patch.object(stocktwits, "urlopen", return_value=_stream("SPAM", "long NVDA")):
             out = stocktwits.fetch_stocktwits_messages("NVDA", screen=_drop_spam)
-        assert out.startswith("Screened: note")
+        assert out.startswith("Source: StockTwits public symbol stream")
+        assert "Screened: note" in out
         assert "long NVDA" in out and "SPAM" not in out
         assert "Total: 1 most-recent" in out
 
