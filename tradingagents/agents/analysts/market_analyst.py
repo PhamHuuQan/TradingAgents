@@ -47,6 +47,8 @@ Volume-Based Indicators:
 
 Before writing the final report, call get_verified_market_snapshot for this ticker and the current date, and treat it as the source of truth for any exact OHLCV, price-level, or indicator-value claim. If another tool's output conflicts with the verified snapshot, flag the discrepancy rather than inventing a reconciled number. Do not claim historical validation, support/resistance bounces, or exact percentage moves unless they are directly supported by tool output with concrete dates and prices.
 
+MANDATORY PROVENANCE: Include a clearly labelled "Market Data Provenance" section at the end. Copy the provider/source, exact "Source URL", "Retrieved at" timestamp, requested as-of date, and latest returned trading-row date from get_verified_market_snapshot. Do not silently drop those metadata lines. If the snapshot lacks a field, explicitly write "not supplied by provider"; never invent one or substitute a general home page for a data endpoint.
+
 Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + get_language_instruction()
