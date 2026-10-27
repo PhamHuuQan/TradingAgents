@@ -23,7 +23,9 @@ _NO_DATA_RE = re.compile(
     re.IGNORECASE,
 )
 _FINANCIAL_STRENGTH_RE = re.compile(
-    r"nền tảng tài chính\s+(?:vững|thép|mạnh|xuất sắc|rất tốt)"
+    r"\bstrong financial position\b|\bstrong financial foundation\b"
+    r"|\b(?:stable|steady|robust|healthy) (?:operating )?cash flow\b"
+    r"|nền tảng tài chính\s+(?:vững|thép|mạnh|xuất sắc|rất tốt)"
     r"|tài chính\s+[\"“]?(?:thép|vững mạnh|vững chắc)"
     r"|dòng tiền(?: hoạt động)?\s+(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|rất tốt)"
     r"|biên lợi nhuận\s+(?:xuất sắc|cao|mạnh|ổn định)"
@@ -61,10 +63,10 @@ def _text(value: Any) -> str:
 def _status(text: str) -> str:
     if not text.strip():
         return "MISSING"
-    if _UNAVAILABLE_RE.search(text):
-        return "LIMITED / SOURCE UNAVAILABLE"
     if _NO_DATA_RE.search(text):
         return "NO USABLE DATA RETURNED"
+    if _UNAVAILABLE_RE.search(text):
+        return "LIMITED / SOURCE UNAVAILABLE"
     return "PRESENT — NOT INDEPENDENTLY VERIFIED"
 
 
