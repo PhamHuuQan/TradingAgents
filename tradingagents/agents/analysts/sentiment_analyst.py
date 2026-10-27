@@ -259,7 +259,8 @@ def _append_sentiment_source_provenance(
     st_folded = (stocktwits_block or "").casefold()
     st_no_messages = "no stocktwits messages" in st_folded
     st_screened_all = "none of the" in st_folded and "messages is about" in st_folded
-    st_has_message_rows = bool(re.search(r"(?m)^\[\d{4}-\d{2}-\d{2}\b", stocktwits_block or ""))
+    # Provider rows may be indented; recognize them before deciding that no message was supplied.
+    st_has_message_rows = bool(re.search(r"(?m)^\s*\[\d{4}-\d{2}-\d{2}\b", stocktwits_block or ""))
     if st_posts:
         for url in dict.fromkeys(st_posts[:10]):
             lines.append(f"- Message permalink: {url}")
