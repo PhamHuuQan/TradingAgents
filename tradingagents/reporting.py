@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from tradingagents.agents.rating import run_rating
+from tradingagents.report_quality import build_report_quality_audit, render_report_quality_markdown
 
 
 def analyst_names(keys) -> list[str]:
@@ -100,6 +101,19 @@ def write_report_tree(final_state: dict, ticker: str, save_path, settings: dict 
     save_path = Path(save_path)
     save_path.mkdir(parents=True, exist_ok=True)
     parts = _report_parts(final_state)
+
+    # Preserve the original agent reports and append a deterministic audit that
+    # makes known source/data limitations visible in both Markdown and HTML.
+    quality_text = render_report_quality_markdown(build_report_quality_audit(final_state))
+    quality_dir = save_path / "6_quality"
+    quality_dir.mkdir(exist_ok=True)
+    (quality_dir / "report_quality.md").write_text(quality_text, encoding="utf-8")
+    parts.append((
+        "VI. Data Quality & Evidence Audit",
+        "6_quality",
+        [("Automated Evidence Audit", "report_quality.md", quality_text)],
+    ))
+
     sections = []
     for heading, folder, written in parts:
         (save_path / folder).mkdir(exist_ok=True)
