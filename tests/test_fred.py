@@ -116,6 +116,10 @@ class FredFormattingTests(unittest.TestCase):
         self.assertIn("## FRED: Unemployment Rate (UNRATE)", out)
         self.assertIn("Units: %", out)
         self.assertIn("Frequency: Monthly (SA)", out)
+        self.assertIn("Source URL: https://fred.stlouisfed.org/series/UNRATE", out)
+        self.assertIn("Retrieved at (UTC):", out)
+        self.assertIn("Data vintage as of:", out)
+        self.assertIn("Observation window: 2025-09-30 to 2025-09-30", out)
         self.assertIn("**Latest:** 4.4 (2025-09-01)", out)
         # The change names the observations it spans, not the lookback window,
         # so a 3-month move on a monthly series cannot read as year on year.
