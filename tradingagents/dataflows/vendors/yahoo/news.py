@@ -76,10 +76,17 @@ def _format_articles(articles: list[dict]) -> str:
     out = ""
     for data in articles:
         out += f"### {data['title']} (source: {data['publisher']})\n"
+        pub_date = data.get("pub_date")
+        if pub_date is not None:
+            out += f"Publication date: {pub_date.date().isoformat()}\n"
+        else:
+            out += "Publication date: unavailable from the provider\n"
         if data["summary"]:
             out += f"{data['summary']}\n"
         if data["link"]:
-            out += f"Link: {data['link']}\n"
+            out += f"Source URL: {data['link']}\n"
+        else:
+            out += "Source URL: unavailable from the provider\n"
         out += "\n"
     return out
 
