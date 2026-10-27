@@ -118,6 +118,7 @@ class FredFormattingTests(unittest.TestCase):
         self.assertIn("Units: %", out)
         self.assertIn("Frequency: Monthly (SA)", out)
         self.assertIn("Source URL: https://fred.stlouisfed.org/series/UNRATE", out)
+        self.assertIn("not endorsed or certified by the Federal Reserve Bank of St. Louis", out)
         self.assertIn("Retrieved at (UTC):", out)
         self.assertIn("Data vintage as of:", out)
         self.assertIn("Observation window: 2024-09-30 to 2025-09-30", out)
@@ -234,6 +235,7 @@ class FredFormattingTests(unittest.TestCase):
 
         self.assertIn("## FRED: Unemployment Rate (UNRATE)", out)
         self.assertIn("https://fred.stlouisfed.org/series/UNRATE", out)
+        self.assertIn("not endorsed or certified by the Federal Reserve Bank of St. Louis", out)
         self.assertIn("fredgraph.csv?id=UNRATE", out)
         self.assertIn("latest values served at retrieval time", out)
         self.assertIn("never historical backtests", out)
