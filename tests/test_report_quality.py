@@ -833,3 +833,23 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
     assert "PREDICTION_MARKET_RELEVANCE_UNVERIFIED" in codes
     assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
     assert "TRADE_ENTRY_EQUALS_STOP_LOSS" in codes
+
+
+
+def test_publication_dates_alone_do_not_count_as_source_linked_financial_metrics():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "FPT earnings report overview. Revenue details are unavailable. "
+        "Profit before tax details are unavailable. "
+        "Published 2026-10-21; reporting period ended 2026-09-30. "
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Values were not supplied in the fetched disclosure."
+    )
+
+    audit = build_report_quality_audit(state)
+    assert audit["source_statuses"]["Fundamentals report"] != (
+        "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+    )
+    assert "FUNDAMENTALS_UNAVAILABLE" in {
+        item["code"] for item in audit["findings"]
+    }
