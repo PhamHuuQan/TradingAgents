@@ -12,10 +12,10 @@ import requests
 
 import tradingagents.dataflows.config as config_module
 import tradingagents.default_config as default_config
+from tradingagents.agents.tools import get_prediction_markets
 from tradingagents.dataflows import router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.vendors import polymarket
-from tradingagents.agents.tools import get_prediction_markets
 
 
 def _market(question, prob, *, volume, end_date, closed=False, wk=None):
