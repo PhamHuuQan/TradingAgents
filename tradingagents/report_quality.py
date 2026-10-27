@@ -107,6 +107,39 @@ _NEWS_ITEM_URL_MISSING_RE = re.compile(
 )
 
 
+_MARKET_SOURCE_LINE_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:source|provider|nguồn(?: dữ liệu)?)\s*[:：]"
+)
+_MARKET_SOURCE_URL_LINE_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:source url|data url|url nguồn|link nguồn)\s*[:：]\s*https?://"
+)
+_MARKET_RETRIEVAL_LINE_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:retrieved at(?: \(utc\))?|retrieval time|"
+    r"thời điểm truy xuất|thời gian truy xuất|thời điểm lấy dữ liệu)\s*[:：]"
+)
+_MARKET_NUMERIC_CLAIM_RE = re.compile(
+    r"\b(?:close|open|high|low|price|volume|rsi|atr|macd|ema|sma|boll(?:inger)?(?:\s+bands?)?)\b"
+    r".{0,120}\d[\d,.]*"
+    r"|\b(?:giá (?:đóng cửa|hiện tại|gần nhất)|chỉ số rsi|rsi|atr|macd|ema|sma|"
+    r"dải bollinger|biên độ dao động|khối lượng giao dịch)\b.{0,100}\d[\d,.]*"
+    r"|\d[\d,.]*\s*(?:VND|VNĐ|đồng)\b",
+    re.IGNORECASE,
+)
+
+
+def _market_provenance_missing(text: str) -> bool:
+    """Require provider, direct source URL, and retrieval time when numeric market claims appear."""
+    if not text.strip():
+        return False
+    if not _MARKET_NUMERIC_CLAIM_RE.search(text) and "verified market data snapshot" not in text.casefold():
+        return False
+    return not (
+        _MARKET_SOURCE_LINE_RE.search(text)
+        and _MARKET_SOURCE_URL_LINE_RE.search(text)
+        and _MARKET_RETRIEVAL_LINE_RE.search(text)
+    )
+
+
 def _text(value: Any) -> str:
     """Normalize optional report values without assuming their type."""
     if value is None:
@@ -184,13 +217,10 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- MARKET DATA LIMITATION: no usable market/technical report is present. Do not state exact prices, indicators, support/resistance levels, "
             "or execution levels as verified without a separate named, dated source. Say which market data is unavailable."
         )
-    elif "verified market data snapshot" in market.casefold() and (
-        not re.search(r"(?im)^\s*(?:[-*]\s*)?source\s*[:：]", market)
-        or not re.search(r"(?im)^\s*(?:[-*]\s*)?retrieved at(?: \(utc\))?\s*[:：]", market)
-    ):
+    elif _market_provenance_missing(market):
         guardrails.append(
-            "- MARKET DATA PROVENANCE LIMITATION: a verified-snapshot heading is present but the report does not preserve both its provider and retrieval time. "
-            "Do not describe the snapshot as source-traceable until those fields are included."
+            "- MARKET DATA PROVENANCE LIMITATION: numeric price/indicator claims are present but the market report does not preserve a labeled provider, direct source URL, and retrieval timestamp. "
+            "Do not describe these figures as source-traceable until all three are included."
         )
     if _requires_fundamentals(state) and (
         not fundamentals.strip()
@@ -268,16 +298,13 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if market.strip() and "verified market data snapshot" in market.casefold() and (
-        not re.search(r"(?im)^\s*(?:[-*]\s*)?source\s*[:：]", market)
-        or not re.search(r"(?im)^\s*(?:[-*]\s*)?retrieved at(?: \(utc\))?\s*[:：]", market)
-    ):
+    if _market_provenance_missing(market):
         findings.append({
             "severity": "MEDIUM",
             "code": "MARKET_SOURCE_METADATA_MISSING",
             "finding": (
-                "A verified market-data snapshot is present but its provider and/or retrieval timestamp is missing. "
-                "Preserve those fields so exact OHLCV and indicator claims can be traced to a source."
+                "Numeric price/indicator claims are present but the market report is missing a labeled provider, direct source URL, and/or retrieval timestamp. "
+                "Preserve all three fields so exact OHLCV and indicator claims can be traced to a source."
             ),
         })
 
