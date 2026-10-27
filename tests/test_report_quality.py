@@ -142,8 +142,8 @@ def test_fundamentals_without_a_source_url_are_flagged_when_values_are_present()
 def test_individual_news_item_without_url_is_flagged_even_when_other_urls_exist():
     state = _sample_state()
     state["news_report"] = (
-        "### First item\\nPublication date: 2026-10-21\\nSource URL: https://example.test/one\\n"
-        "### Second item\\nPublication date: 2026-10-22\\nSource URL unavailable from the provider"
+        "### First item\nPublication date: 2026-10-21\nSource URL: https://example.test/one\n"
+        "### Second item\nPublication date: 2026-10-22\nSource URL unavailable from the provider"
     )
     audit = build_report_quality_audit(state)
     assert any(item["code"] == "NEWS_ITEM_URLS_MISSING" for item in audit["findings"])
@@ -153,7 +153,7 @@ def test_verified_market_snapshot_requires_provider_and_retrieval_metadata():
     state = _sample_state()
     state["market_report"] = (
         "## Verified market data snapshot for FPT\n"
-        "| Close | 56,900 |\\n"
+        "| Close | 56,900 |\n"
         "| rsi | 43.2 |"
     )
     audit = build_report_quality_audit(state)
