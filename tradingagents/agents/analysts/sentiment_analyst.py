@@ -279,7 +279,7 @@ def _append_sentiment_source_provenance(
     lines.append("")
     lines.append(f"- Direct source URLs preserved in this index: {url_count}")
 
-    return report_text.rstrip() + "\\n" + "\\n".join(lines) + "\\n"
+    return report_text.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 def _build_system_message(
