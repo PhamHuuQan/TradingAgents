@@ -21,6 +21,8 @@ on:
       - "tradingagents/agents/managers/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
+      - "tests/test_market_provenance.py"
+      - "tests/test_sentiment_provenance.py"
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
       - "tests/test_news_lookahead.py"
@@ -53,6 +55,8 @@ on:
       - "tradingagents/agents/managers/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
+      - "tests/test_market_provenance.py"
+      - "tests/test_sentiment_provenance.py"
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
       - "tests/test_news_lookahead.py"
@@ -90,6 +94,8 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_report_quality.py \
+            tests/test_market_provenance.py \
+            tests/test_sentiment_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
             tests/test_news_lookahead.py \
@@ -123,6 +129,8 @@ jobs:
             tradingagents/agents/managers/portfolio_manager.py \
             tradingagents/agents/trader/trader.py \
             tests/test_report_quality.py \
+            tests/test_market_provenance.py \
+            tests/test_sentiment_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
             tests/test_news_lookahead.py \
