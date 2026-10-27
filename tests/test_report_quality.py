@@ -170,6 +170,28 @@ def test_partial_fpt_ir_summary_is_not_mistaken_for_complete_fundamentals():
     assert "Do not infer operating/free cash flow" in guardrails
 
 
+def test_partial_fundamentals_cannot_support_numeric_roE_or_cashflow_claims():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Official FPT IR 9M2026 earnings summary: "
+        "https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Scope: earnings-performance summary; not a complete financial-statement package."
+    )
+    state["investment_debate_state"]["history"] = (
+        "Bull Analyst: FPT ROE of 22% and operating cash flow of VND 5,000 billion."
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "UNSUPPORTED_FINANCIAL_METRIC" for item in audit["findings"])
+
+
+def test_source_url_counter_strips_terminal_sentence_punctuation():
+    state = _sample_state()
+    state["news_report"] = "Source: https://example.test/article."
+    audit = build_report_quality_audit(state)
+    assert audit["news_url_count"] == 1
+    assert audit["news_url_count"] == len(["https://example.test/article"])
+
+
 def test_news_item_without_publication_date_is_flagged_even_with_a_url():
     state = _sample_state()
     state["news_report"] = (
