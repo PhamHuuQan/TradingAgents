@@ -347,6 +347,27 @@ def test_fred_macro_claim_requires_direct_series_page_url():
     assert any(item["code"] == "FRED_SERIES_CITATION_MISSING" for item in audit["findings"])
 
 
+def test_oversold_rsi_does_not_support_high_reversal_probability_without_backtest():
+    state = _sample_state()
+    state["investment_debate_state"] = {
+        "history": (
+            "Bull: RSI is 27.3 and the stock is near the Bollinger lower band. "
+            "This creates a very high probability of a technical bounce."
+        )
+    }
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    assert any(
+        item["code"] == "UNSUPPORTED_REVERSAL_PROBABILITY"
+        for item in audit["findings"]
+    )
+    assert "REVERSAL PROBABILITY LIMITATION" in build_decision_evidence_guardrails(state)
+
+
 def test_partial_earnings_summary_does_not_support_undervaluation_claims():
     state = _sample_state()
     state["fundamentals_report"] = (
