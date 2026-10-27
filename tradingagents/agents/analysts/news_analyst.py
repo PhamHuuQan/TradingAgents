@@ -1,3 +1,6 @@
+import re
+
+from langchain_core.messages import ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.analysts.turn import take_turn
@@ -16,6 +19,65 @@ TOOLS = (
     get_macro_indicators,
     get_prediction_markets,
 )
+
+
+
+
+def _append_news_tool_evidence(report: str, messages) -> str:
+    """Append source dates/URLs present in the exact news-tool results."""
+    if not report.strip():
+        return report
+    heading = "### Source records returned by news tools"
+    if heading in report:
+        report = report.split(heading, 1)[0].rstrip()
+
+    records = []
+    unavailable_blocks = []
+    for message in messages or ():
+        if not isinstance(message, ToolMessage):
+            continue
+        tool_name = str(getattr(message, "name", "") or "")
+        content = str(getattr(message, "content", "") or "")
+        if tool_name not in {"get_news", "get_global_news"} and not re.search(
+            r"(?m)^###\s+.+\nPublication date:", content
+        ):
+            continue
+        if any(token in content.casefold() for token in ("data_unavailable", "unavailable:", "no news found", "no global news found")):
+            unavailable_blocks.append((tool_name or "news tool", content[:260].replace("\n", " ")))
+        for chunk in re.split(r"(?m)(?=^###\s+)", content):
+            title_match = re.search(r"(?m)^###\s+(.+?)(?:\s+\(source:\s*(.+?)\))?\s*$", chunk)
+            if not title_match:
+                continue
+            title = title_match.group(1).strip()
+            publisher = (title_match.group(2) or "publisher not labelled").strip()
+            date_match = re.search(r"(?im)^\s*Publication date:\s*(.+?)\s*$", chunk)
+            url_match = re.search(r"(?im)^\s*Link:\s*(https?://\S+)\s*$", chunk)
+            publication_date = date_match.group(1).strip() if date_match else "unavailable from provider"
+            url = url_match.group(1).strip().rstrip(".,;:!?)]}") if url_match else None
+            if url and not url.startswith("https://"):
+                url = None
+            key = (title, publisher, publication_date, url)
+            if key not in records:
+                records.append(key)
+
+    if not records and not unavailable_blocks:
+        return report
+
+    lines = ["", heading, "", "- The following records were copied from the news tools' returned blocks; their presence does not independently validate the article or claim.", ""]
+    if records:
+        for title, publisher, pub_date, url in records[:20]:
+            suffix = f"; URL: {url}" if url else "; direct URL not supplied"
+            lines.append(f"- {title} — {publisher}; publication date: {pub_date}{suffix}")
+        if len(records) > 20:
+            lines.append(f"- {len(records) - 20} additional tool-returned news records omitted from this index.")
+    else:
+        lines.append("- No article-level records with publisher/date/URL were available in the supplied tool results.")
+    if unavailable_blocks:
+        lines.append("")
+        lines.append("**Tool coverage limitations**")
+        for tool_name, detail in list(dict.fromkeys(unavailable_blocks))[:5]:
+            lines.append(f"- {tool_name}: {detail}")
+    return report.rstrip() + "\\n" + "\\n".join(lines) + "\\n"
 
 
 def create_news_analyst(llm):
@@ -55,6 +117,8 @@ def create_news_analyst(llm):
         prompt = prompt.partial(instrument_context=instrument_context)
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        if report:
+            report = _append_news_tool_evidence(report, state.get("messages", []))
 
         return {
             "messages": [result],
