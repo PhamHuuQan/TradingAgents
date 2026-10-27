@@ -369,8 +369,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
-    fundamentals_are_partial = bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals))
     fundamentals_has_summary_metrics = _has_source_linked_summary_metrics(fundamentals)
+    fundamentals_has_unavailable_sections = bool(
+        _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
+    )
+    # A report can contain source-linked revenue/PBT/PAT/EPS and still lack
+    # balance-sheet/cash-flow/valuation detail. Treat that as partial coverage,
+    # not as if every fundamental metric were unavailable.
+    fundamentals_are_partial = bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals)) or (
+        fundamentals_has_summary_metrics and fundamentals_has_unavailable_sections
+    )
     if (
         _requires_fundamentals(final_state)
         and fundamentals_are_partial
@@ -516,7 +524,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
 
     if news.strip() and _urls(news) and (
         _MISSING_NEWS_DATE_RE.search(news)
-        or not re.search(r"(?im)^\s*(?:publication date|published|ngày công bố)\s*[:：]", news)
+        or not re.search(r"(?i)\b(?:publication date|published|ngày công bố)\s*[:：]", news)
     ):
         findings.append({
             "severity": "MEDIUM",
