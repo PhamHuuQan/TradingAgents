@@ -76,3 +76,27 @@ def test_existing_sentiment_provenance_section_is_replaced_with_tool_grounded_in
     assert actual.count("### Source URLs and coverage supplied to sentiment analysis") == 1
     assert "Model-invented URL" not in actual
     assert "Direct source URLs preserved in this index: 0" in actual
+
+def test_present_social_items_without_permalinks_are_explicitly_flagged_as_unavailable():
+    actual = _append_sentiment_source_provenance(
+        "Overall Sentiment: Neutral (Score: 5.0/10)\\nConfidence: Low",
+        ticker="FPT",
+        start_date="2026-10-20",
+        end_date="2026-10-27",
+        news_block="",
+        stocktwits_block=(
+            "Source: StockTwits public symbol stream\\n"
+            "Source URL: https://api.stocktwits.com/api/2/streams/symbol/FPT.json\\n"
+            "Retrieved at (UTC): 2026-10-27T05:30:00+00:00\\n"
+            "[2026-10-26 · @user1 · Bullish] FPT long\\n"
+            "  Source URL unavailable from the provider"
+        ),
+        reddit_block=(
+            "r/stocks — 1 recent posts mentioning FPT:\\n"
+            "  [2026-10-25] Thoughts on FPT\\n"
+            "    Source URL unavailable from the provider"
+        ),
+    )
+    assert "Message URL unavailable from the provider" in actual
+    assert "Post permalink unavailable from the provider" in actual
+
