@@ -30,7 +30,11 @@ _PARTIAL_FUNDAMENTALS_RE = re.compile(
     r"|does not provide .*?cash-flow statement|metrics not inferred"
     r"|this VCI mapping does not currently validate|does not claim EPS, P/E, P/B, ROE"
     r"|TTM (?:net income|operating cash flow): unavailable; four contiguous standalone quarter facts are required"
-    r"|unavailable from the supported VCI mappings",
+    r"|unavailable from the supported VCI mappings"
+    r"|ngoại trừ\s+(?:4|bốn)\s+chỉ tiêu tổng quan"
+    r"|các cấu phần chi tiết.{0,220}không có dữ liệu xác thực"
+    r"|bảng cân đối kế toán.{0,220}(?:không khả dụng|không có dữ liệu xác nhận|DATA_UNAVAILABLE)"
+    r"|báo cáo lưu chuyển tiền tệ.{0,220}(?:không khả dụng|không có dữ liệu)",
     re.IGNORECASE,
 )
 _FINANCIAL_STRENGTH_RE = re.compile(
@@ -45,12 +49,11 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     r"|\brobust cash flow\b"
     r"|\b(?:operating |free )?cash flow.{0,30}\b(?:strong|stable|steady|robust|healthy|positive|improving|increased|grew)\b"
     r"|\b(?:balance sheet|financial position|solvency|liquidity).{0,30}\b(?:strong|stable|healthy|robust|solid|sound|improved)\b"
-    # Vietnamese phrasing seen in actual TradingAgents debate output.
+    # These are condition/quality claims; plain revenue/PBT/EPS growth is not enough to trigger them.
     r"|(?:nền tảng|sức khỏe|tình hình)\s+tài chính.{0,35}(?:[\"'“”‘’]?\s*)(?:thép|vững(?: mạnh| chắc)?|mạnh|tốt|xuất sắc|ổn định)"
     r"|tài chính\s+[\"'“”‘’]?(?:thép|vững mạnh|vững chắc|mạnh|xuất sắc)"
     r"|(?:dòng tiền|biên lợi nhuận|khả năng sinh lời|năng lực tài chính).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt|bền vững)"
-    r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)"
-    r"|(?:tăng trưởng|CAGR).{0,35}(?:ổn định|bền vững|đều đặn).{0,35}(?:qua các năm|trong dài hạn|dài hạn)?",
+    r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)",
     re.IGNORECASE,
 )
 _INSIDER_ABSENCE_RE = re.compile(
@@ -189,7 +192,22 @@ def _urls(text: str) -> list[str]:
     return list(dict.fromkeys(url for url in values if url))
 
 
-def _downstream_text(state: dict[str, Any]) -> str:
+def _has_source_linked_summary_metrics(text: str) -> bool:
+    """True when a report supplies a source URL and at least two numeric earnings-summary metrics."""
+    metric_patterns = (
+        r"(?:\brevenue\b|doanh thu).{0,180}\d[\d,.]*",
+        r"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế).{0,180}\d[\d,.]*",
+        r"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế).{0,180}\d[\d,.]*",
+        r"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu).{0,180}\d[\d,.]*",
+    )
+    metric_count = sum(
+        bool(re.search(pattern, text or "", re.IGNORECASE | re.DOTALL))
+        for pattern in metric_patterns
+    )
+    return metric_count >= 2 and bool(_urls(text))
+
+
+def _downstream_text(state: dict[str, Any]) -> str:def _downstream_text(state: dict[str, Any]) -> str:
     pieces = [
         _text(state.get("investment_plan")),
         _text(state.get("trader_investment_plan")),
@@ -307,6 +325,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
+    fundamentals_are_partial = bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals))
+    fundamentals_has_summary_metrics = _has_source_linked_summary_metrics(fundamentals)
+    if (
+        _requires_fundamentals(final_state)
+        and fundamentals_are_partial
+        and fundamentals_has_summary_metrics
+    ):
+        source_statuses["Fundamentals report"] = (
+            "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+        )
     downstream = _downstream_text(final_state)
     findings: list[dict[str, str]] = []
 
@@ -332,9 +360,13 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if _requires_fundamentals(final_state) and source_statuses["Fundamentals report"] in {
-        "MISSING", "LIMITED / SOURCE UNAVAILABLE", "NO USABLE DATA RETURNED"
-    }:
+    if _requires_fundamentals(final_state) and (
+        source_statuses["Fundamentals report"] in {"MISSING", "NO USABLE DATA RETURNED"}
+        or (
+            source_statuses["Fundamentals report"] == "LIMITED / SOURCE UNAVAILABLE"
+            and not (fundamentals_are_partial and fundamentals_has_summary_metrics)
+        )
+    ):
         findings.append({
             "severity": "HIGH",
             "code": "FUNDAMENTALS_UNAVAILABLE",
@@ -344,7 +376,6 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    fundamentals_are_partial = bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals))
     if _requires_fundamentals(final_state) and fundamentals_are_partial:
         findings.append({
             "severity": "MEDIUM",
@@ -356,32 +387,27 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if _requires_fundamentals(final_state) and fundamentals_are_partial and _FINANCIAL_STRENGTH_RE.search(downstream):
-        findings.append({
-            "severity": "HIGH",
-            "code": "UNSUPPORTED_FINANCIAL_STRENGTH",
-            "finding": (
-                "Downstream debate/decision text asserts financial strength while the supplied fundamentals source explicitly describes itself "
-                "as a partial summary. Remove the unsupported claim or attach a separately verified source for the specific metric."
-            ),
-        })
-
-    if fundamentals and _UNAVAILABLE_RE.search(fundamentals) and _FINANCIAL_STRENGTH_RE.search(downstream):
-        findings.append({
-            "severity": "HIGH",
-            "code": "UNSUPPORTED_FINANCIAL_STRENGTH",
-            "finding": (
-                "Downstream debate/decision text asserts financial strength while the fundamentals report "
-                "contains an unavailable-data marker. Remove the assertion or attach a separately verified source."
-            ),
-        })
-
     fundamentals_limitations = (
         not fundamentals.strip()
-        or _UNAVAILABLE_RE.search(fundamentals)
-        or _NO_DATA_RE.search(fundamentals)
+        or bool(_UNAVAILABLE_RE.search(fundamentals))
+        or bool(_NO_DATA_RE.search(fundamentals))
         or fundamentals_are_partial
     )
+    if (
+        _requires_fundamentals(final_state)
+        and fundamentals_limitations
+        and _FINANCIAL_STRENGTH_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_FINANCIAL_STRENGTH",
+            "finding": (
+                "Downstream debate/decision text asserts balance-sheet strength, liquidity, margins, or cash-flow quality "
+                "while the supplied fundamentals evidence is unavailable or partial. Keep such claims only when a named source "
+                "supports that specific metric; sourced revenue/PBT/PAT/EPS growth alone does not prove balance-sheet or cash-flow strength."
+            ),
+        })
+
     if _requires_fundamentals(final_state) and fundamentals_limitations and _UNSUPPORTED_FINANCIAL_METRIC_RE.search(downstream):
         findings.append({
             "severity": "HIGH",
