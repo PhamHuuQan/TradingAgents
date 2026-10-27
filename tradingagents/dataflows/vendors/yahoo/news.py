@@ -84,9 +84,10 @@ def _format_articles(articles: list[dict]) -> str:
         if data["summary"]:
             out += f"{data['summary']}\n"
         if data["link"]:
-            out += f"Source URL: {data['link']}\n"
+            # Keep the established label used by downstream prompts and tests.
+            out += f"Link: {data['link']}\n"
         else:
-            out += "Source URL: unavailable from the provider\n"
+            out += "Source URL unavailable from the provider\n"
         out += "\n"
     return out
 
