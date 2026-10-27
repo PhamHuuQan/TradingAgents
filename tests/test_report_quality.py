@@ -658,10 +658,10 @@ def test_report5_style_source_linked_earnings_summary_is_partial_not_unavailable
         "Dựa trên báo cáo tóm tắt kết quả kinh doanh chính thức từ FPT IR "
         "(công bố 21/10/2026; kỳ báo cáo kết thúc 30/09/2026; "
         "URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0): "
-        "**Doanh thu (Revenue):**\\n- Giá trị: 40.023 tỷ VND\\n- Tăng trưởng: 12,4%. "
-        "**Lợi nhuận trước thuế (Profit before tax - PBT):**\\n- Giá trị: 8.770 tỷ VND\\n- Tăng trưởng: 17,0%. "
-        "**Lợi nhuận sau thuế thuộc về cổ đông công ty mẹ (PAT):**\\n- Giá trị: 7.778 tỷ VND. "
-        "**Lợi nhuận trên mỗi cổ phiếu (EPS):**\\n- Giá trị: 4.142 VND/cổ phiếu. "
+        "**Doanh thu (Revenue):**\n- Giá trị: 40.023 tỷ VND\n- Tăng trưởng: 12,4%. "
+        "**Lợi nhuận trước thuế (Profit before tax - PBT):**\n- Giá trị: 8.770 tỷ VND\n- Tăng trưởng: 17,0%. "
+        "**Lợi nhuận sau thuế thuộc về cổ đông công ty mẹ (PAT):**\n- Giá trị: 7.778 tỷ VND. "
+        "**Lợi nhuận trên mỗi cổ phiếu (EPS):**\n- Giá trị: 4.142 VND/cổ phiếu. "
         "Bảng cân đối kế toán không có dữ liệu xác nhận (EntitlementError); "
         "báo cáo lưu chuyển tiền tệ và báo cáo kết quả kinh doanh chi tiết không thể truy xuất."
     )
@@ -758,12 +758,12 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
         "trade_date": "2026-10-27",
         "asset_type": "stock",
         "market_report": (
-            "FPT close 55,400; RSI 25.43; SMA50 62,574.48.\\n"
-            "### Market Data Provenance\\n"
-            "- Provider: ssi-fastconnect-v3\\n"
-            "- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\\n"
-            "- Retrieved at: 2026-10-27T16:15:01+07:00\\n"
-            "- Requested as-of date: 2026-10-27\\n"
+            "FPT close 55,400; RSI 25.43; SMA50 62,574.48.\n"
+            "### Market Data Provenance\n"
+            "- Provider: ssi-fastconnect-v3\n"
+            "- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\n"
+            "- Retrieved at: 2026-10-27T16:15:01+07:00\n"
+            "- Requested as-of date: 2026-10-27\n"
             "- Latest returned trading row: 2026-10-27"
         ),
         "sentiment_report": (
@@ -804,7 +804,7 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
         },
         "investment_plan": "Recommendation: Hold. The growth data is sourced but valuation remains unverified.",
         "trader_investment_plan": (
-            "Action: Hold\\nEntry Price: not provided\\nStop Loss: not provided\\n"
+            "Action: Hold\nEntry Price: not provided\nStop Loss: not provided\n"
             "Position Sizing: not provided"
         ),
         "risk_debate_state": {
@@ -814,7 +814,7 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
             )
         },
         "final_rating": "Hold",
-        "final_trade_decision": "Rating: Hold\\nPrice Target: not provided",
+        "final_trade_decision": "Rating: Hold\nPrice Target: not provided",
     }
 
     audit = build_report_quality_audit(state)
