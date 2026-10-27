@@ -24,7 +24,7 @@ def _sample_state():
             "bear_history": "financial statements were not available.",
         },
         "investment_plan": "Recommendation: Underweight. Rationale references strong financial position.",
-        "trader_investment_plan": "Action: SELL\nEntry Price: not provided\nStop Loss: not provided",
+        "trader_investment_plan": "Action: SELL\n**Entry Price**: not provided\n**Stop Loss**: not provided",
         "risk_debate_state": {"history": "Conservative Analyst: Hold."},
         "final_rating": "Underweight",
         "final_trade_decision": "Rating: Underweight\nExecutive Summary: trim exposure.",
