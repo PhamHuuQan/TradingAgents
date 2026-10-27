@@ -177,4 +177,4 @@ def fetch_stocktwits_messages(
         f"Unlabeled: {unlabeled} · "
         f"Total: {total} most-recent messages"
     )
-    return (f"{note}\n\n" if note else "") + summary + "\n\n" + "\n".join(lines)
+    return source_header + (f"{note}\n\n" if note else "") + summary + "\n\n" + "\n".join(lines)
