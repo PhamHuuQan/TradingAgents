@@ -17,6 +17,7 @@ on:
       - "tradingagents/dataflows/vendors/reddit.py"
       - "tradingagents/dataflows/vendors/stocktwits.py"
       - "tradingagents/dataflows/router.py"
+      - "tradingagents/agents/tools.py"
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
@@ -53,6 +54,7 @@ on:
       - "tradingagents/dataflows/vendors/reddit.py"
       - "tradingagents/dataflows/vendors/stocktwits.py"
       - "tradingagents/dataflows/router.py"
+      - "tradingagents/agents/tools.py"
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
@@ -127,6 +129,9 @@ jobs:
             tradingagents/dataflows/vendors/reddit.py \
             tradingagents/dataflows/vendors/stocktwits.py \
             tradingagents/dataflows/router.py \
+            tradingagents/agents/tools.py \
+            tradingagents/graph/trading_graph.py \
+            tradingagents/report_html.py \
             tradingagents/agents/analysts/fundamentals_analyst.py \
             tradingagents/agents/analysts/news_analyst.py \
             tradingagents/agents/analysts/sentiment_analyst.py \
