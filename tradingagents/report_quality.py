@@ -88,6 +88,11 @@ _POLYMARKET_CLAIM_RE = re.compile(
     r"Polymarket|prediction[- ]market|market[- ]implied probability",
     re.IGNORECASE,
 )
+_POLYMARKET_PROBABILITY_RE = re.compile(
+    r"(?:Polymarket|prediction[- ]market|market[- ]implied)[\\s\\S]{0,120}\\b\\d+(?:\\.\\d+)?\\s*%"
+    r"|\\b\\d+(?:\\.\\d+)?\\s*%[\\s\\S]{0,100}(?:Polymarket|prediction[- ]market|market[- ]implied)",
+    re.IGNORECASE,
+)
 _POLYMARKET_URL_RE = re.compile(r"https?://(?:www\.)?polymarket\.com/", re.IGNORECASE)
 
 _MARKET_URL_MISSING_RE = re.compile(
@@ -351,7 +356,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _POLYMARKET_CLAIM_RE.search(news):
+    if news.strip() and _POLYMARKET_PROBABILITY_RE.search(news):
         has_market_url = bool(_POLYMARKET_URL_RE.search(news))
         if not has_market_url or _MARKET_URL_MISSING_RE.search(news):
             findings.append({
