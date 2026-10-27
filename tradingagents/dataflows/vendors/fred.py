@@ -10,7 +10,7 @@ the routing layer treats it as "unavailable" rather than a hard crash.
 """
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytz
 
@@ -241,12 +241,18 @@ def get_macro_data(
         if o.get("value") not in (".", None, "")
     ]
 
+    retrieved_at = datetime.now(UTC).isoformat()
+    source_url = f"https://fred.stlouisfed.org/series/{series_id}"
     header = (
         f"## FRED: {title} ({series_id})\n"
+        f"- Source: Federal Reserve Bank of St. Louis, FRED\n"
+        f"- Source URL: {source_url}\n"
+        f"- Retrieved at (UTC): {retrieved_at}\n"
+        f"- Data vintage as of: {pit}\n"
         f"- Units: {units}\n"
         f"- Frequency: {frequency}"
         f"{f' ({seasonal})' if seasonal else ''}\n"
-        f"- Window: {start_date} to {as_of_date}\n"
+        f"- Observation window: {start_date} to {as_of_date}\n"
     )
 
     if not points:
