@@ -41,6 +41,13 @@ _INSIDER_ABSENCE_RE = re.compile(
     r"|no insider trades",
     re.IGNORECASE,
 )
+_INSIDER_QUALIFIER_RE = re.compile(
+    r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
+    r"|not proof of (?:no|absence of) insider"
+    r"|not exhaustive|no records were returned|empty result from one provider"
+    r"|không phải bằng chứng rằng không có|không chứng minh không có",
+    re.IGNORECASE,
+)
 _MISSING_TRADE_LEVEL_RE = re.compile(
     r"(?:entry price|stop[\s-]?loss|price target)\s*[:：]\s*(?:not provided|not specified|n/?a|chưa có|không có)",
     re.IGNORECASE,
@@ -168,9 +175,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if _INSIDER_ABSENCE_RE.search(downstream) and (
-        not fundamentals or _UNAVAILABLE_RE.search(fundamentals) or not _urls(fundamentals)
-    ):
+    if _INSIDER_ABSENCE_RE.search(downstream) and not _INSIDER_QUALIFIER_RE.search(downstream):
         findings.append({
             "severity": "HIGH",
             "code": "INSIDER_ABSENCE_UNVERIFIED",
