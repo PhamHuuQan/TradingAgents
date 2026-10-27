@@ -22,6 +22,14 @@ _NO_DATA_RE = re.compile(
     r"no data (?:was|were) returned|không có dữ liệu sử dụng được",
     re.IGNORECASE,
 )
+_PARTIAL_FUNDAMENTALS_RE = re.compile(
+    r"not a complete financial[- ]statement package|not a complete set of financial statements"
+    r"|does not provide (?:a )?complete balance sheet|summary only|limited earnings summary"
+    r"|partial fundamentals|incomplete financial statements|chỉ là tóm tắt kết quả kinh doanh"
+    r"|không thay thế (?:đầy đủ )?(?:bảng cân đối|báo cáo lưu chuyển tiền tệ)"
+    r"|does not provide .*?cash-flow statement",
+    re.IGNORECASE,
+)
 _FINANCIAL_STRENGTH_RE = re.compile(
     r"\bstrong financial position\b|\bstrong financial foundation\b"
     r"|\b(?:stable|steady|robust|healthy) (?:operating )?cash flow\b"
@@ -145,6 +153,13 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- Do not write 'no insider transactions' or 'no unusual insider activity' unless the supplied tool result explicitly confirms "
             "that the relevant source was queried successfully for a stated period."
         )
+    if _requires_fundamentals(state) and _PARTIAL_FUNDAMENTALS_RE.search(fundamentals):
+        guardrails.append(
+            "- PARTIAL FUNDAMENTALS COVERAGE: the supplied source is an earnings-performance summary, not a complete financial-statement package. "
+            "Use only the exact metrics, reporting period, unit and growth rates it provides. Do not infer operating/free cash flow, cash balances, debt, "
+            "liquidity, solvency, equity, margins, P/E, P/B, ROE, debt ratios, or insider activity unless another supplied source explicitly provides those values. "
+            "State that those metrics remain unverified."
+        )
     if not _urls(news) and news.strip():
         guardrails.append(
             "- NEWS PROVENANCE LIMITATION: the supplied news report contains no direct URLs. Do not present a named event, macro value, "
@@ -193,6 +208,28 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Financial statements or ratios are missing/unavailable. Treat valuation, earnings, "
                 "cash flow, margins, balance-sheet strength and ROE as unverified unless separately sourced."
+            ),
+        })
+
+    fundamentals_are_partial = bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals))
+    if _requires_fundamentals(final_state) and fundamentals_are_partial:
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "FUNDAMENTALS_PARTIAL_COVERAGE",
+            "finding": (
+                "The supplied fundamentals source is only an earnings-performance summary, not a complete set of financial statements. "
+                "Revenue/PBT/PAT/EPS may be reported, but cash flow, balance-sheet strength, margins, valuation ratios and insider activity "
+                "remain unverified unless separately sourced."
+            ),
+        })
+
+    if _requires_fundamentals(final_state) and fundamentals_are_partial and _FINANCIAL_STRENGTH_RE.search(downstream):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_FINANCIAL_STRENGTH",
+            "finding": (
+                "Downstream debate/decision text asserts financial strength while the supplied fundamentals source explicitly describes itself "
+                "as a partial summary. Remove the unsupported claim or attach a separately verified source for the specific metric."
             ),
         })
 
