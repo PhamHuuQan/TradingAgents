@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+import copy
 from unittest.mock import Mock
 
 import pytest
 
-from tradingagents.dataflows import date_window, router
+from tradingagents.dataflows import config as config_module, date_window, router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import VendorUnavailableError
 from tradingagents.dataflows.vendors import fpt_ir
+from tradingagents.default_config import DEFAULT_CONFIG
 
 
 _HOME = """
@@ -122,6 +123,8 @@ def test_router_registers_fpt_ir_as_explicit_only_fundamentals_fallback(monkeypa
     assert "fpt_ir" in router.EXPLICIT_ONLY_VENDORS
 
     _mock_pages(monkeypatch)
+    # Avoid leaking configuration to unrelated tests in the full suite.
+    monkeypatch.setattr(config_module, "_config", copy.deepcopy(DEFAULT_CONFIG))
     # The caller chooses this issuer-specific endpoint intentionally.
     set_config({"data_vendors": {"fundamental_data": "fpt_ir"}})
     out = router.route_to_vendor("get_fundamentals", "FPT", "2026-10-27")
