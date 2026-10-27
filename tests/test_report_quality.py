@@ -143,6 +143,27 @@ def test_actual_fpt_report_failure_patterns_are_detected():
     assert audit["overall_status"] == "REVIEW REQUIRED"
 
 
+def test_fpt_ir_summary_metrics_are_partial_not_fully_unavailable():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "FPT 9M2026 summary. Doanh thu: 40.023 tỷ VND, tăng 12,4%. "
+        "Lợi nhuận trước thuế (PBT): 8.770 tỷ VND, tăng 17,0%. "
+        "Lợi nhuận sau thuế: 7.778 tỷ VND, tăng 13,3%. "
+        "EPS: 4.142 VND/cổ phiếu, tăng 12,8%. "
+        "Nguồn chính thức FPT IR: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Dữ liệu không khả dụng: Bảng cân đối kế toán, báo cáo lưu chuyển tiền tệ "
+        "và báo cáo kết quả kinh doanh chi tiết không thể truy xuất do EntitlementError."
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
+
+
 def test_missing_company_fundamentals_are_not_a_blocker_for_crypto():
     state = {
         "asset_type": "crypto",
