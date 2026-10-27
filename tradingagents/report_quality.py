@@ -84,13 +84,9 @@ _MISSING_NEWS_DATE_RE = re.compile(
     re.IGNORECASE,
 )
 _FRED_SOURCE_CLAIM_RE = re.compile(r"\bFRED\s*:|FRED series|Federal Reserve Economic Data", re.IGNORECASE)
-_POLYMARKET_CLAIM_RE = re.compile(
-    r"Polymarket|prediction[- ]market|market[- ]implied probability",
-    re.IGNORECASE,
-)
 _POLYMARKET_PROBABILITY_RE = re.compile(
-    r"(?:Polymarket|prediction[- ]market|market[- ]implied)[\\s\\S]{0,120}\\b\\d+(?:\\.\\d+)?\\s*%"
-    r"|\\b\\d+(?:\\.\\d+)?\\s*%[\\s\\S]{0,100}(?:Polymarket|prediction[- ]market|market[- ]implied)",
+    r"(?:Polymarket|prediction[- ]market|market[- ]implied)[\s\S]{0,120}\b\d+(?:\.\d+)?\s*%"
+    r"|\b\d+(?:\.\d+)?\s*%[\s\S]{0,100}(?:Polymarket|prediction[- ]market|market[- ]implied)",
     re.IGNORECASE,
 )
 _POLYMARKET_URL_RE = re.compile(r"https?://(?:www\.)?polymarket\.com/", re.IGNORECASE)
