@@ -358,26 +358,43 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- MARKET DATA PROVENANCE LIMITATION: numeric price/indicator claims are present but the market report does not preserve a labeled provider, direct source URL, and retrieval timestamp. "
             "Do not describe these figures as source-traceable until all three are included."
         )
-    if _requires_fundamentals(state) and (
+    fundamentals_has_summary_metrics = _has_source_linked_summary_metrics(fundamentals)
+    fundamentals_has_unavailable_sections = bool(
+        _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
+    )
+    fundamentals_are_partial = bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals)) or (
+        fundamentals_has_summary_metrics and fundamentals_has_unavailable_sections
+    )
+    fundamentals_fully_unavailable = (
         not fundamentals.strip()
-        or _UNAVAILABLE_RE.search(fundamentals)
-        or _NO_DATA_RE.search(fundamentals)
-    ):
-        guardrails.append(
-            "- FUNDAMENTALS LIMITATION: financial statements/ratios are unavailable or not usable in the supplied fundamentals report. "
-            "Do not assert strong/weak cash flow, margins, solvency, valuation ratios, EPS/ROE, or a strong financial position "
-            "unless that specific claim is supported by another named, dated source in the supplied evidence. State the limitation."
+        or (
+            not fundamentals_has_summary_metrics
+            and (
+                _UNAVAILABLE_RE.search(fundamentals)
+                or _NO_DATA_RE.search(fundamentals)
+            )
         )
+    )
+    if _requires_fundamentals(state) and fundamentals_fully_unavailable:
+        guardrails.append(
+            "- FUNDAMENTALS LIMITATION: usable source-linked earnings metrics and financial statements/ratios "
+            "are unavailable in the supplied fundamentals report. Do not invent revenue, PBT, PAT, EPS, "
+            "cash flow, margins, solvency, valuation ratios, or a strong financial position. State the limitation."
+        )
+    if _requires_fundamentals(state) and (
+        fundamentals_fully_unavailable or fundamentals_are_partial
+    ):
         guardrails.append(
             "- Do not write 'no insider transactions' or 'no unusual insider activity' unless the supplied tool result explicitly confirms "
             "that the relevant source was queried successfully for a stated period."
         )
-    if _requires_fundamentals(state) and _PARTIAL_FUNDAMENTALS_RE.search(fundamentals):
+    if _requires_fundamentals(state) and fundamentals_are_partial:
         guardrails.append(
-            "- PARTIAL FUNDAMENTALS COVERAGE: the supplied source is an earnings-performance summary, not a complete financial-statement package. "
-            "Use only the exact metrics, reporting period, unit and growth rates it provides. Do not infer operating/free cash flow, cash balances, debt, "
-            "liquidity, solvency, equity, margins, P/E, P/B, ROE, debt ratios, or insider activity unless another supplied source explicitly provides those values. "
-            "State that those metrics remain unverified."
+            "- PARTIAL FUNDAMENTALS COVERAGE: the supplied report includes only source-linked summary metrics, "
+            "not a complete financial-statement package. Use the exact supported revenue/PBT/PAT/EPS values, "
+            "reporting period, units and growth rates it provides. Do not infer operating/free cash flow, cash balances, debt, "
+            "liquidity, solvency, equity, margins, P/E, P/B, ROE, debt ratios, or insider activity unless another supplied "
+            "source explicitly provides those values. State that those metrics remain unverified."
         )
     has_financial_data_limits = (
         not fundamentals.strip()
