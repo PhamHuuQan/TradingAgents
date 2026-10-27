@@ -290,6 +290,7 @@ def build_ssi_market_snapshot(symbol: str, as_of_date: str, look_back_days: int 
         f"- Requested as-of date: {as_of.isoformat()}",
         f"- Latest returned trading row: {latest.timestamp.date().isoformat()}",
         f"- Source: {latest.source}",
+        "- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc",
         f"- Retrieved at: {fetched_at.isoformat()}",
         "- SSI route is current-date only; historical first-availability time is unknown.",
         "",
