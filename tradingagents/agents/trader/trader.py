@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage
 
+from tradingagents.report_quality import build_decision_evidence_guardrails
+
 from tradingagents.agents.context import (
     get_instrument_context_from_state,
     get_language_instruction,
@@ -31,6 +33,7 @@ def create_trader(llm):
         # only offer it (and the grounding instruction) when it has content.
         market_report = (state["market_report"] or "").strip()
         portfolio_context = get_portfolio_context_from_state(state)
+        evidence_guardrails = build_decision_evidence_guardrails(state)
 
         if market_report:
             grounding = (
@@ -58,6 +61,7 @@ def create_trader(llm):
                     "or a range; convert a percentage distance to the price level it "
                     "implies, or omit the field if you cannot state a number. "
                     + NO_EXTERNAL_TOOLS
+                    + evidence_guardrails
                     + get_language_instruction()
                 ),
             },
