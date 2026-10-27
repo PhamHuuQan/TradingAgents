@@ -182,6 +182,22 @@ _SOCIAL_POST_URL_MISSING_RE = re.compile(
     r"Source URL unavailable from the provider|post permalink unavailable|message URL unavailable",
     re.IGNORECASE,
 )
+_SOCIAL_SILENCE_CLAIM_RE = re.compile(
+    r"hoàn toàn không có (?:dữ liệu|thảo luận).{0,100}(?:stocktwits|reddit|mạng xã hội|nhà đầu tư)?"
+    r"|vắng bóng hoàn toàn.{0,100}(?:thảo luận|cộng đồng|nhà đầu tư)"
+    r"|cạn kiệt thanh khoản quan tâm"
+    r"|complete absence of (?:social|retail) discussion"
+    r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
+    r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)",
+    re.IGNORECASE,
+)
+_SOCIAL_COVERAGE_LIMITATION_RE = re.compile(
+    r"(?:provider|feed|source).{0,45}(?:unavailable|failed|error|timed out|not available)"
+    r"|no reddit posts found|no matching posts|not proof of zero discussion"
+    r"|no individual (?:post|message) permalink was supplied"
+    r"|provider block marks the feed unavailable",
+    re.IGNORECASE,
+)
 _NEWS_ITEM_URL_MISSING_RE = re.compile(
     r"Source URL unavailable from the provider|article URL unavailable|news link unavailable",
     re.IGNORECASE,
@@ -395,6 +411,12 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         guardrails.append(
             "- SENTIMENT PROVENANCE LIMITATION: the supplied sentiment report contains no direct URLs; treat source-specific social/news "
             "claims as unverified and describe the sample size/window or missing coverage when available."
+        )
+    if sentiment.strip() and _SOCIAL_COVERAGE_LIMITATION_RE.search(sentiment):
+        guardrails.append(
+            "- SOCIAL COVERAGE LIMITATION: distinguish an unavailable provider from a successful empty search result. "
+            "Do not generalize either into market-wide silence, lack of investor attention, or low stock liquidity; "
+            "state the exact provider and date window instead."
         )
     if fundamentals.strip() and not _urls(fundamentals) and not (
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
@@ -689,6 +711,21 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Sentiment report contains no direct source URLs. Preserve source name, sample size/window, "
                 "and links so readers can distinguish an empty feed from unavailable coverage."
+            ),
+        })
+
+    if (
+        _SOCIAL_SILENCE_CLAIM_RE.search(downstream)
+        and sentiment.strip()
+        and _SOCIAL_COVERAGE_LIMITATION_RE.search(sentiment)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "SOCIAL_SILENCE_EXTRAPOLATION",
+            "finding": (
+                "Downstream analysis generalizes an unavailable provider or an empty search window into market-wide social silence, "
+                "investor inattention, or weak liquidity. A provider failure and a successful zero-result query are different, "
+                "and neither alone establishes overall investor attention or the stock's trading liquidity."
             ),
         })
 
