@@ -161,6 +161,21 @@ def test_verified_market_snapshot_requires_provider_and_retrieval_metadata():
     assert "MARKET DATA PROVENANCE LIMITATION" in build_decision_evidence_guardrails(state)
 
 
+def test_vietnamese_market_report_with_numeric_claims_requires_provenance():
+    state = _sample_state()
+    state["market_report"] = (
+        "Phân tích chi tiết xu hướng FPT: giá đóng cửa 56,000 VND; "
+        "RSI 27.25; close_50_sma 62,724.68 VND; ATR 1,413.09 VND."
+    )
+
+    audit = build_report_quality_audit(state)
+    assert any(
+        item["code"] == "MARKET_SOURCE_METADATA_MISSING"
+        for item in audit["findings"]
+    )
+    assert "MARKET DATA PROVENANCE LIMITATION" in build_decision_evidence_guardrails(state)
+
+
 def test_market_snapshot_with_source_and_retrieval_time_passes_metadata_check():
     state = _sample_state()
     state["market_report"] = (
