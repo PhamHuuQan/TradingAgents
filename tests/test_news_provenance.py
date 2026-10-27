@@ -1,6 +1,9 @@
 from langchain_core.messages import ToolMessage
 
-from tradingagents.agents.analysts.news_analyst import _append_news_tool_evidence
+from tradingagents.agents.analysts.news_analyst import (
+    _append_news_tool_evidence,
+    _build_system_message,
+)
 
 
 def test_news_report_preserves_tool_returned_publication_dates_and_urls():
@@ -64,4 +67,19 @@ def test_empty_news_query_is_distinguished_from_provider_failure():
     assert "Queries with no matching news returned for the requested window" in actual
     assert "Provider or retrieval failures" not in actual
     assert "No article-level records" in actual
+
+def test_news_prompt_excludes_prediction_markets_unrelated_to_investment_thesis():
+    prompt = _build_system_message(
+        ticker="FPT",
+        start_date="2026-10-20",
+        end_date="2026-10-27",
+        news_block="No relevant company news found.",
+        stocktwits_block="StockTwits unavailable.",
+        reddit_block="No Reddit posts found.",
+    )
+
+    assert "PREDICTION-MARKET RELEVANCE" in prompt
+    assert "Exclude unrelated sports, entertainment" in prompt
+    assert "clear transmission channel" in prompt
+
 
