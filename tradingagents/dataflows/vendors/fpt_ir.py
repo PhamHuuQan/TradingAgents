@@ -20,6 +20,7 @@ from tradingagents.dataflows.symbols import normalize_symbol
 _IR_HOME = "https://fpt.com/en/ir"
 _ALLOWED_HOSTS = {"fpt.com", "www.fpt.com"}
 _TIMEOUT_SECONDS = 12
+_MAX_RELEASE_AGE_DAYS = 180
 _USER_AGENT = "TradingAgents/0.7 (public FPT investor-relations data; contact via project repository)"
 _MONTHS_PATTERN = re.compile(
     r"\b(?:(?P<word_months>9)\s*months?\s*(?P<word_year>20\d{2})|"
@@ -153,7 +154,13 @@ def _find_latest_9m_release(home_html: str) -> tuple[str, str, tuple[int, int]]:
     return title, url, period
 
 
-def _parse_release(article_html: str, source_url: str, retrieved_at: str, period: tuple[int, int]) -> str:
+def _parse_release(
+    article_html: str,
+    source_url: str,
+    retrieved_at: str,
+    period: tuple[int, int],
+    as_of_date: str | None = None,
+) -> str:
     text = _visible_text(article_html)
     published = _PUBLISHED_DATE_PATTERN.search(text)
     if not published:
@@ -166,8 +173,16 @@ def _parse_release(article_html: str, source_url: str, retrieved_at: str, period
         publication_dt = datetime.strptime(publication_date, "%Y-%m-%d").date()
     except ValueError as exc:
         raise VendorUnavailableError("FPT IR release publication date is invalid") from exc
-    if publication_date > get_current_date():
-        raise VendorUnavailableError("FPT IR release publication date is after the current date")
+    current_date = get_current_date()
+    analysis_cutoff = min(as_of_date or current_date, current_date)
+    if publication_date > analysis_cutoff:
+        raise VendorUnavailableError("FPT IR release publication date is after the analysis cutoff")
+    age_days = (datetime.strptime(analysis_cutoff, "%Y-%m-%d").date() - publication_dt).days
+    if age_days > _MAX_RELEASE_AGE_DAYS:
+        raise VendorUnavailableError(
+            f"FPT IR 9M summary is stale ({age_days} days since publication; "
+            f"maximum allowed is {_MAX_RELEASE_AGE_DAYS} days). Do not substitute it for a newer period."
+        )
 
     metrics = _METRICS_PATTERN.search(text)
     if not metrics:
@@ -228,4 +243,4 @@ def get_fpt_ir_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
     _title, source_url, period = _find_latest_9m_release(home_html)
     article_html = _fetch_html(source_url)
     retrieved_at = datetime.now(UTC).isoformat()
-    return _parse_release(article_html, source_url, retrieved_at, period)
+    return _parse_release(article_html, source_url, retrieved_at, period, as_of_date)
