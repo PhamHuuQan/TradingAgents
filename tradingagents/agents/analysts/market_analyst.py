@@ -16,77 +16,77 @@ TOOLS = (
 
 
 def _append_verified_market_provenance(report: str, messages) -> str:
-    """Append provider/source metadata from the actual verified snapshot tool result."""
+    """Append metadata only from the latest successful verified snapshot result."""
     if not report.strip():
         return report
 
-    existing_heading = "### Market Data Provenance"
-    snapshot_messages = []
+    matching_messages = [
+        message for message in (messages or ())
+        if isinstance(message, ToolMessage)
+        and getattr(message, "name", None) == "get_verified_market_snapshot"
+    ]
+    if not matching_messages:
+        return report
+
+    # Use the latest call result. If a later call failed, an earlier successful
+    # snapshot must not be reused as though it were current.
+    message = matching_messages[-1]
+    raw_content = getattr(message, "content", "")
+    if isinstance(raw_content, list):
+        content = "\\n".join(
+            str(item.get("text", "")) if isinstance(item, dict) else str(item)
+            for item in raw_content
+        )
+    else:
+        content = str(raw_content)
+    content = content.replace("\\r\\n", "\\n").replace("\\n", "\n").replace("\\r", "\n")
+    content_folded = content.casefold().lstrip()
+
     unavailable_pattern = re.compile(
-        r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|EntitlementError)\b"
+        r"\\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|EntitlementError)\\b"
         r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot",
         re.IGNORECASE,
     )
-    verified_heading_pattern = re.compile(
-        r"(?im)^\s*#{1,6}\s*Verified(?: SSI)? market data snapshot\b"
-    )
-    for message in messages or ():
-        if not isinstance(message, ToolMessage):
-            continue
-        # Only the verified snapshot tool can authorize this provenance section.
-        # A generic/error ToolMessage must never manufacture source metadata.
-        if getattr(message, "name", None) != "get_verified_market_snapshot":
-            continue
-        content = str(getattr(message, "content", "")).replace("\\n", "\n")
-        content_folded = content.casefold().lstrip()
-        explicit_unavailable = (
-            unavailable_pattern.search(content) is not None
-            or any(
-                marker in content_folded
-                for marker in (
-                    "data_unavailable",
-                    "no_data_available",
-                    "no market snapshot",
-                    "snapshot unavailable",
-                    "could not retrieve snapshot",
-                )
-            )
-            or content_folded.startswith(("error:", "failed:", "<error"))
-        )
-        if explicit_unavailable:
-            continue
-        has_verified_heading = bool(verified_heading_pattern.search(content))
-        has_snapshot_metadata = all(
-            re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
-            for pattern in (
-                r"^\s*[-*]?\s*Requested as-of date\s*:",
-                r"^\s*[-*]?\s*Latest returned trading row\s*:",
-                r"^\s*[-*]?\s*Source\s*:",
-            )
-        )
-        if has_verified_heading or has_snapshot_metadata:
-            snapshot_messages.append(message)
-    if not snapshot_messages:
+    if (
+        unavailable_pattern.search(content)
+        or content_folded.startswith(("error:", "failed:", "<error"))
+    ):
         return report
 
+    verified_heading_pattern = re.compile(
+        r"(?im)^\\s*#{1,6}\\s*Verified(?: SSI)? market data snapshot\\b"
+    )
+    has_verified_heading = bool(verified_heading_pattern.search(content))
+    has_snapshot_metadata = all(
+        re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+        for pattern in (
+            r"^\\s*[-*]?\\s*Requested as-of date\\s*:",
+            r"^\\s*[-*]?\\s*Latest returned trading row\\s*:",
+            r"^\\s*[-*]?\\s*Source\\s*:",
+        )
+    )
+    if not (has_verified_heading or has_snapshot_metadata):
+        return report
+
+    existing_heading = "### Market Data Provenance"
     if existing_heading in report:
         report = report.split(existing_heading, 1)[0].rstrip()
-    snapshot = str(snapshot_messages[-1].content)
+
     fields = (
-        ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
-        ("Source URL", r"(?im)^\s*(?:[-*]\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\s*[:：]\s*(.+)$"),
-        ("Retrieved at", r"(?im)^\s*(?:[-*]\s*)?Retrieved at(?: \(UTC\))?\s*[:：]\s*(.+)$"),
-        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested as-of date\s*[:：]\s*(.+)$"),
-        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest returned trading row\s*[:：]\s*(.+)$"),
+        ("Provider", r"(?im)^\\s*(?:[-*]\\s*)?Source\\s*[:：]\\s*(.+)$"),
+        ("Source URL", r"(?im)^\\s*(?:[-*]\\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\\s*[:：]\\s*(.+)$"),
+        ("Retrieved at", r"(?im)^\\s*(?:[-*]\\s*)?Retrieved at(?: \\(UTC\\))?\\s*[:：]\\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\\s*(?:[-*]\\s*)?Requested as-of date\\s*[:：]\\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\\s*(?:[-*]\\s*)?Latest returned trading row\\s*[:：]\\s*(.+)$"),
     )
     lines = ["", "### Market Data Provenance", ""]
     for label, pattern in fields:
-        match = re.search(pattern, snapshot)
+        match = re.search(pattern, content)
         if match:
             lines.append(f"- {label}: {match.group(1).strip()}")
         elif label in {"Provider", "Source URL", "Retrieved at"}:
             lines.append(f"- {label}: not supplied by provider")
-    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
+    return report.rstrip() + "\\n" + "\\n".join(lines) + "\\n"
 
 
 def create_market_analyst(llm):
