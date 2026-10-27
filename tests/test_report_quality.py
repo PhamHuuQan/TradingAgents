@@ -149,6 +149,31 @@ def test_individual_news_item_without_url_is_flagged_even_when_other_urls_exist(
     assert any(item["code"] == "NEWS_ITEM_URLS_MISSING" for item in audit["findings"])
 
 
+def test_verified_market_snapshot_requires_provider_and_retrieval_metadata():
+    state = _sample_state()
+    state["market_report"] = (
+        "## Verified market data snapshot for FPT\\n"
+        "| Close | 56,900 |\\n"
+        "| rsi | 43.2 |"
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "MARKET_SOURCE_METADATA_MISSING" for item in audit["findings"])
+    assert "MARKET DATA PROVENANCE LIMITATION" in build_decision_evidence_guardrails(state)
+
+
+def test_market_snapshot_with_source_and_retrieval_time_passes_metadata_check():
+    state = _sample_state()
+    state["market_report"] = (
+        "## Verified market data snapshot for FPT\\n"
+        "- Source: Yahoo Finance chart history (yfinance)\\n"
+        "- Source URL: https://finance.yahoo.com/quote/FPT/history/\\n"
+        "- Retrieved at (UTC): 2026-10-27T02:00:00+00:00\\n"
+        "| Close | 56,900 |"
+    )
+    audit = build_report_quality_audit(state)
+    assert not any(item["code"] == "MARKET_SOURCE_METADATA_MISSING" for item in audit["findings"])
+
+
 def test_missing_market_report_gets_high_severity_and_prompt_guardrail():
     state = _sample_state()
     state["market_report"] = "DATA_UNAVAILABLE: no configured vendor could serve price data."
