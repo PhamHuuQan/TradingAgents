@@ -264,10 +264,10 @@ def _append_sentiment_source_provenance(
         lines.append("- The fetched block reports no matching messages in the stated window; this is feed output, not proof of zero discussion everywhere.")
     elif st_screened_all:
         lines.append("- The screening step retained no on-topic StockTwits messages; no individual post is asserted as evidence.")
-    elif any(token in st_folded for token in ("unavailable", "error", "failed")):
-        lines.append("- The provider block marks the feed unavailable; no conclusion about underlying market discussion is justified.")
     elif st_has_message_rows:
         lines.append("- Message URL unavailable from the provider for one or more fetched StockTwits messages.")
+    elif any(token in st_folded for token in ("unavailable", "error", "failed")):
+        lines.append("- The provider block marks the feed unavailable; no conclusion about underlying market discussion is justified.")
     else:
         lines.append("- No individual message permalink was supplied in the fetched block; do not present a specific post as verified.")
     lines.append("")
@@ -286,12 +286,12 @@ def _append_sentiment_source_provenance(
             url_count += 1
         if len(set(rd_urls)) > 10:
             lines.append(f"- {len(set(rd_urls)) - 10} additional post permalinks omitted from this index.")
-    elif "unavailable" in reddit_folded or "fetch failed" in reddit_folded:
-        lines.append("- The Reddit source block marks the fetch unavailable; it must not be described as confirmed silence.")
     elif "no reddit posts found" in reddit_folded or "<no posts found mentioning" in reddit_folded:
         lines.append("- The fetched search block reports no matching posts in the stated window; this is not proof of zero discussion everywhere.")
     elif rd_has_post_rows or "source url unavailable from the provider" in reddit_folded:
         lines.append("- Post permalink unavailable from the provider for one or more fetched Reddit items.")
+    elif "unavailable" in reddit_folded or "fetch failed" in reddit_folded:
+        lines.append("- The Reddit source block marks the fetch unavailable; it must not be described as confirmed silence.")
     else:
         lines.append("- No individual Reddit post permalink was supplied in the fetched block.")
     lines.append("")
