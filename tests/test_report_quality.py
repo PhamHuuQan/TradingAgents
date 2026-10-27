@@ -481,3 +481,29 @@ def test_equal_entry_and_stop_loss_price_is_flagged_as_unusable_execution_plan()
     assert equal_level_findings
     assert equal_level_findings[0]["severity"] == "HIGH"
 
+def test_partial_fpt_summary_does_not_support_cash_machine_claims():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Ngoại trừ 4 chỉ tiêu tổng quan được trích xuất từ thông cáo IR, "
+        "các cấu phần chi tiết hiện không có dữ liệu xác thực. "
+        "Doanh thu 40.023 tỷ VND (+12,4% YoY), LNTT 8.770 tỷ VND (+17,0% YoY), "
+        "LNST cổ đông công ty mẹ 7.778 tỷ VND (+13,3% YoY), EPS 4.142 VND/cổ phiếu (+12,8% YoY). "
+        "Nguồn: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Bảng cân đối kế toán không có dữ liệu xác nhận; báo cáo lưu chuyển tiền tệ hiện không khả dụng."
+    )
+    state["investment_debate_state"] = {
+        "history": "Aggressive Analyst: FPT là một cỗ máy in tiền mạnh mẽ."
+    }
+    state["investment_plan"] = "Recommendation: Hold based on the available evidence."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["risk_debate_state"] = {"history": "Cash flow remains unverified."}
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
+
