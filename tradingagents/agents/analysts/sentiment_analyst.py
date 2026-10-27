@@ -178,6 +178,12 @@ def _append_sentiment_source_provenance(
     if not report_text.strip():
         return report_text
 
+    # Some provider wrappers serialize multiline tool output with literal \\n sequences.
+    # Normalize that representation before parsing individual rows, URLs and missing-link markers.
+    news_block = (news_block or "").replace("\\n", "\n")
+    stocktwits_block = (stocktwits_block or "").replace("\\n", "\n")
+    reddit_block = (reddit_block or "").replace("\\n", "\n")
+
     existing_heading = "### Source URLs and coverage supplied to sentiment analysis"
     lines = [
         "",
