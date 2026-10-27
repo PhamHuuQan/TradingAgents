@@ -260,6 +260,26 @@ def test_partial_fpt_ir_summary_is_not_mistaken_for_complete_fundamentals():
     assert "Do not infer operating/free cash flow" in guardrails
 
 
+def test_fpt_report_with_linked_9m_metrics_and_unverified_statements_is_partial_not_unavailable():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Dữ liệu tài chính cốt lõi 9 tháng đầu năm 2026: "
+        "Doanh thu 40.023 tỷ VND (+12,4% YoY), LNTT 8.770 tỷ VND (+17,0% YoY), "
+        "LNST cổ đông công ty mẹ 7.778 tỷ VND (+13,3% YoY), EPS 4.142 VND/cổ phiếu (+12,8% YoY). "
+        "Nguồn: FPT IR News Release "
+        "https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Unverified Metrics: Toàn bộ dữ liệu chi tiết về Bảng cân đối kế toán, "
+        "Báo cáo lưu chuyển tiền tệ và các hệ số định giá không thể xác thực trong phiên chạy này."
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+
+
 def test_vnstock_metrics_not_inferred_section_is_a_partial_coverage_warning():
     state = _sample_state()
     state["fundamentals_report"] = (
