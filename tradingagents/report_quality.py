@@ -85,6 +85,19 @@ _NUMERIC_VALUATION_MULTIPLE_RE = re.compile(
     r"price[- ]to[- ]earnings|price[- ]to[- ]book)"
     r"[^\n]{0,45}?[:=]?\s*\d[\d,.]*(?:\s*x|\s*times|倍)?"
 )
+
+_UNSUPPORTED_REVERSAL_PROBABILITY_RE = re.compile(
+    r"(?:xác suất|khả năng).{0,35}(?:bật hồi|hồi phục|đảo chiều|tăng giá).{0,50}(?:rất cao|cao|lớn|gần như chắc chắn|áp đảo)"
+    r"|(?:very high|high) probability of (?:a )?(?:technical )?(?:bounce|rebound|reversal|recovery)"
+    r"|highly likely.{0,60}(?:bounce|rebound|reversal)",
+    re.IGNORECASE,
+)
+_REVERSAL_EVIDENCE_RE = re.compile(
+    r"\bbacktest(?:ed|ing)?\b|\bwin rate\b|\bhit rate\b|historical (?:frequency|hit rate|reversal rate)"
+    r"|sample of \d+|based on \d+ (?:observations|trades|cases)"
+    r"|kiểm định lịch sử|tỷ lệ thành công lịch sử|mẫu gồm \d+",
+    re.IGNORECASE,
+)
 _INSIDER_QUALIFIER_RE = re.compile(
     r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not proof of (?:no|absence of) insider"
@@ -305,6 +318,7 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Label interpretation as inference. Never invent financial values, citations, publication dates, market probabilities, or insider-activity conclusions.",
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
         "- TRADE-LEVEL CONSISTENCY: keep entry, stop-loss and target in the same currency and price scale. For a buy, the target must be strictly above entry and stop-loss below entry; never label an entry/support price as a profit target.",
+        "- REVERSAL PROBABILITY LIMITATION: RSI below 30 or proximity to a Bollinger band does not quantify reversal odds. Do not call a bounce high-probability unless a cited historical test gives its sample, time horizon, and hit rate.",
     ]
     market = _text(state.get("market_report"))
     if (
@@ -515,6 +529,20 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                 "Downstream debate/decision text calls the stock undervalued, cheap, a bargain, or below intrinsic value "
                 "without a numeric, source-linked valuation multiple in the supplied fundamentals report. "
                 "Oversold technical indicators and earnings growth alone do not establish valuation."
+            ),
+        })
+
+    if (
+        _UNSUPPORTED_REVERSAL_PROBABILITY_RE.search(downstream)
+        and not _REVERSAL_EVIDENCE_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "UNSUPPORTED_REVERSAL_PROBABILITY",
+            "finding": (
+                "The report describes a technical bounce/reversal as highly probable without a cited historical test, "
+                "sample definition, time horizon, or hit rate. RSI oversold conditions and Bollinger proximity alone "
+                "do not establish a quantified probability."
             ),
         })
 
