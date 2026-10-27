@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from urllib.error import HTTPError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from tradingagents.dataflows.date_window import coverage_gap, in_window
@@ -231,12 +231,27 @@ def _fetch_subreddit_rss(
         published_el = entry.find("atom:published", _ATOM_NS)
         content_el = entry.find("atom:content", _ATOM_NS)
         category_el = entry.find("atom:category", _ATOM_NS)
+        # Use the permalink supplied by Reddit's Atom entry; never reconstruct
+        # a post URL from its title or ID when the source did not supply one.
+        post_url = ""
+        for link_el in entry.findall("atom:link", _ATOM_NS):
+            href = (link_el.get("href") or "").strip()
+            parsed = urlparse(href)
+            if (
+                href
+                and parsed.scheme == "https"
+                and parsed.hostname in {"reddit.com", "www.reddit.com", "old.reddit.com"}
+                and link_el.get("rel", "alternate") == "alternate"
+            ):
+                post_url = href
+                break
         posts.append({
             "title": (title_el.text if title_el is not None else "") or "",
             "created_utc": _iso_to_timestamp(
                 published_el.text if published_el is not None else None
             ),
             "selftext": _strip_html(content_el.text if content_el is not None else ""),
+            "url": post_url,
             # A combined feed names each entry's subreddit; a single-subreddit
             # feed may omit it, and then it can only be that one.
             "subreddit": category_el.get("term") if category_el is not None
@@ -329,9 +344,11 @@ def fetch_reddit_posts(
             selftext = (p.get("selftext") or "").replace("\n", " ").strip()
             if len(selftext) > 240:
                 selftext = selftext[:240] + "…"
+            post_url = (p.get("url") or "").strip()
             lines.append(
                 f"  [{created_str}] {title}"
                 + (f"\n    body excerpt: {selftext}" if selftext else "")
+                + (f"\n    Source URL: {post_url}" if post_url else "\n    Source URL unavailable from the provider")
             )
         blocks.append("\n".join(lines))
     return "\n\n".join(([note] if note else []) + blocks)
