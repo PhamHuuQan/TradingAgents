@@ -1,0 +1,59 @@
+from langchain_core.messages import ToolMessage
+
+from tradingagents.agents.analysts.market_analyst import _append_verified_market_provenance
+
+
+def test_verified_snapshot_provenance_is_appended_verbatim():
+    snapshot = """## Verified SSI market data snapshot for FPT
+
+- Requested as-of date: 2026-10-27
+- Latest returned trading row: 2026-10-26
+- Source: ssi-fastconnect-v3
+- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc
+- Retrieved at: 2026-10-27T12:30:00+07:00
+"""
+    report = "## FPT Market Analysis\nClose: 56000"
+    messages = [
+        ToolMessage(
+            content=snapshot,
+            tool_call_id="snapshot-call",
+            name="get_verified_market_snapshot",
+        )
+    ]
+
+    actual = _append_verified_market_provenance(report, messages)
+
+    assert "### Market Data Provenance" in actual
+    assert "- Provider: ssi-fastconnect-v3" in actual
+    assert "- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc" in actual
+    assert "- Retrieved at: 2026-10-27T12:30:00+07:00" in actual
+    assert "- Requested as-of date: 2026-10-27" in actual
+    assert "- Latest returned trading row: 2026-10-26" in actual
+    assert "\\n### Market Data Provenance" not in actual
+
+
+def test_verified_snapshot_provenance_does_not_invent_missing_metadata():
+    snapshot = """## Verified market data snapshot for FPT
+
+- Requested as-of date: 2026-10-27
+- Latest returned trading row: 2026-10-26
+- Source: vendor-x
+"""
+    messages = [
+        ToolMessage(content=snapshot, tool_call_id="snapshot-call", name="get_verified_market_snapshot")
+    ]
+
+    actual = _append_verified_market_provenance("Market report", messages)
+
+    assert "- Provider: vendor-x" in actual
+    assert "- Source URL: not supplied by provider" in actual
+    assert "- Retrieved at: not supplied by provider" in actual
+
+
+def test_no_snapshot_means_no_fabricated_provenance_section():
+    messages = [
+        ToolMessage(content="DATA_UNAVAILABLE: no market snapshot", tool_call_id="failed", name="get_verified_market_snapshot")
+    ]
+    report = "Report without source evidence"
+
+    assert _append_verified_market_provenance(report, messages) == report
