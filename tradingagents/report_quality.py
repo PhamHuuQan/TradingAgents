@@ -98,6 +98,34 @@ _EQUAL_ENTRY_STOP_LOSS_RE = re.compile(
     re.IGNORECASE,
 )
 
+_TRADE_LEVEL_FIELD_RE = re.compile(
+    rf"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?(?P<label>entry price|stop[\s-]?loss|price target|target price)(?:\*\*)?\s*[:：]\s*(?P<value>{_TRADE_PRICE_TOKEN})"
+)
+
+
+def _parse_trade_price_token(value: str) -> float | None:
+    """Parse common English/Vietnamese price formatting for internal consistency checks."""
+    token = re.sub(r"[^0-9.,]", "", value or "")
+    if not token:
+        return None
+    if "." in token and "," in token:
+        # The final separator is the decimal mark; the other is a thousands separator.
+        if token.rfind(",") > token.rfind("."):
+            token = token.replace(".", "").replace(",", ".")
+        else:
+            token = token.replace(",", "")
+    elif "." in token or "," in token:
+        separator = "." if "." in token else ","
+        chunks = token.split(separator)
+        if len(chunks) > 1 and all(len(chunk) == 3 for chunk in chunks[1:]):
+            token = "".join(chunks)
+        else:
+            token = token.replace(separator, ".")
+    try:
+        return float(token)
+    except ValueError:
+        return None
+
 
 _RATING_RE = re.compile(
     r"(?im)^\s*(?:\*\*)?(?:recommendation|rating)(?:\*\*)?\s*[:：]\s*(buy|overweight|hold|underweight|sell)\b"
@@ -259,6 +287,7 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Distinguish 'source unavailable', 'query returned no matching data', and 'verified absence'; these are not interchangeable.",
         "- Label interpretation as inference. Never invent financial values, citations, publication dates, market probabilities, or insider-activity conclusions.",
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
+        "- TRADE-LEVEL CONSISTENCY: keep entry, stop-loss and target in the same currency and price scale. For a buy, the target must be strictly above entry and stop-loss below entry; never label an entry/support price as a profit target.",
     ]
     market = _text(state.get("market_report"))
     if (
@@ -562,6 +591,51 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Trader plan explicitly leaves one or more entry, stop-loss, or price-target fields blank. "
                 "Treat the signal as directional analysis, not a fully specified execution plan."
+            ),
+        })
+
+    parsed_levels: dict[str, float] = {}
+    for level_match in _TRADE_LEVEL_FIELD_RE.finditer(execution_text):
+        label = re.sub(r"[^a-z]", "", level_match.group("label").casefold())
+        canonical_label = (
+            "entry" if label == "entryprice"
+            else "stop" if label == "stoploss"
+            else "target" if label in {"pricetarget", "targetprice"}
+            else label
+        )
+        parsed = _parse_trade_price_token(level_match.group("value"))
+        if parsed is not None:
+            parsed_levels.setdefault(canonical_label, parsed)
+
+    entry_level = parsed_levels.get("entry")
+    stop_level = parsed_levels.get("stop")
+    target_level = parsed_levels.get("target")
+    trader_action_for_levels = _TRADER_ACTION_RE.search(_text(final_state.get("trader_investment_plan")))
+
+    if entry_level is not None and stop_level is not None:
+        if min(entry_level, stop_level) > 0 and max(entry_level, stop_level) / min(entry_level, stop_level) >= 20:
+            findings.append({
+                "severity": "HIGH",
+                "code": "TRADE_LEVEL_UNIT_MISMATCH",
+                "finding": (
+                    "Entry and stop-loss values parse to price levels more than 20x apart. This often indicates inconsistent "
+                    "thousands/decimal notation or units; normalize all VND prices before using the plan."
+                ),
+            })
+
+    if (
+        trader_action_for_levels
+        and trader_action_for_levels.group(1).casefold() == "buy"
+        and entry_level is not None
+        and target_level is not None
+        and target_level <= entry_level
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "TRADE_TARGET_NOT_ABOVE_ENTRY",
+            "finding": (
+                "The Trader action is Buy, but the Portfolio/decision price target is not above the entry price. "
+                "A long trade needs a target with positive price upside; reconcile the target or relabel it as an entry/support level."
             ),
         })
 
