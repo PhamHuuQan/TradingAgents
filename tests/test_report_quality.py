@@ -238,6 +238,34 @@ def test_source_url_counter_strips_terminal_sentence_punctuation():
     assert audit["news_url_count"] == len(["https://example.test/article"])
 
 
+def test_sentiment_posts_without_provider_permalinks_are_flagged():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Source: StockTwits public symbol stream\n"
+        "Source URL: https://api.stocktwits.com/api/2/streams/symbol/FPT.json\n"
+        "Retrieved at (UTC): 2026-10-27T00:00:00+00:00\n"
+        "Bullish: 1 (100%)\n"
+        "[2026-10-27 · @trader · Bullish] FPT looks good\n"
+        "  Source URL unavailable from the provider"
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "SENTIMENT_POST_URLS_MISSING" for item in audit["findings"])
+    assert "SOCIAL POST PROVENANCE LIMITATION" in build_decision_evidence_guardrails(state)
+
+
+def test_sentiment_with_sourceable_post_permalinks_does_not_trigger_missing_permalink_flag():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Source: StockTwits public symbol stream\n"
+        "Source URL: https://api.stocktwits.com/api/2/streams/symbol/FPT.json\n"
+        "Retrieved at (UTC): 2026-10-27T00:00:00+00:00\n"
+        "[2026-10-27 · @trader · Bullish] FPT looks good\n"
+        "  Source URL: https://stocktwits.com/trader/message/123"
+    )
+    audit = build_report_quality_audit(state)
+    assert not any(item["code"] == "SENTIMENT_POST_URLS_MISSING" for item in audit["findings"])
+
+
 def test_news_item_without_publication_date_is_flagged_even_with_a_url():
     state = _sample_state()
     state["news_report"] = (
