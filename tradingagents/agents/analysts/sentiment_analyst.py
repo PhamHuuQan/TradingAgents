@@ -187,6 +187,8 @@ Community discussion, without vote or comment counts. Subreddit character matter
 
 8. **Past sentiment is not predictive.** Frame your conclusions as signal for the trader to weigh alongside fundamentals and technicals, not as a price call.
 
+9. **Preserve provenance.** Include direct URLs for the Yahoo Finance articles and source/post URLs when present in the source blocks. State the date window and actual sample count for each source where available. An empty source, provider error, and verified absence are different states. Never invent a link, post, headline, event, or sample count; if a source block lacks provenance, label it unverified and reduce confidence.
+
 ## Output fields
 
 Fill the following fields:
