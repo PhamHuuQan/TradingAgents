@@ -249,7 +249,10 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _urls(news) and _MISSING_NEWS_DATE_RE.search(news):
+    if news.strip() and _urls(news) and (
+        _MISSING_NEWS_DATE_RE.search(news)
+        or not re.search(r"(?im)^\\s*(?:publication date|published|ngày công bố)\\s*[:：]", news)
+    ):
         findings.append({
             "severity": "MEDIUM",
             "code": "NEWS_PUBLICATION_DATES_MISSING",
