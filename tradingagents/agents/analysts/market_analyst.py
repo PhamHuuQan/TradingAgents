@@ -34,11 +34,11 @@ def _append_verified_market_provenance(report: str, messages) -> str:
 
     snapshot = str(snapshot_messages[-1].content)
     fields = (
-        ("Provider", r"(?im)^\\s*(?:[-*]\\s*)?Source\\s*[:：]\\s*(.+)$"),
-        ("Source URL", r"(?im)^\\s*(?:[-*]\\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\\s*[:：]\\s*(.+)$"),
-        ("Retrieved at", r"(?im)^\\s*(?:[-*]\\s*)?Retrieved at(?: \\(UTC\\))?\\s*[:：]\\s*(.+)$"),
-        ("Requested as-of date", r"(?im)^\\s*(?:[-*]\\s*)?Requested as-of date\\s*[:：]\\s*(.+)$"),
-        ("Latest returned trading row", r"(?im)^\\s*(?:[-*]\\s*)?Latest returned trading row\\s*[:：]\\s*(.+)$"),
+        ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
+        ("Source URL", r"(?im)^\s*(?:[-*]\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\s*[:：]\s*(.+)$"),
+        ("Retrieved at", r"(?im)^\s*(?:[-*]\s*)?Retrieved at(?: \(UTC\))?\s*[:：]\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested as-of date\s*[:：]\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest returned trading row\s*[:：]\s*(.+)$"),
     )
     lines = ["", "### Market Data Provenance", ""]
     for label, pattern in fields:
@@ -47,7 +47,7 @@ def _append_verified_market_provenance(report: str, messages) -> str:
             lines.append(f"- {label}: {match.group(1).strip()}")
         elif label in {"Provider", "Source URL", "Retrieved at"}:
             lines.append(f"- {label}: not supplied by provider")
-    return report.rstrip() + "\\n" + "\\n".join(lines) + "\\n"
+    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 def create_market_analyst(llm):
