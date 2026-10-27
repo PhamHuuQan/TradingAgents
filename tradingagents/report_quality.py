@@ -97,6 +97,10 @@ _MARKET_URL_MISSING_RE = re.compile(
     r"Market URL:\\s*(?:unavailable|not provided|missing)|market link unavailable",
     re.IGNORECASE,
 )
+_SOCIAL_POST_URL_MISSING_RE = re.compile(
+    r"Source URL unavailable from the provider|post permalink unavailable|message URL unavailable",
+    re.IGNORECASE,
+)
 
 
 def _text(value: Any) -> str:
@@ -191,6 +195,10 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         guardrails.append(
             "- NEWS PROVENANCE LIMITATION: the supplied news report contains no direct URLs. Do not present a named event, macro value, "
             "or prediction-market probability as verified unless another supplied source gives its URL and observation/publication date."
+        )
+    if sentiment.strip() and _SOCIAL_POST_URL_MISSING_RE.search(sentiment):
+        guardrails.append(
+            "- SOCIAL POST PROVENANCE LIMITATION: at least one Reddit/StockTwits item has no provider-supplied permalink. Do not describe it as individually verified; keep the missing link visible and rely only on sourceable items for specific claims."
         )
     if not _urls(sentiment) and sentiment.strip():
         guardrails.append(
@@ -374,6 +382,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                     "Live probabilities must not be presented as timeless facts."
                 ),
             })
+
+    if sentiment.strip() and _SOCIAL_POST_URL_MISSING_RE.search(sentiment):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "SENTIMENT_POST_URLS_MISSING",
+            "finding": (
+                "At least one Reddit/StockTwits item lacks a provider-supplied permalink. The source stream URL proves which feed was queried, "
+                "but not which individual post supports a particular sentiment claim."
+            ),
+        })
 
     if sentiment.strip() and not _urls(sentiment):
         findings.append({
