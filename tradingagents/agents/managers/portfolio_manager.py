@@ -16,6 +16,7 @@ from tradingagents.agents.context import (
     get_portfolio_context_from_state,
 )
 from tradingagents.agents.rating import parse_rating
+from tradingagents.report_quality import build_decision_evidence_guardrails
 from tradingagents.agents.schemas import PortfolioDecision, render_pm_decision
 from tradingagents.agents.structured import NO_EXTERNAL_TOOLS, bind_structured, invoke_structured
 
@@ -31,6 +32,7 @@ def create_portfolio_manager(llm):
         risk_debate_state = state["risk_debate_state"]
         research_plan = state["investment_plan"]
         trader_plan = state["trader_investment_plan"]
+        evidence_guardrails = build_decision_evidence_guardrails(state)
 
         past_context = state.get("past_context", "")
         lessons_line = (
@@ -44,6 +46,8 @@ def create_portfolio_manager(llm):
 {instrument_context}
 
 {portfolio_context}
+
+{evidence_guardrails}
 
 ---
 
