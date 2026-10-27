@@ -146,6 +146,30 @@ def test_linked_news_without_any_publication_date_field_is_flagged():
     assert any(item["code"] == "NEWS_PUBLICATION_DATES_MISSING" for item in audit["findings"])
 
 
+def test_partial_fpt_ir_summary_is_not_mistaken_for_complete_fundamentals():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "# FPT Official Investor-Relations Performance Summary — 9M2026\n"
+        "- Reporting period: nine months ended September 30, 2026\n"
+        "- Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0\n"
+        "- Scope: company earnings-performance summary; not a complete financial-statement package.\n"
+        "Revenue: VND 40,023 billion; PBT: VND 8,770 billion; parent PAT: VND 7,778 billion; EPS: VND 4,142/share."
+    )
+    state["investment_debate_state"]["history"] = (
+        "Bull Analyst: FPT has strong cash flow, a strong balance sheet and a strong financial position."
+    )
+    state["investment_plan"] = "Recommendation: Buy because the financial position is strong."
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
+
+    guardrails = build_decision_evidence_guardrails(state)
+    assert "PARTIAL FUNDAMENTALS COVERAGE" in guardrails
+    assert "Do not infer operating/free cash flow" in guardrails
+
+
 def test_news_item_without_publication_date_is_flagged_even_with_a_url():
     state = _sample_state()
     state["news_report"] = (
