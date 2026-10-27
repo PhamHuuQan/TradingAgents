@@ -137,6 +137,8 @@ def test_ssi_snapshot_uses_ssi_prices_and_indicators(monkeypatch, configured_ssi
 
     assert "Verified SSI market data snapshot" in result
     assert "Source: ssi-fastconnect-v3" in result
+    assert "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc" in result
+    assert "Retrieved at:" in result
     assert "| Close | 1451 |" in result
     assert "historical first-availability time is unknown" in result
     assert len(provider.calls) == 1
