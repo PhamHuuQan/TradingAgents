@@ -746,3 +746,86 @@ def test_market_wide_social_silence_is_not_inferred_from_unavailable_and_empty_f
     codes = {item["code"] for item in audit["findings"]}
     assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
     assert "SOCIAL COVERAGE LIMITATION" in build_decision_evidence_guardrails(state)
+
+
+
+def test_report5_regression_flags_known_claims_and_avoids_known_false_positives():
+    state = {
+        "trade_date": "2026-10-27",
+        "asset_type": "stock",
+        "market_report": (
+            "FPT close 55,400; RSI 25.43; SMA50 62,574.48.\\n"
+            "### Market Data Provenance\\n"
+            "- Provider: ssi-fastconnect-v3\\n"
+            "- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\\n"
+            "- Retrieved at: 2026-10-27T16:15:01+07:00\\n"
+            "- Requested as-of date: 2026-10-27\\n"
+            "- Latest returned trading row: 2026-10-27"
+        ),
+        "sentiment_report": (
+            "Overall Sentiment: Neutral; Confidence: Low. "
+            "FPT partnership: https://finance.yahoo.com/technology/ai/articles/"
+            "fpt-niels-bohr-institute-advance-180700712.html. "
+            "StockTwits provider unavailable due to HTTPError. "
+            "Reddit returned no matching posts in the requested window; "
+            "this is not proof of zero discussion everywhere."
+        ),
+        "news_report": (
+            "FPT / Niels Bohr partnership. Publication date: 2026-10-20. "
+            "Source URL: https://finance.yahoo.com/technology/ai/articles/"
+            "fpt-niels-bohr-institute-advance-180700712.html. "
+            "Polymarket prediction markets mainly returned AFC Asian Cup 2027 Group E winner. "
+            "Market URL: https://polymarket.com/event/afc-asian-cup-2027-group-e-winner. "
+            "Observed at (UTC): 2026-10-27T09:15:00Z."
+        ),
+        "fundamentals_report": (
+            "FPT 9M2026 source-linked earnings summary. "
+            "Revenue: VND 40,023 billion (+12.4% YoY). "
+            "Profit before tax (PBT): VND 8,770 billion (+17.0% YoY). "
+            "Profit after tax attributable to parent (PAT): VND 7,778 billion (+13.3% YoY). "
+            "Earnings per share (EPS): VND 4,142 (+12.8% YoY). "
+            "Published 2026-10-21; reporting period ended 2026-09-30. "
+            "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+            "Balance sheet and cash flow statements are unavailable (EntitlementError). "
+            "Yahoo Finance returned no insider transaction records. "
+            "This is an empty result from one provider and not definitive evidence that no insider transactions occurred. "
+            "https://finance.yahoo.com/quote/FPT/insider-transactions/"
+        ),
+        "investment_debate_state": {
+            "history": (
+                "FPT is a bargain and a gift at this price; it is a powerful cash machine. "
+                "Hoàn toàn không có dữ liệu hay thảo luận nào trên StockTwits và Reddit. "
+                "Sự vắng bóng hoàn toàn của cộng đồng nhà đầu tư cho thấy FPT cạn kiệt thanh khoản quan tâm."
+            )
+        },
+        "investment_plan": "Recommendation: Hold. The growth data is sourced but valuation remains unverified.",
+        "trader_investment_plan": (
+            "Action: Hold\\nEntry Price: not provided\\nStop Loss: not provided\\n"
+            "Position Sizing: not provided"
+        ),
+        "risk_debate_state": {
+            "aggressive_history": (
+                "FINAL TRANSACTION PROPOSAL: ACCUMULATE SMALL POSITION (SCALE-IN) "
+                "AT 54.200 WITH STRICT STOP LOSS AT 54.200."
+            )
+        },
+        "final_rating": "Hold",
+        "final_trade_decision": "Rating: Hold\\nPrice Target: not provided",
+    }
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+    assert "MARKET_SOURCE_METADATA_MISSING" not in codes
+    assert "INSIDER_ABSENCE_UNVERIFIED" not in codes
+    assert "SENTIMENT_CITATIONS_MISSING" not in codes
+    assert "NEWS_PUBLICATION_DATES_MISSING" not in codes
+    assert "TRADE_PLAN_LEVELS_MISSING" not in codes
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
+    assert "UNSUPPORTED_VALUATION_CLAIM" in codes
+    assert "PREDICTION_MARKET_RELEVANCE_UNVERIFIED" in codes
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+    assert "TRADE_ENTRY_EQUALS_STOP_LOSS" in codes
