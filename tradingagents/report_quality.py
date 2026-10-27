@@ -285,11 +285,16 @@ def _has_source_linked_summary_metrics(text: str) -> bool:
     # The analyst may put the value in the next Markdown bullet (e.g. a metric
     # heading followed by "- Giá trị: 40.023 tỷ VND"). Allow that layout while
     # still requiring at least two distinct financial metric families and a URL.
+    numeric_financial_value = (
+        r"\d[\d,.]*\s*(?:%|VND|VNĐ|USD|EUR|GBP|"
+        r"billion|million|trillion|\btỷ\b|\bđồng\b|"
+        r"cổ phiếu|per share|/share)"
+    )
     metric_patterns = (
-        r"(?:\brevenue\b|doanh thu(?: hợp nhất| thuần)?).{0,180}\d[\d,.]*",
-        r"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế|profit before tax).{0,180}\d[\d,.]*",
-        r"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế|profit after tax).{0,180}\d[\d,.]*",
-        r"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu|lợi nhuận trên mỗi cổ phiếu|earnings per share).{0,180}\d[\d,.]*",
+        rf"(?:\brevenue\b|doanh thu(?: hợp nhất| thuần)?).{{0,180}}{numeric_financial_value}",
+        rf"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế|profit before tax).{{0,180}}{numeric_financial_value}",
+        rf"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế|profit after tax).{{0,180}}{numeric_financial_value}",
+        rf"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu|lợi nhuận trên mỗi cổ phiếu|earnings per share).{{0,180}}{numeric_financial_value}",
     )
     metric_count = sum(
         bool(re.search(pattern, text or "", re.IGNORECASE | re.DOTALL))
