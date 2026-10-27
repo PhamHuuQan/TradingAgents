@@ -643,3 +643,83 @@ def test_opposing_market_analyst_and_trader_directions_are_flagged():
 
     assert "MARKET_TRADER_DIRECTION_MISMATCH" in codes
 
+
+
+
+def test_report5_style_source_linked_earnings_summary_is_partial_not_unavailable():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Báo cáo nghiên cứu cơ bản về cổ phiếu FPT cập nhật đến ngày 27/10/2026. "
+        "Dữ liệu tài chính cốt lõi (9 tháng đầu năm 2026). "
+        "Dựa trên báo cáo tóm tắt kết quả kinh doanh chính thức từ FPT IR "
+        "(công bố 21/10/2026; kỳ báo cáo kết thúc 30/09/2026; "
+        "URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0): "
+        "**Doanh thu (Revenue):**\\n- Giá trị: 40.023 tỷ VND\\n- Tăng trưởng: 12,4%. "
+        "**Lợi nhuận trước thuế (Profit before tax - PBT):**\\n- Giá trị: 8.770 tỷ VND\\n- Tăng trưởng: 17,0%. "
+        "**Lợi nhuận sau thuế thuộc về cổ đông công ty mẹ (PAT):**\\n- Giá trị: 7.778 tỷ VND. "
+        "**Lợi nhuận trên mỗi cổ phiếu (EPS):**\\n- Giá trị: 4.142 VND/cổ phiếu. "
+        "Bảng cân đối kế toán không có dữ liệu xác nhận (EntitlementError); "
+        "báo cáo lưu chuyển tiền tệ và báo cáo kết quả kinh doanh chi tiết không thể truy xuất."
+    )
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+
+
+def test_hold_plan_does_not_require_new_entry_or_upside_target():
+    state = _sample_state()
+    state["trader_investment_plan"] = (
+        "Action: Hold\\nEntry Price: not provided\\n"
+        "Stop Loss: not provided\\nPosition Sizing: not provided"
+    )
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold\\nPrice Target: not provided"
+
+    audit = build_report_quality_audit(state)
+    assert not any(item["code"] == "TRADE_PLAN_LEVELS_MISSING" for item in audit["findings"])
+
+
+def test_audit_checks_newer_debate_state_fields_for_unsupported_valuation_claims():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "FPT 9M2026 summary: Revenue VND 40,023 billion; PBT VND 8,770 billion. "
+        "Source: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Balance sheet and cash flow are unavailable (EntitlementError)."
+    )
+    state["risk_debate_state"] = {
+        "aggressive_case": "The RSI proves FPT is a bargain and a gift at this price."
+    }
+
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "UNSUPPORTED_VALUATION_CLAIM" for item in audit["findings"])
+
+
+def test_irrelevant_sports_prediction_market_is_flagged_in_equity_news():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["news_report"] = (
+        "Polymarket prediction markets: AFC Asian Cup 2027 Group E winner. "
+        "https://polymarket.com/event/afc-asian-cup-2027-group-e-winner"
+    )
+
+    audit = build_report_quality_audit(state)
+    assert any(
+        item["code"] == "PREDICTION_MARKET_RELEVANCE_UNVERIFIED"
+        for item in audit["findings"]
+    )
+
+
+def test_fpt_insider_empty_result_with_explicit_nonproof_language_is_qualified():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Yahoo Finance returned no insider transaction records. "
+        "This is an empty result from one provider and is not definitive evidence that no insider transactions occurred. "
+        "https://finance.yahoo.com/quote/FPT/insider-transactions/"
+    )
+    state["investment_debate_state"] = {"history": "No insider activity was confirmed."}
+
+    audit = build_report_quality_audit(state)
+    assert not any(item["code"] == "INSIDER_ABSENCE_UNVERIFIED" for item in audit["findings"])
