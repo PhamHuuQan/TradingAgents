@@ -37,8 +37,23 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         # A generic/error ToolMessage must never manufacture source metadata.
         if getattr(message, "name", None) != "get_verified_market_snapshot":
             continue
-        content = str(getattr(message, "content", ""))
-        if unavailable_pattern.search(content):
+        content = str(getattr(message, "content", "")).replace("\\n", "\n")
+        content_folded = content.casefold().lstrip()
+        explicit_unavailable = (
+            unavailable_pattern.search(content) is not None
+            or any(
+                marker in content_folded
+                for marker in (
+                    "data_unavailable",
+                    "no_data_available",
+                    "no market snapshot",
+                    "snapshot unavailable",
+                    "could not retrieve snapshot",
+                )
+            )
+            or content_folded.startswith(("error:", "failed:", "<error"))
+        )
+        if explicit_unavailable:
             continue
         has_verified_heading = bool(verified_heading_pattern.search(content))
         has_snapshot_metadata = all(
