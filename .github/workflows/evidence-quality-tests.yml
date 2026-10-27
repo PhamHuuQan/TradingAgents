@@ -1,0 +1,98 @@
+name: Evidence quality and FPT IR regression tests
+
+on:
+  push:
+    branches:
+      - feature/report-evidence-quality-20261027
+    paths:
+      - "tradingagents/report_quality.py"
+      - "tradingagents/reporting.py"
+      - "tradingagents/dataflows/vendors/fpt_ir.py"
+      - "tradingagents/dataflows/vendors/yahoo/fundamentals.py"
+      - "tradingagents/dataflows/vendors/yahoo/news.py"
+      - "tradingagents/dataflows/router.py"
+      - "tradingagents/agents/analysts/**"
+      - "tradingagents/agents/researchers/**"
+      - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/trader/**"
+      - "tests/test_report_quality.py"
+      - "tests/test_fpt_ir.py"
+      - "tests/test_fundamentals_units.py"
+      - "tests/test_news_lookahead.py"
+      - "tests/test_report_html.py"
+      - "tests/test_reporting.py"
+      - ".github/workflows/evidence-quality-tests.yml"
+  pull_request:
+    branches:
+      - feature/vietnam-market-foundation
+    paths:
+      - "tradingagents/report_quality.py"
+      - "tradingagents/reporting.py"
+      - "tradingagents/dataflows/vendors/fpt_ir.py"
+      - "tradingagents/dataflows/vendors/yahoo/fundamentals.py"
+      - "tradingagents/dataflows/vendors/yahoo/news.py"
+      - "tradingagents/dataflows/router.py"
+      - "tradingagents/agents/analysts/**"
+      - "tradingagents/agents/researchers/**"
+      - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/trader/**"
+      - "tests/test_report_quality.py"
+      - "tests/test_fpt_ir.py"
+      - "tests/test_fundamentals_units.py"
+      - "tests/test_news_lookahead.py"
+      - "tests/test_report_html.py"
+      - "tests/test_reporting.py"
+      - ".github/workflows/evidence-quality-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project and development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Run evidence/provenance/report regressions
+        run: |
+          python -m pytest -q \
+            tests/test_report_quality.py \
+            tests/test_fpt_ir.py \
+            tests/test_fundamentals_units.py \
+            tests/test_news_lookahead.py \
+            tests/test_report_html.py \
+            tests/test_reporting.py
+      - name: Lint changed Python files
+        run: |
+          python -m ruff check \
+            tradingagents/report_quality.py \
+            tradingagents/reporting.py \
+            tradingagents/dataflows/vendors/fpt_ir.py \
+            tradingagents/dataflows/vendors/yahoo/fundamentals.py \
+            tradingagents/dataflows/vendors/yahoo/news.py \
+            tradingagents/dataflows/router.py \
+            tradingagents/agents/analysts/fundamentals_analyst.py \
+            tradingagents/agents/analysts/news_analyst.py \
+            tradingagents/agents/analysts/sentiment_analyst.py \
+            tradingagents/agents/researchers/bull_researcher.py \
+            tradingagents/agents/researchers/bear_researcher.py \
+            tradingagents/agents/managers/research_manager.py \
+            tradingagents/agents/managers/portfolio_manager.py \
+            tradingagents/agents/trader/trader.py \
+            tests/test_report_quality.py \
+            tests/test_fpt_ir.py \
+            tests/test_fundamentals_units.py \
+            tests/test_news_lookahead.py \
+            tests/test_report_html.py \
+            tests/test_reporting.py
