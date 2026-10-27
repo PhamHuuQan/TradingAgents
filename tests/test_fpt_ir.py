@@ -78,6 +78,24 @@ def test_official_9m_summary_contains_values_period_and_provenance(monkeypatch):
 
 
 @pytest.mark.unit
+def test_current_official_release_with_intervening_growth_clause_is_parsed(monkeypatch):
+    current_wording = _ARTICLE.replace(
+        "respectively. Profit after tax attributable",
+        "respectively, maintaining double-digit profit growth. Profit after tax attributable",
+    )
+    _mock_pages(monkeypatch, article=current_wording)
+
+    out = fpt_ir.get_fpt_ir_fundamentals("FPT", "2026-10-27")
+
+    assert "Publication date: 2026-10-21" in out
+    assert "VND 40,023 billion" in out
+    assert "VND 8,770 billion" in out
+    assert "VND 7,778 billion" in out
+    assert "VND 4,142 per share" in out
+    assert "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0" in out
+
+
+@pytest.mark.unit
 def test_only_fpt_is_supported_and_no_request_is_made_for_other_tickers(monkeypatch):
     get = Mock()
     monkeypatch.setattr(fpt_ir.requests, "get", get)
