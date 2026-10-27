@@ -271,7 +271,7 @@ def _append_sentiment_source_provenance(
     elif st_screened_all:
         lines.append("- The screening step retained no on-topic StockTwits messages; no individual post is asserted as evidence.")
     elif st_has_message_rows:
-        lines.append("- Message URL unavailable from the provider for one or more fetched StockTwits messages.")
+        lines.append("- Message URL unavailable from the provider for one or more fetched StockTwits messages; the stream endpoint is not an individual message permalink.")
     elif any(token in st_folded for token in ("unavailable", "error", "failed")):
         lines.append("- The provider block marks the feed unavailable; no conclusion about underlying market discussion is justified.")
     else:
