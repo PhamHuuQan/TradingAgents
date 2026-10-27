@@ -258,6 +258,7 @@ def _get_macro_data_public_csv(series_id: str, start_date: str, as_of_date: str)
         f"## FRED: {title} ({series_id})\n"
         "- Source: Federal Reserve Bank of St. Louis, FRED\n"
         f"- Source URL: {source_url}\n"
+        '- Attribution: This product uses FRED® data and is not endorsed or certified by the Federal Reserve Bank of St. Louis.\n'
         f"- Data URL: {data_url}\n"
         f"- Retrieved at (UTC): {retrieved_at}\n"
         f"- Units: {units}\n"
@@ -387,6 +388,7 @@ def get_macro_data(
         f"## FRED: {title} ({series_id})\n"
         f"- Source: Federal Reserve Bank of St. Louis, FRED\n"
         f"- Source URL: {source_url}\n"
+        '- Attribution: This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.\n'
         f"- Retrieved at (UTC): {retrieved_at}\n"
         f"- Data vintage as of: {pit}\n"
         f"- Units: {units}\n"
