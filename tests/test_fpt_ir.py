@@ -118,6 +118,39 @@ def test_unrecognized_article_format_fails_closed(monkeypatch):
 
 
 @pytest.mark.unit
+def test_router_reaches_fpt_ir_after_vnstock_and_yahoo_are_unavailable(monkeypatch):
+    monkeypatch.setattr(config_module, "_config", copy.deepcopy(DEFAULT_CONFIG))
+    set_config({"data_vendors": {"fundamental_data": "vnstock,yfinance,fpt_ir"}})
+
+    calls = []
+    def unavailable_vnstock(*args, **kwargs):
+        calls.append("vnstock")
+        raise VendorUnavailableError("EntitlementError")
+
+    def unavailable_yahoo(*args, **kwargs):
+        calls.append("yfinance")
+        raise VendorUnavailableError("Yahoo unavailable")
+
+    def official_fpt(*args, **kwargs):
+        calls.append("fpt_ir")
+        return "FPT IR summary with Source URL: https://fpt.com/en/news/example"
+
+    monkeypatch.setitem(
+        router.VENDOR_METHODS,
+        "get_fundamentals",
+        {
+            "vnstock": unavailable_vnstock,
+            "yfinance": unavailable_yahoo,
+            "fpt_ir": official_fpt,
+        },
+    )
+
+    result = router.route_to_vendor("get_fundamentals", "FPT", "2026-10-27")
+    assert result.startswith("FPT IR summary")
+    assert calls == ["vnstock", "yfinance", "fpt_ir"]
+
+
+@pytest.mark.unit
 def test_router_registers_fpt_ir_as_explicit_only_fundamentals_fallback(monkeypatch):
     assert router.VENDOR_METHODS["get_fundamentals"]["fpt_ir"] is fpt_ir.get_fpt_ir_fundamentals
     assert "fpt_ir" in router.EXPLICIT_ONLY_VENDORS
