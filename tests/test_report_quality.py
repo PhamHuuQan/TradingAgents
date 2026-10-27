@@ -793,7 +793,7 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
         ),
         "investment_debate_state": {
             "history": (
-                "FPT is a bargain and a gift at this price; it is a powerful cash machine. "
+                "FPT đang bị thị trường định giá thấp; FPT là một cỗ máy in tiền mạnh mẽ. "
                 "Hoàn toàn không có dữ liệu hay thảo luận nào trên StockTwits và Reddit. "
                 "Sự vắng bóng hoàn toàn của cộng đồng nhà đầu tư cho thấy FPT cạn kiệt thanh khoản quan tâm."
             )
