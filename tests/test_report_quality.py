@@ -186,6 +186,36 @@ def test_vnstock_metrics_not_inferred_section_is_a_partial_coverage_warning():
     assert "PARTIAL FUNDAMENTALS COVERAGE" in guardrails
 
 
+def test_prediction_market_probability_requires_specific_market_url_and_timestamp():
+    state = _sample_state()
+    state["news_report"] = (
+        "Polymarket market-implied probability was 96%. "
+        "API endpoint: https://gamma-api.polymarket.com/public-search. "
+        "Retrieved at (UTC): 2026-10-27T00:00:00+00:00."
+    )
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "PREDICTION_MARKET_URL_MISSING" in codes
+    assert "PREDICTION_MARKET_TIMESTAMP_MISSING" not in codes
+
+
+def test_prediction_market_probability_without_timestamp_is_flagged():
+    state = _sample_state()
+    state["news_report"] = (
+        "Polymarket probability: 96%. "
+        "Market URL: https://polymarket.com/event/fed-rate-cut-2026."
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "PREDICTION_MARKET_TIMESTAMP_MISSING" for item in audit["findings"])
+
+
+def test_fred_macro_claim_requires_direct_series_page_url():
+    state = _sample_state()
+    state["news_report"] = "FRED: Unemployment Rate (UNRATE), latest value 4.4."
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "FRED_SERIES_CITATION_MISSING" for item in audit["findings"])
+
+
 def test_partial_fundamentals_cannot_support_numeric_roE_or_cashflow_claims():
     state = _sample_state()
     state["fundamentals_report"] = (
