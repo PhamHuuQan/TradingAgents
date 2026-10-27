@@ -231,7 +231,6 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
     downstream = _downstream_text(final_state)
-    combined_news = news + "\n" + sentiment
     findings: list[dict[str, str]] = []
 
     if _requires_fundamentals(final_state) and source_statuses["Fundamentals report"] in {
