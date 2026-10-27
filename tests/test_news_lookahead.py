@@ -20,6 +20,36 @@ def _epoch(date_str):
 
 
 @pytest.mark.unit
+def test_news_formatter_preserves_publication_date_and_direct_source_url():
+    article = {
+        "title": "FPT earnings update",
+        "publisher": "FPT Corporation",
+        "summary": "Revenue and PBT update.",
+        "link": "https://fpt.com/en/news/earnings-update",
+        "pub_date": datetime(2026, 10, 21, tzinfo=UTC),
+    }
+
+    out = ynews._format_articles([article])
+
+    assert "Publication date: 2026-10-21" in out
+    assert "Source URL: https://fpt.com/en/news/earnings-update" in out
+
+
+@pytest.mark.unit
+def test_news_formatter_marks_missing_provenance_instead_of_fabricating_it():
+    out = ynews._format_articles([{
+        "title": "Undated article",
+        "publisher": "Unknown",
+        "summary": "",
+        "link": "",
+        "pub_date": None,
+    }])
+
+    assert "Publication date: unavailable from the provider" in out
+    assert "Source URL: unavailable from the provider" in out
+
+
+@pytest.mark.unit
 def test_flat_article_publish_time_is_parsed():
     # #992: flat articles now carry a pub_date (was always None -> unfilterable).
     # #1126: parsed as UTC-aware, so the date can't shift with the host timezone.
