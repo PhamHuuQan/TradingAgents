@@ -197,6 +197,26 @@ prove when it first became available. The adapter is not a financial-statement s
 or a validated historical backtesting feed. No trading SDK or order-placement endpoint
 is used.
 
+## Official FPT Investor Relations earnings-summary fallback
+
+For current-date research on `FPT`, the fundamentals vendor chain may opt in to the issuer-specific
+public IR parser after Vnstock VCI and Yahoo Finance:
+
+~~~python
+config["data_vendors"]["fundamental_data"] = "vnstock,yfinance,fpt_ir"
+~~~
+
+`fpt_ir` only supports FPT. It finds the latest period-labelled nine-month revenue/PBT release on the
+official [FPT Investor Relations page](https://fpt.com/en/ir), parses the publication date and reported
+revenue, PBT, parent-company PAT and EPS, and records the article URL and retrieval timestamp.
+It fails closed if the official article, date, period or expected metric pattern cannot be verified.
+The source is deliberately explicit-only and is not added to the implicit `default` vendor chain.
+
+This release is an earnings-performance summary, **not** a full financial-statement package. It does not
+supply a complete balance sheet, cash-flow statement, all valuation ratios or insider-transaction coverage.
+A report must not infer those missing metrics from revenue/PBT/PAT/EPS alone. The adapter is also blocked
+for historical as-of dates because discovering the latest release now does not reconstruct exactly which
+public disclosures were available on a past decision date.
 ## Offline CSV-to-valuation report
 
 The normalized CSV readers provide a no-network path for validating data and
