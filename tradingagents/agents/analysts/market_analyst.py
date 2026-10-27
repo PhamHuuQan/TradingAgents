@@ -33,8 +33,11 @@ def _append_verified_market_provenance(report: str, messages) -> str:
     for message in messages or ():
         if not isinstance(message, ToolMessage):
             continue
+        # Only the verified snapshot tool can authorize this provenance section.
+        # A generic/error ToolMessage must never manufacture source metadata.
+        if getattr(message, "name", None) != "get_verified_market_snapshot":
+            continue
         content = str(getattr(message, "content", ""))
-        # Tool name alone does not prove success: failed calls use the same name.
         if unavailable_pattern.search(content):
             continue
         has_verified_heading = bool(verified_heading_pattern.search(content))
