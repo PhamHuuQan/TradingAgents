@@ -21,15 +21,33 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         return report
 
     existing_heading = "### Market Data Provenance"
-    snapshot_messages = [
-        message for message in messages or ()
-        if isinstance(message, ToolMessage)
-        and (
-            getattr(message, "name", None) == "get_verified_market_snapshot"
-            or "Verified SSI market data snapshot" in str(getattr(message, "content", ""))
-            or "Verified market data snapshot" in str(getattr(message, "content", ""))
+    snapshot_messages = []
+    unavailable_pattern = re.compile(
+        r"\\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|EntitlementError)\\b"
+        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot",
+        re.IGNORECASE,
+    )
+    verified_heading_pattern = re.compile(
+        r"(?im)^\\s*#{1,6}\\s*Verified(?: SSI)? market data snapshot\\b"
+    )
+    for message in messages or ():
+        if not isinstance(message, ToolMessage):
+            continue
+        content = str(getattr(message, "content", ""))
+        # Tool name alone does not prove success: failed calls use the same name.
+        if unavailable_pattern.search(content):
+            continue
+        has_verified_heading = bool(verified_heading_pattern.search(content))
+        has_snapshot_metadata = all(
+            re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+            for pattern in (
+                r"^\\s*[-*]?\\s*Requested as-of date\\s*:",
+                r"^\\s*[-*]?\\s*Latest returned trading row\\s*:",
+                r"^\\s*[-*]?\\s*Source\\s*:",
+            )
         )
-    ]
+        if has_verified_heading or has_snapshot_metadata:
+            snapshot_messages.append(message)
     if not snapshot_messages:
         return report
 
