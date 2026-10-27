@@ -111,6 +111,11 @@ _NEWS_ITEM_URL_MISSING_RE = re.compile(
     r"Source URL unavailable from the provider|article URL unavailable|news link unavailable",
     re.IGNORECASE,
 )
+_NEWS_UNLINKED_SOURCE_CUE_RE = re.compile(
+    r"xem chi tiết tại nguồn|xem tại nguồn|xem nguồn|link bài viết|"
+    r"see (?:the )?source|read more at the source|source link unavailable",
+    re.IGNORECASE,
+)
 
 
 _MARKET_SOURCE_LINE_RE = re.compile(
@@ -144,6 +149,15 @@ def _market_provenance_missing(text: str) -> bool:
         and _MARKET_SOURCE_URL_LINE_RE.search(text)
         and _MARKET_RETRIEVAL_LINE_RE.search(text)
     )
+
+
+def _has_unlinked_news_source_cue(text: str) -> bool:
+    """Catch prose that points to a source without a nearby usable direct URL."""
+    for match in _NEWS_UNLINKED_SOURCE_CUE_RE.finditer(text or ""):
+        context = text[max(0, match.start() - 160):min(len(text), match.end() + 160)]
+        if not _urls(context):
+            return True
+    return False
 
 
 def _text(value: Any) -> str:
@@ -248,6 +262,10 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "Use only the exact metrics, reporting period, unit and growth rates it provides. Do not infer operating/free cash flow, cash balances, debt, "
             "liquidity, solvency, equity, margins, P/E, P/B, ROE, debt ratios, or insider activity unless another supplied source explicitly provides those values. "
             "State that those metrics remain unverified."
+        )
+    if news.strip() and _has_unlinked_news_source_cue(news):
+        guardrails.append(
+            "- NEWS ITEM LINK LIMITATION: at least one item points readers to a source but has no direct URL nearby. Keep that item unverified until its own source link is supplied."
         )
     if not _urls(news) and news.strip():
         guardrails.append(
@@ -417,7 +435,9 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _NEWS_ITEM_URL_MISSING_RE.search(news):
+    if news.strip() and (
+        _NEWS_ITEM_URL_MISSING_RE.search(news) or _has_unlinked_news_source_cue(news)
+    ):
         findings.append({
             "severity": "MEDIUM",
             "code": "NEWS_ITEM_URLS_MISSING",
