@@ -17,9 +17,10 @@ TOOLS = (
 
 def _append_verified_market_provenance(report: str, messages) -> str:
     """Append provider/source metadata from the actual verified snapshot tool result."""
-    if not report.strip() or "### Market Data Provenance" in report:
+    if not report.strip():
         return report
 
+    existing_heading = "### Market Data Provenance"
     snapshot_messages = [
         message for message in messages or ()
         if isinstance(message, ToolMessage)
@@ -32,6 +33,8 @@ def _append_verified_market_provenance(report: str, messages) -> str:
     if not snapshot_messages:
         return report
 
+    if existing_heading in report:
+        report = report.split(existing_heading, 1)[0].rstrip()
     snapshot = str(snapshot_messages[-1].content)
     fields = (
         ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
