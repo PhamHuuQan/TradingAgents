@@ -111,6 +111,23 @@ def test_actual_fpt_report_failure_patterns_are_detected():
     assert audit["overall_status"] == "REVIEW REQUIRED"
 
 
+def test_missing_company_fundamentals_are_not_a_blocker_for_crypto():
+    state = {
+        "asset_type": "crypto",
+        "trade_date": "2026-10-27",
+        "market_report": "BTC market snapshot.",
+        "news_report": "",
+        "sentiment_report": "",
+        "fundamentals_report": "",
+        "investment_plan": "Recommendation: Hold.",
+        "trader_investment_plan": "Action: Hold.",
+        "final_rating": "Hold",
+        "final_trade_decision": "Rating: Hold",
+    }
+    audit = build_report_quality_audit(state)
+    assert not any(item["code"] == "FUNDAMENTALS_UNAVAILABLE" for item in audit["findings"])
+
+
 def test_rendered_quality_section_never_claims_external_fact_check():
     rendered = render_report_quality_markdown(build_report_quality_audit(_sample_state()))
     assert "REVIEW REQUIRED" in rendered
