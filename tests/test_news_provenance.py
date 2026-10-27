@@ -2,7 +2,7 @@ from langchain_core.messages import ToolMessage
 
 from tradingagents.agents.analysts.news_analyst import (
     _append_news_tool_evidence,
-    _build_system_message,
+    _prediction_market_relevance_guardrail,
 )
 
 
@@ -69,17 +69,10 @@ def test_empty_news_query_is_distinguished_from_provider_failure():
     assert "No article-level records" in actual
 
 def test_news_prompt_excludes_prediction_markets_unrelated_to_investment_thesis():
-    prompt = _build_system_message(
-        ticker="FPT",
-        start_date="2026-10-20",
-        end_date="2026-10-27",
-        news_block="No relevant company news found.",
-        stocktwits_block="StockTwits unavailable.",
-        reddit_block="No Reddit posts found.",
-    )
+    rule = _prediction_market_relevance_guardrail()
 
-    assert "PREDICTION-MARKET RELEVANCE" in prompt
-    assert "Exclude unrelated sports, entertainment" in prompt
-    assert "clear transmission channel" in prompt
+    assert "PREDICTION-MARKET RELEVANCE" in rule
+    assert "Exclude unrelated sports, entertainment" in rule
+    assert "clear transmission channel" in rule
 
 
