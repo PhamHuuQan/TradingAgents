@@ -49,3 +49,19 @@ def test_news_helper_does_not_invent_articles_without_tool_evidence():
     assert "### Source records returned by news tools" in actual
     assert "get_news: DATA_UNAVAILABLE: news provider failed" in actual
     assert "https://finance.yahoo.com/" not in actual
+
+def test_empty_news_query_is_distinguished_from_provider_failure():
+    messages = [
+        ToolMessage(
+            content="No news found for FPT between 2026-10-20 and 2026-10-27",
+            tool_call_id="empty-query",
+            name="get_news",
+        )
+    ]
+
+    actual = _append_news_tool_evidence("News analysis text", messages)
+
+    assert "Queries with no matching news returned for the requested window" in actual
+    assert "Provider or retrieval failures" not in actual
+    assert "No article-level records" in actual
+
