@@ -139,6 +139,24 @@ def test_fundamentals_without_a_source_url_are_flagged_when_values_are_present()
     assert audit["fundamentals_url_count"] == 0
 
 
+def test_individual_news_item_without_url_is_flagged_even_when_other_urls_exist():
+    state = _sample_state()
+    state["news_report"] = (
+        "### First item\\nPublication date: 2026-10-21\\nSource URL: https://example.test/one\\n"
+        "### Second item\\nPublication date: 2026-10-22\\nSource URL unavailable from the provider"
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "NEWS_ITEM_URLS_MISSING" for item in audit["findings"])
+
+
+def test_missing_market_report_gets_high_severity_and_prompt_guardrail():
+    state = _sample_state()
+    state["market_report"] = "DATA_UNAVAILABLE: no configured vendor could serve price data."
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "MARKET_DATA_UNAVAILABLE" for item in audit["findings"])
+    assert "MARKET DATA LIMITATION" in build_decision_evidence_guardrails(state)
+
+
 def test_linked_news_without_any_publication_date_field_is_flagged():
     state = _sample_state()
     state["news_report"] = "A dated-looking story title: https://example.test/news"
