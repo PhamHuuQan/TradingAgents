@@ -100,3 +100,23 @@ def test_present_social_items_without_permalinks_are_explicitly_flagged_as_unava
     assert "Message URL unavailable from the provider" in actual
     assert "Post permalink unavailable from the provider" in actual
 
+def test_partially_linked_stocktwits_feed_still_flags_posts_without_permalinks():
+    actual = _append_sentiment_source_provenance(
+        "Overall Sentiment: Neutral (Score: 5.0/10)\nConfidence: Low",
+        ticker="FPT",
+        start_date="2026-10-20",
+        end_date="2026-10-27",
+        news_block="",
+        stocktwits_block=(
+            "Source URL: https://api.stocktwits.com/api/2/streams/symbol/FPT.json\n"
+            "[2026-10-26 · @user1 · Bullish] FPT long\n"
+            "  Source URL: https://stocktwits.com/user1/message/123\n"
+            "[2026-10-27 · @user2 · Bearish] Another message\n"
+            "  Source URL unavailable from the provider"
+        ),
+        reddit_block="No Reddit posts found in the requested window.",
+    )
+
+    assert "Message permalink: https://stocktwits.com/user1/message/123" in actual
+    assert "Message URL unavailable from the provider" in actual
+
