@@ -33,6 +33,7 @@ def _append_news_tool_evidence(report: str, messages) -> str:
 
     records = []
     unavailable_blocks = []
+    no_match_blocks = []
     for message in messages or ():
         if not isinstance(message, ToolMessage):
             continue
@@ -42,8 +43,11 @@ def _append_news_tool_evidence(report: str, messages) -> str:
             r"(?m)^###\s+.+\nPublication date:", content
         ):
             continue
-        if any(token in content.casefold() for token in ("data_unavailable", "unavailable:", "no news found", "no global news found")):
+        folded_content = content.casefold()
+        if any(token in folded_content for token in ("data_unavailable", "unavailable:", "vendorunavailableerror", "failed", "timed out", "timeout")):
             unavailable_blocks.append((tool_name or "news tool", content[:260].replace("\n", " ")))
+        elif "no news found" in folded_content or "no global news found" in folded_content:
+            no_match_blocks.append((tool_name or "news tool", content[:260].replace("\n", " ")))
         for chunk in re.split(r"(?m)(?=^###\s+)", content):
             title_match = re.search(r"(?m)^###\s+(.+?)(?:\s+\(source:\s*(.+?)\))?\s*$", chunk)
             if not title_match:
@@ -60,7 +64,7 @@ def _append_news_tool_evidence(report: str, messages) -> str:
             if key not in records:
                 records.append(key)
 
-    if not records and not unavailable_blocks:
+    if not records and not unavailable_blocks and not no_match_blocks:
         return report
 
     lines = ["", heading, "", "- The following records were copied from the news tools' returned blocks; their presence does not independently validate the article or claim.", ""]
@@ -72,9 +76,14 @@ def _append_news_tool_evidence(report: str, messages) -> str:
             lines.append(f"- {len(records) - 20} additional tool-returned news records omitted from this index.")
     else:
         lines.append("- No article-level records with publisher/date/URL were available in the supplied tool results.")
+    if no_match_blocks:
+        lines.append("")
+        lines.append("**Queries with no matching news returned for the requested window**")
+        for tool_name, detail in list(dict.fromkeys(no_match_blocks))[:5]:
+            lines.append(f"- {tool_name}: {detail}")
     if unavailable_blocks:
         lines.append("")
-        lines.append("**Tool coverage limitations**")
+        lines.append("**Provider or retrieval failures**")
         for tool_name, detail in list(dict.fromkeys(unavailable_blocks))[:5]:
             lines.append(f"- {tool_name}: {detail}")
     return report.rstrip() + "\n" + "\n".join(lines) + "\n"
