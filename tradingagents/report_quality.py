@@ -94,7 +94,7 @@ _POLYMARKET_PROBABILITY_RE = re.compile(
 _POLYMARKET_URL_RE = re.compile(r"https?://(?:www\.)?polymarket\.com/", re.IGNORECASE)
 
 _MARKET_URL_MISSING_RE = re.compile(
-    r"Market URL:\\s*(?:unavailable|not provided|missing)|market link unavailable",
+    r"Market URL:\s*(?:unavailable|not provided|missing)|market link unavailable",
     re.IGNORECASE,
 )
 _SOCIAL_POST_URL_MISSING_RE = re.compile(
