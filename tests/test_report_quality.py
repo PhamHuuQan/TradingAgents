@@ -347,6 +347,34 @@ def test_fred_macro_claim_requires_direct_series_page_url():
     assert any(item["code"] == "FRED_SERIES_CITATION_MISSING" for item in audit["findings"])
 
 
+def test_partial_earnings_summary_does_not_support_undervaluation_claims():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "FPT 9M2026 summary: revenue 40,023 billion VND (+12.4%), "
+        "PBT 8,770 billion VND (+17.0%), EPS 4,142 VND. "
+        "Official source: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Balance sheet and cash-flow details unavailable; P/E and P/B not available."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Bull: FPT is being priced irrationally low and is a gift from the market. "
+            "The sourced earnings summary does not include valuation multiples."
+        )
+    }
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+    assert "UNSUPPORTED_VALUATION_CLAIM" in codes
+    assert "VALUATION EVIDENCE LIMITATION" in build_decision_evidence_guardrails(state)
+
+
 def test_partial_fundamentals_cannot_support_numeric_roE_or_cashflow_claims():
     state = _sample_state()
     state["fundamentals_report"] = (
