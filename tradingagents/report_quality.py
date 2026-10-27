@@ -270,10 +270,10 @@ def _has_source_linked_summary_metrics(text: str) -> bool:
     # heading followed by "- Giá trị: 40.023 tỷ VND"). Allow that layout while
     # still requiring at least two distinct financial metric families and a URL.
     metric_patterns = (
-        r"(?:\brevenue\b|doanh thu(?: hợp nhất| thuần)?).{0,420}\d[\d,.]*",
-        r"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế|profit before tax).{0,420}\d[\d,.]*",
-        r"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế|profit after tax).{0,420}\d[\d,.]*",
-        r"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu|lợi nhuận trên mỗi cổ phiếu|earnings per share).{0,420}\d[\d,.]*",
+        r"(?:\brevenue\b|doanh thu(?: hợp nhất| thuần)?).{0,180}\d[\d,.]*",
+        r"(?:\bPBT\b|\bLNTT\b|lợi nhuận trước thuế|profit before tax).{0,180}\d[\d,.]*",
+        r"(?:\bPAT\b|\bLNST\b|lợi nhuận sau thuế|profit after tax).{0,180}\d[\d,.]*",
+        r"(?:\bEPS\b|lãi cơ bản trên (?:mỗi )?cổ phiếu|lợi nhuận trên mỗi cổ phiếu|earnings per share).{0,180}\d[\d,.]*",
     )
     metric_count = sum(
         bool(re.search(pattern, text or "", re.IGNORECASE | re.DOTALL))
