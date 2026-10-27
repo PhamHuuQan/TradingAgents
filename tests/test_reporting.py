@@ -24,7 +24,8 @@ def _state():
 
 SETTINGS = {"version": "0.5.2", "llm_provider": "openai", "deep_think_llm": "gpt-6-sol",
             "quick_think_llm": "gpt-6-luna", "analysts": ["market", "news"], "max_debate_rounds": 1,
-            "max_risk_discuss_rounds": 2, "data_vendors": {"core_stock_apis": "yfinance"}}
+            "max_risk_discuss_rounds": 2, "data_vendors": {"core_stock_apis": "yfinance"},
+            "code_branch": "feature/test-revision", "code_commit": "0123456789abcdef0123456789abcdef01234567"}
 
 
 @pytest.mark.unit
@@ -76,6 +77,7 @@ def test_the_report_names_the_analysis_date_and_what_produced_it(tmp_path):
     assert "Analysts: market, news" in header
     assert "research debate rounds 1, risk debate rounds 2" in header
     assert "core_stock_apis yfinance" in header
+    assert "Code revision: `feature/test-revision` @ `0123456789abcdef0123456789abcdef01234567`" in header
 
 
 @pytest.mark.unit
@@ -87,12 +89,16 @@ def test_run_settings_record_the_run_without_endpoints_or_paths():
     graph.config = {"llm_provider": "openai", "deep_think_llm": "gpt-6-sol", "quick_think_llm": "gpt-6-luna",
                     "max_debate_rounds": 1, "max_risk_discuss_rounds": 1, "output_language": "English",
                     "data_vendors": {"core_stock_apis": "yfinance"}, "tool_vendors": {},
+                    "code_branch": "feature/test-revision",
+                    "code_commit": "0123456789abcdef0123456789abcdef01234567",
                     "backend_url": "https://user:secret@relay.example/v1", "results_dir": "/home/me/results"}
 
     settings = graph.run_settings()
 
     assert settings["analysts"] == ["market", "news"]
     assert settings["deep_think_llm"] == "gpt-6-sol"
+    assert settings["code_branch"] == "feature/test-revision"
+    assert settings["code_commit"] == "0123456789abcdef0123456789abcdef01234567"
     assert "secret" not in str(settings) and "/home/me" not in str(settings)
 
 
