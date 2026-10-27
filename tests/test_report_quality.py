@@ -725,3 +725,24 @@ def test_fpt_insider_empty_result_with_explicit_nonproof_language_is_qualified()
 
     audit = build_report_quality_audit(state)
     assert not any(item["code"] == "INSIDER_ABSENCE_UNVERIFIED" for item in audit["findings"])
+
+
+
+def test_market_wide_social_silence_is_not_inferred_from_unavailable_and_empty_feeds():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "StockTwits provider unavailable due to HTTPError. "
+        "Reddit returned no matching posts in the requested window; "
+        "this is not proof of zero discussion everywhere."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Hoàn toàn không có dữ liệu hay thảo luận nào trên StockTwits và Reddit. "
+            "Sự vắng bóng hoàn toàn của cộng đồng nhà đầu tư cho thấy FPT cạn kiệt thanh khoản quan tâm."
+        )
+    }
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+    assert "SOCIAL COVERAGE LIMITATION" in build_decision_evidence_guardrails(state)
