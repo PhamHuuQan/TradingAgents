@@ -8,9 +8,12 @@ A free API key (https://fred.stlouisfed.org/docs/api/api_key.html) is read from
 ``FRED_API_KEY``; if it is unset the vendor raises ``FredNotConfiguredError`` so
 the routing layer treats it as "unavailable" rather than a hard crash.
 """
+import csv
+import io
 import logging
 import os
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 
 import pytz
 
@@ -20,6 +23,32 @@ from tradingagents.dataflows.net import get_scrubbed
 logger = logging.getLogger(__name__)
 
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
+
+# Keyless graph CSV is used only for live/current analysis; unlike the API path,
+# it does not pin historical realtime vintages and must never power backtests.
+FRED_GRAPH_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+FRED_CSV_METADATA = {
+    "FEDFUNDS": ("Federal Funds Effective Rate", "Percent", "Monthly"),
+    "DGS2": ("Market Yield on U.S. Treasury Securities at 2-Year Constant Maturity", "Percent", "Daily"),
+    "DGS10": ("Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity", "Percent", "Daily"),
+    "DGS30": ("Market Yield on U.S. Treasury Securities at 30-Year Constant Maturity", "Percent", "Daily"),
+    "T10Y2Y": ("10-Year Treasury Constant Maturity Minus 2-Year Treasury Constant Maturity", "Percentage Points", "Daily"),
+    "CPIAUCSL": ("Consumer Price Index for All Urban Consumers: All Items", "Index 1982-84=100", "Monthly"),
+    "CPILFESL": ("Consumer Price Index for All Urban Consumers: All Items Less Food and Energy", "Index 1982-84=100", "Monthly"),
+    "PCEPI": ("Personal Consumption Expenditures Price Index", "Index 2017=100", "Monthly"),
+    "PCEPILFE": ("Personal Consumption Expenditures Excluding Food and Energy Price Index", "Index 2017=100", "Monthly"),
+    "UNRATE": ("Unemployment Rate", "Percent", "Monthly"),
+    "PAYEMS": ("All Employees, Total Nonfarm", "Thousands of Persons", "Monthly"),
+    "ICSA": ("Initial Claims", "Number of Persons", "Weekly"),
+    "M2SL": ("M2", "Billions of Dollars", "Monthly"),
+    "VIXCLS": ("CBOE Volatility Index: VIX", "Index", "Daily"),
+    "DTWEXBGS": ("Nominal Broad U.S. Dollar Index", "Index", "Daily"),
+    "UMCSENT": ("University of Michigan: Consumer Sentiment", "Index", "Monthly"),
+    "HOUST": ("Housing Starts: Total: New Privately Owned Housing Units Started", "Thousands of Units, SAAR", "Monthly"),
+    "RSAFS": ("Advance Retail Sales: Retail Trade", "Millions of Dollars", "Monthly"),
+    "DEXUSEU": ("U.S. Dollars to Euro Spot Exchange Rate", "U.S. Dollars to One Euro", "Daily"),
+}
+
 
 # FRED's realtime clock runs on US Central (St. Louis Fed). It rejects a
 # realtime date in its own future with a 400, so the vintage pin is clamped to
@@ -164,6 +193,108 @@ def _request(path: str, params: dict) -> dict:
     return response.json()
 
 
+
+def _get_macro_data_public_csv(series_id: str, start_date: str, as_of_date: str) -> str:
+    """Fetch a live series without an API key and label its no-vintage limitation.
+
+    The public chart CSV contains observations but not the API's historical
+    realtime-vintage controls. It is restricted to curated series with known
+    units and is called only for live/current as-of dates.
+    """
+    metadata = FRED_CSV_METADATA.get(series_id)
+    if metadata is None:
+        raise FredNotConfiguredError(
+            f"FRED_API_KEY is required for {series_id}: the keyless CSV fallback "
+            "is only enabled for curated series with known units and frequency."
+        )
+
+    params = {"id": series_id, "cosd": start_date, "coed": as_of_date}
+    response = get_scrubbed(
+        FRED_GRAPH_CSV_URL,
+        params=params,
+        timeout=REQUEST_TIMEOUT,
+        secret="",
+    )
+    csv_text = getattr(response, "text", "")
+    reader = csv.DictReader(io.StringIO(csv_text.lstrip("\ufeff")))
+    if not reader.fieldnames:
+        raise ValueError(f"FRED public CSV returned no header for {series_id}.")
+    reader.fieldnames = [field.strip() if field else field for field in reader.fieldnames]
+    fields = reader.fieldnames
+    date_field = next(
+        (field for field in fields if field and field.casefold() in {"observation_date", "date"}),
+        None,
+    )
+    value_field = next(
+        (field for field in fields if field and field.casefold() == series_id.casefold()),
+        None,
+    )
+    if date_field is None or value_field is None:
+        raise ValueError(
+            f"FRED public CSV schema was not recognized for {series_id}; headers={fields!r}."
+        )
+
+    points = []
+    for row in reader:
+        normalized = {
+            (key.strip() if key else key): (value.strip() if isinstance(value, str) else value)
+            for key, value in row.items()
+        }
+        observation_date = normalized.get(date_field, "")
+        value = normalized.get(value_field, "")
+        if (
+            observation_date
+            and start_date <= observation_date <= as_of_date
+            and value not in (".", None, "")
+        ):
+            points.append((observation_date, value))
+    points.sort(key=lambda point: point[0])
+
+    title, units, frequency = metadata
+    retrieved_at = datetime.now(UTC).isoformat()
+    data_url = f"{FRED_GRAPH_CSV_URL}?{urlencode(params)}"
+    source_url = f"https://fred.stlouisfed.org/series/{series_id}"
+    header = (
+        f"## FRED: {title} ({series_id})\n"
+        "- Source: Federal Reserve Bank of St. Louis, FRED\n"
+        f"- Source URL: {source_url}\n"
+        f"- Data URL: {data_url}\n"
+        f"- Retrieved at (UTC): {retrieved_at}\n"
+        f"- Units: {units}\n"
+        f"- Frequency: {frequency}\n"
+        f"- Observation window: {start_date} to {as_of_date}\n"
+        f"- Data vintage: latest values served at retrieval time ({retrieved_at}); not pinned to an historical ALFRED vintage.\n"
+        "- Point-in-time limitation: this keyless CSV fallback is only for live/current analysis, never historical backtests.\n"
+    )
+    if not points:
+        return header + f"\nNo observations for {series_id} in this window."
+
+    first_date, first_value = points[0]
+    last_date, last_value = points[-1]
+    try:
+        delta = float(last_value) - float(first_value)
+        first_numeric = float(first_value)
+        pct = f" ({delta / first_numeric * 100:+.2f}%)" if first_numeric != 0 else ""
+        summary = (
+            f"\n**Latest:** {last_value} ({last_date}) | "
+            f"**Change from {first_date} to {last_date}:** {delta:+.2f}{pct}, from {first_value}\n"
+        )
+    except ValueError:
+        summary = f"\n**Latest:** {last_value} ({last_date})\n"
+
+    shown = points[-MAX_ROWS:]
+    note = (
+        f"\n_(showing the most recent {MAX_ROWS} of {len(points)} observations)_\n"
+        if len(points) > MAX_ROWS else ""
+    )
+    table = (
+        "\n| Date | Value |\n| --- | --- |\n"
+        + "\n".join(f"| {date} | {value} |" for date, value in shown)
+        + "\n"
+    )
+    return header + summary + note + table
+
+
 def get_macro_data(
     indicator: str,
     as_of_date: str,
@@ -210,6 +341,15 @@ def get_macro_data(
         series_id = _resolve_series_id(indicator)
     except ValueError as e:
         return f"FRED: {e}"
+
+    if not os.getenv("FRED_API_KEY"):
+        fred_today = _fred_today()
+        if as_of_date < fred_today:
+            raise FredNotConfiguredError(
+                "FRED_API_KEY is required for historical/as-of runs because the public chart CSV "
+                "does not pin the historical data vintage. Set FRED_API_KEY to preserve look-ahead safety."
+            )
+        return _get_macro_data_public_csv(series_id, start_date, as_of_date)
 
     meta = _request("series", {"series_id": series_id, **realtime}).get("seriess") or []
     if not meta:
