@@ -101,6 +101,7 @@ _REVERSAL_EVIDENCE_RE = re.compile(
 _INSIDER_QUALIFIER_RE = re.compile(
     r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not proof of (?:no|absence of) insider"
+    r"|not (?:definitive|conclusive) evidence (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not exhaustive|no records were returned|empty result from one provider"
     r"|not evidence that (?:there are|there were|any) no insider"
     r"|không phải bằng chứng rằng không có|không chứng minh không có"
