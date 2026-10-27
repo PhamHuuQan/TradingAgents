@@ -156,7 +156,7 @@ def test_partial_fpt_ir_summary_is_not_mistaken_for_complete_fundamentals():
         "Revenue: VND 40,023 billion; PBT: VND 8,770 billion; parent PAT: VND 7,778 billion; EPS: VND 4,142/share."
     )
     state["investment_debate_state"]["history"] = (
-        "Bull Analyst: FPT has strong cash flow, a strong balance sheet and a strong financial position."
+        "Bull Analyst: FPT's operating cash flow is stable, the balance sheet is sound, and the financial position remains strong."
     )
     state["investment_plan"] = "Recommendation: Buy because the financial position is strong."
     audit = build_report_quality_audit(state)
