@@ -15,6 +15,7 @@ import tradingagents.default_config as default_config
 from tradingagents.dataflows import router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.vendors import polymarket
+from tradingagents.agents.tools import get_prediction_markets
 
 
 def _market(question, prob, *, volume, end_date, closed=False, wk=None):
@@ -181,3 +182,36 @@ class PolymarketRoutingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+def test_tool_filters_unrelated_sports_topics_for_equity_before_provider_query():
+    with mock.patch("tradingagents.agents.tools.route_to_vendor") as route:
+        out = get_prediction_markets.func(
+            "AFC Asian Cup 2027 Group E winner",
+            6,
+            "FPT",
+            "stock",
+            "2026-10-27",
+        )
+
+    assert "filtered" in out.lower()
+    assert "no external market query was sent" in out.lower()
+    route.assert_not_called()
+
+
+def test_tool_still_queries_financially_relevant_prediction_markets():
+    with mock.patch(
+        "tradingagents.agents.tools.route_to_vendor",
+        return_value="POLYMARKET_RESULT",
+    ) as route:
+        out = get_prediction_markets.func(
+            "Fed rate cut 2026",
+            6,
+            "FPT",
+            "stock",
+            "2026-10-27",
+        )
+
+    assert out == "POLYMARKET_RESULT"
+    route.assert_called_once_with("get_prediction_markets", "Fed rate cut 2026", 6, "2026-10-27")
