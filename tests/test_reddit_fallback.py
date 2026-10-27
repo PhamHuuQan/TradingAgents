@@ -15,6 +15,7 @@ _SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <entry>
     <title>NVDA earnings beat, stock pops</title>
+    <link rel="alternate" href="https://www.reddit.com/r/stocks/comments/abc123/nvda_earnings_beat/"/>
     <published>2026-05-20T14:30:00+00:00</published>
     <content type="html">&lt;!-- SC_OFF --&gt;&lt;div class="md"&gt;&lt;p&gt;Great &lt;b&gt;quarter&lt;/b&gt; for NVDA&amp;#39;s datacenter unit.&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt;</content>
   </entry>
@@ -83,6 +84,7 @@ class TestRssParsing:
         assert posts[0]["created_utc"] > 0
         assert "datacenter unit" in posts[0]["selftext"]
         assert posts[0]["subreddit"] == "stocks"
+        assert posts[0]["url"] == "https://www.reddit.com/r/stocks/comments/abc123/nvda_earnings_beat/"
 
     def test_malformed_xml_reports_unavailable(self):
         with patch.object(reddit, "urlopen", return_value=_resp(lambda: b"<<not xml>>")):
@@ -161,12 +163,14 @@ class TestFormatterHandlesRssPosts:
             "title": "NVDA pops", "score": None, "num_comments": None,
             "created_utc": reddit._iso_to_timestamp("2026-05-20T14:30:00Z"),
             "selftext": "great quarter", "source": "rss",
+            "url": "https://www.reddit.com/r/stocks/comments/abc123/nvda_pops/",
         }]
         with patch.object(reddit, "_fetch_subreddit_rss", return_value=rss_posts):
             out = reddit.fetch_reddit_posts("NVDA", subreddits=("stocks",))
         assert "↑" not in out  # RSS has no scores; none are invented
         assert "NVDA pops" in out
         assert "great quarter" in out
+        assert "Source URL: https://www.reddit.com/r/stocks/comments/abc123/nvda_pops/" in out
 
 
 @pytest.mark.unit
@@ -237,6 +241,20 @@ class TestOneRequestForAllSubreddits:
         with patch.object(reddit, "_fetch_subreddit_rss", return_value=[self._post("a")]):
             out = reddit.fetch_reddit_posts("NVDA", subreddits=("a", "b"))
         assert "r/b: <no posts found" in out
+
+
+@pytest.mark.unit
+def test_missing_reddit_permalink_is_not_reconstructed_from_title_or_id():
+    posts = [{
+        "title": "No permalink",
+        "created_utc": reddit._iso_to_timestamp("2026-05-20T14:30:00Z"),
+        "selftext": "",
+        "subreddit": "stocks",
+    }]
+    with patch.object(reddit, "_fetch_subreddit_rss", return_value=posts):
+        out = reddit.fetch_reddit_posts("NVDA", subreddits=("stocks",))
+    assert "Source URL unavailable from the provider" in out
+    assert "https://www.reddit.com/r/stocks/comments/" not in out
 
 
 @pytest.mark.unit
