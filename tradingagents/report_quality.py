@@ -220,7 +220,7 @@ def _has_source_linked_summary_metrics(text: str) -> bool:
     return metric_count >= 2 and bool(_urls(text))
 
 
-def _downstream_text(state: dict[str, Any]) -> str:def _downstream_text(state: dict[str, Any]) -> str:
+def _downstream_text(state: dict[str, Any]) -> str:
     pieces = [
         _text(state.get("investment_plan")),
         _text(state.get("trader_investment_plan")),
