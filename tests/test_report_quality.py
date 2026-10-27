@@ -170,6 +170,22 @@ def test_partial_fpt_ir_summary_is_not_mistaken_for_complete_fundamentals():
     assert "Do not infer operating/free cash flow" in guardrails
 
 
+def test_vnstock_metrics_not_inferred_section_is_a_partial_coverage_warning():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "# Current VCI fundamentals for FPT\n"
+        "- Source: vnstock-vci\n"
+        "## Derived summary (only where inputs are complete)\n"
+        "- TTM operating cash flow: unavailable; four contiguous standalone quarter facts are required.\n"
+        "## Metrics not inferred\n"
+        "This VCI mapping does not currently validate shares outstanding. Therefore it does not claim EPS, P/E, P/B, ROE, market capitalization, or free cash flow."
+    )
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "FUNDAMENTALS_PARTIAL_COVERAGE" for item in audit["findings"])
+    guardrails = build_decision_evidence_guardrails(state)
+    assert "PARTIAL FUNDAMENTALS COVERAGE" in guardrails
+
+
 def test_partial_fundamentals_cannot_support_numeric_roE_or_cashflow_claims():
     state = _sample_state()
     state["fundamentals_report"] = (
