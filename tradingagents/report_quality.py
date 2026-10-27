@@ -27,7 +27,10 @@ _PARTIAL_FUNDAMENTALS_RE = re.compile(
     r"|does not provide (?:a )?complete balance sheet|summary only|limited earnings summary"
     r"|partial fundamentals|incomplete financial statements|chỉ là tóm tắt kết quả kinh doanh"
     r"|không thay thế (?:đầy đủ )?(?:bảng cân đối|báo cáo lưu chuyển tiền tệ)"
-    r"|does not provide .*?cash-flow statement",
+    r"|does not provide .*?cash-flow statement|metrics not inferred"
+    r"|this VCI mapping does not currently validate|does not claim EPS, P/E, P/B, ROE"
+    r"|TTM (?:net income|operating cash flow): unavailable; four contiguous standalone quarter facts are required"
+    r"|unavailable from the supported VCI mappings",
     re.IGNORECASE,
 )
 _FINANCIAL_STRENGTH_RE = re.compile(
