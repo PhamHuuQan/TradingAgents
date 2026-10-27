@@ -83,6 +83,17 @@ _MISSING_NEWS_DATE_RE = re.compile(
     r"publication date:\s*unavailable|no publication date|undated (?:source|article)",
     re.IGNORECASE,
 )
+_FRED_SOURCE_CLAIM_RE = re.compile(r"\\bFRED\\s*:|FRED series|Federal Reserve Economic Data", re.IGNORECASE)
+_POLYMARKET_CLAIM_RE = re.compile(
+    r"Polymarket|prediction[- ]market|market[- ]implied probability",
+    re.IGNORECASE,
+)
+_POLYMARKET_URL_RE = re.compile(r"https?://(?:www\\.)?polymarket\\.com/", re.IGNORECASE)
+_POLYMARKET_API_URL_RE = re.compile(r"https?://gamma-api\\.polymarket\\.com/", re.IGNORECASE)
+_MARKET_URL_MISSING_RE = re.compile(
+    r"Market URL:\\s*(?:unavailable|not provided|missing)|market link unavailable",
+    re.IGNORECASE,
+)
 
 
 def _text(value: Any) -> str:
@@ -327,6 +338,39 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                 "use them in time-sensitive or point-in-time claims."
             ),
         })
+
+    if news.strip() and _FRED_SOURCE_CLAIM_RE.search(news) and not re.search(
+        r"https?://(?:api\\.)?stlouisfed\\.org/series/", news, re.IGNORECASE
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "FRED_SERIES_CITATION_MISSING",
+            "finding": (
+                "News report refers to FRED macro data but contains no direct series page URL. "
+                "A generic Fed/news link does not identify the time series behind the quoted value."
+            ),
+        })
+
+    if news.strip() and _POLYMARKET_CLAIM_RE.search(news):
+        has_market_url = bool(_POLYMARKET_URL_RE.search(news))
+        if not has_market_url or _MARKET_URL_MISSING_RE.search(news):
+            findings.append({
+                "severity": "MEDIUM",
+                "code": "PREDICTION_MARKET_URL_MISSING",
+                "finding": (
+                    "News report discusses a prediction-market probability without a verifiable Polymarket market URL. "
+                    "The generic Gamma API endpoint is not a substitute for the specific market page."
+                ),
+            })
+        if not re.search(r"Observed at \\(UTC\\):|Retrieved at \\(UTC\\):", news, re.IGNORECASE):
+            findings.append({
+                "severity": "MEDIUM",
+                "code": "PREDICTION_MARKET_TIMESTAMP_MISSING",
+                "finding": (
+                    "News report discusses live prediction-market odds without an observation/retrieval timestamp. "
+                    "Live probabilities must not be presented as timeless facts."
+                ),
+            })
 
     if sentiment.strip() and not _urls(sentiment):
         findings.append({
