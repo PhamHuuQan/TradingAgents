@@ -36,6 +36,13 @@ def _header(ticker: str, final_state: dict, settings: dict | None) -> str:
             models = (f"deep {deep_provider} {s('deep_think_llm', '?')}, "
                       f"quick {quick_provider} {s('quick_think_llm', '?')}")
         lines.append(f"- TradingAgents {s('version', '?')}: {models}")
+        code_branch = s("code_branch")
+        code_commit = s("code_commit")
+        if code_branch or code_commit:
+            lines.append(
+                f"- Code revision: `{code_branch or 'unknown'}` @ "
+                f"`{code_commit or 'unknown'}`"
+            )
         lines.append(f"- Analysts: {', '.join(analyst_names(s('analysts')))}; "
                      f"research debate rounds {s('max_debate_rounds', '?')}, "
                      f"risk debate rounds {s('max_risk_discuss_rounds', '?')}")
