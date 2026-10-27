@@ -109,9 +109,9 @@ def fetch_stocktwits_messages(
 
     fetched = data.get("messages", []) if isinstance(data, dict) else []
     source_header = (
-        "Source: StockTwits public symbol stream\\n"
-        f"Source URL: {url}\\n"
-        f"Retrieved at (UTC): {retrieved_at}\\n"
+        "Source: StockTwits public symbol stream\n"
+        f"Source URL: {url}\n"
+        f"Retrieved at (UTC): {retrieved_at}\n"
     )
     messages = _within_window(fetched, start_date, end_date)
     if not messages:
@@ -164,7 +164,7 @@ def fetch_stocktwits_messages(
             if parsed_url.scheme == "https" and parsed_url.hostname in {"stocktwits.com", "www.stocktwits.com"}:
                 message_url = raw_url.strip()
         lines.append(
-            f"[{created} · @{user} · {tag}] {body}\\n"
+            f"[{created} · @{user} · {tag}] {body}\n"
             + (f"  Source URL: {message_url}" if message_url else "  Source URL unavailable from the provider")
         )
 
