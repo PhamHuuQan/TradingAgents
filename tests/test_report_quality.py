@@ -569,9 +569,9 @@ def test_source_linked_9m_metrics_with_unavailable_detail_are_partial_not_unavai
 def test_news_items_with_inline_publication_dates_are_not_flagged_as_undated():
     state = _sample_state()
     state["news_report"] = (
-        "Source records returned by news tools:\\n"
+        "Source records returned by news tools:\n"
         "FPT partnership — Business Wire; publication date: 2026-10-20; "
-        "URL: https://example.test/fpt-news\\n"
+        "URL: https://example.test/fpt-news\n"
         "IBM AI announcement — PR Newswire; publication date: 2026-10-27; "
         "URL: https://example.test/ibm-news"
     )
