@@ -563,15 +563,15 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    risk_text = "\\n".join((
+    risk_text = "\n".join((
         _text(final_state.get("trader_investment_plan")),
         _text(final_state.get("investment_plan")),
         _text(final_state.get("risk_debate_state")),
         _text(final_state.get("final_trade_decision")),
     ))
     for proposed_levels in _EQUAL_ENTRY_STOP_LOSS_RE.finditer(risk_text):
-        entry_digits = re.sub(r"\\D", "", proposed_levels.group("entry"))
-        stop_digits = re.sub(r"\\D", "", proposed_levels.group("stop"))
+        entry_digits = re.sub(r"\D", "", proposed_levels.group("entry"))
+        stop_digits = re.sub(r"\D", "", proposed_levels.group("stop"))
         if entry_digits and entry_digits == stop_digits:
             findings.append({
                 "severity": "HIGH",
