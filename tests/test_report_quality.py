@@ -581,3 +581,16 @@ def test_news_items_with_inline_publication_dates_are_not_flagged_as_undated():
     assert audit["news_url_count"] == 2
     assert "NEWS_PUBLICATION_DATES_MISSING" not in codes
 
+def test_opposing_market_analyst_and_trader_directions_are_flagged():
+    state = _sample_state()
+    state["market_report"] = "Market analysis of FPT.\nRating: Underweight\nFINAL TRANSACTION PROPOSAL: Wait."
+    state["investment_plan"] = "Recommendation: Overweight"
+    state["trader_investment_plan"] = "Action: Buy\nEntry Price: 54.075\nStop Loss: 52.0"
+    state["final_rating"] = "Overweight"
+    state["final_trade_decision"] = "Rating: Overweight\nPrice Target: 56.000"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MARKET_TRADER_DIRECTION_MISMATCH" in codes
+
