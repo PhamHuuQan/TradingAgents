@@ -77,7 +77,7 @@ def _append_news_tool_evidence(report: str, messages) -> str:
         lines.append("**Tool coverage limitations**")
         for tool_name, detail in list(dict.fromkeys(unavailable_blocks))[:5]:
             lines.append(f"- {tool_name}: {detail}")
-    return report.rstrip() + "\\n" + "\\n".join(lines) + "\\n"
+    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 def create_news_analyst(llm):
