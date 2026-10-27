@@ -105,8 +105,18 @@ def test_publication_after_analysis_date_is_rejected(monkeypatch):
     future_article = _ARTICLE.replace("10/21/2026", "10/28/2026")
     _mock_pages(monkeypatch, article=future_article)
 
-    with pytest.raises(VendorUnavailableError, match="after the current date"):
+    with pytest.raises(VendorUnavailableError, match="after the analysis cutoff"):
         fpt_ir.get_fpt_ir_fundamentals("FPT", "2026-10-27")
+
+
+@pytest.mark.unit
+def test_stale_9m_release_is_not_used_as_current_fundamentals(monkeypatch):
+    _mock_pages(monkeypatch)
+    monkeypatch.setattr(date_window, "get_current_date", lambda: "2027-05-01")
+    monkeypatch.setattr(fpt_ir, "get_current_date", lambda: "2027-05-01")
+
+    with pytest.raises(VendorUnavailableError, match="summary is stale"):
+        fpt_ir.get_fpt_ir_fundamentals("FPT", "2027-05-01")
 
 
 @pytest.mark.unit
