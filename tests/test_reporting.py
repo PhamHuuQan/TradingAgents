@@ -39,6 +39,9 @@ def test_write_report_tree_creates_files(tmp_path):
     complete = out.read_text()
     assert "Trading Analysis Report: AAPL" in complete
     assert "MKT" in complete and "PM DECISION" in complete
+    assert "VI. Data Quality & Evidence Audit" in complete
+    assert "REVIEW REQUIRED" in complete
+    assert (tmp_path / "6_quality" / "report_quality.md").exists()
 
 
 @pytest.mark.unit
