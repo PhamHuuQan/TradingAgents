@@ -11,6 +11,7 @@ outcomes (a "Yes" at 0.76 means the market prices a 76% chance).
 """
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from urllib.parse import quote, urlparse
 
@@ -81,6 +82,41 @@ def _market_url(event: dict, market: dict) -> str:
         return f"https://polymarket.com/event/{quote(slug.strip(), safe='-')}"
     return ""
 
+_TOPIC_STOPWORDS = {
+    "a", "an", "and", "are", "be", "by", "can", "did", "does", "for",
+    "from", "how", "in", "is", "it", "of", "on", "or", "the", "to",
+    "was", "were", "what", "when", "where", "which", "who", "why",
+    "will", "would", "market", "markets", "prediction", "probability",
+}
+
+
+def _topic_tokens(topic: str) -> set[str]:
+    """Extract content tokens for a conservative local relevance check."""
+    return {
+        token for token in re.findall(r"[a-z0-9]+", (topic or "").casefold())
+        if len(token) > 1 and token not in _TOPIC_STOPWORDS
+    }
+
+
+def _is_topic_relevant(topic: str, event: dict, market: dict) -> bool:
+    """Drop broad-search results whose event/question/slug shares no topic token."""
+    terms = _topic_tokens(topic)
+    if not terms:
+        return False
+    searchable_text = " ".join(
+        str(value or "")
+        for value in (
+            event.get("title"),
+            event.get("slug"),
+            event.get("description"),
+            market.get("question"),
+            market.get("slug"),
+        )
+    ).casefold()
+    market_terms = set(re.findall(r"[a-z0-9]+", searchable_text))
+    return bool(terms & market_terms)
+
+
 def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str | None = None) -> str:
     """Return live prediction-market probabilities for an event topic.
 
@@ -122,6 +158,7 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
         for event in data.get("events", [])
         for market in event.get("markets", [])
         if _is_forward_looking(market, now)
+        and _is_topic_relevant(topic, event, market)
     ]
     candidates.sort(key=lambda pair: pair[1].get("volumeNum") or 0, reverse=True)
 
@@ -137,7 +174,7 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
 
     if not candidates:
         return header + (
-            f"No open prediction markets matched '{topic}'. Polymarket coverage "
+            f"No open, topic-relevant prediction markets matched '{topic}'. Polymarket coverage "
             f"is concentrated in macro, political, geopolitical, and crypto "
             f"events; a specific equity may have none."
         )
