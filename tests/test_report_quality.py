@@ -481,6 +481,25 @@ def test_caveated_empty_insider_query_is_not_flagged_due_to_unrelated_unavailabl
     assert not any(item["code"] == "INSIDER_ABSENCE_UNVERIFIED" for item in audit["findings"])
 
 
+def test_buy_plan_flags_target_at_entry_and_mixed_price_scale():
+    state = _sample_state()
+    state["investment_plan"] = "Recommendation: Overweight"
+    state["trader_investment_plan"] = (
+        "Action: Buy\n**Entry Price**: 54.075\n**Stop Loss**: 52.0"
+    )
+    state["final_rating"] = "Overweight"
+    state["final_trade_decision"] = (
+        "Rating: Overweight\n**Price Target**: 54.075"
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "TRADE_TARGET_NOT_ABOVE_ENTRY" in codes
+    assert "TRADE_LEVEL_UNIT_MISMATCH" in codes
+    assert "TRADE-LEVEL CONSISTENCY" in build_decision_evidence_guardrails(state)
+
+
 def test_equal_entry_and_stop_loss_price_is_flagged_as_unusable_execution_plan():
     state = _sample_state()
     state["investment_plan"] = "Recommendation: Hold."
