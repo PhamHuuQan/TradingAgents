@@ -12,6 +12,7 @@ outcomes (a "Yes" at 0.76 means the market prices a 76% chance).
 import json
 import logging
 from datetime import UTC, datetime
+from urllib.parse import quote, urlparse
 
 import requests
 
@@ -67,6 +68,19 @@ def _is_forward_looking(market: dict, now: datetime) -> bool:
     )
 
 
+
+def _market_url(event: dict, market: dict) -> str:
+    """Return a traceable official market URL only when supported by provider fields."""
+    direct = market.get("url") or event.get("url")
+    if isinstance(direct, str) and direct.strip():
+        parsed = urlparse(direct.strip())
+        if parsed.scheme == "https" and parsed.hostname in {"polymarket.com", "www.polymarket.com"}:
+            return direct.strip()
+    slug = event.get("slug") or market.get("slug")
+    if isinstance(slug, str) and slug.strip():
+        return f"https://polymarket.com/event/{quote(slug.strip(), safe='-')}"
+    return ""
+
 def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str | None = None) -> str:
     """Return live prediction-market probabilities for an event topic.
 
@@ -102,16 +116,20 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
         )
 
     now = datetime.now(UTC)
+    retrieved_at = now.isoformat()
     candidates = [
-        m
+        (event, market)
         for event in data.get("events", [])
-        for m in event.get("markets", [])
-        if _is_forward_looking(m, now)
+        for market in event.get("markets", [])
+        if _is_forward_looking(market, now)
     ]
     candidates.sort(key=lambda m: m.get("volumeNum") or 0, reverse=True)
 
     header = (
         f'## Polymarket prediction markets: "{topic}"\n'
+        f"- Source: Polymarket public Gamma API\n"
+        f"- API endpoint: {GAMMA_BASE}/public-search\n"
+        f"- Retrieved at (UTC): {retrieved_at}\n"
         f"Live, market-implied probabilities (higher traded volume = deeper, "
         f"more reliable). A probability is the crowd's priced odds of the event, "
         f"not a forecast you should take as certain.\n\n"
@@ -125,7 +143,7 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
         )
 
     lines = []
-    for m in candidates[:limit]:
+    for event, m in candidates[:limit]:
         prices = _parse_json_list(m.get("outcomePrices"))
         outcomes = _parse_json_list(m.get("outcomes"))
         try:
@@ -141,9 +159,16 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
             if isinstance(wk, (int, float)) and wk
             else ""
         )
+        market_url = _market_url(event, m)
         lines.append(
             f"- **{m.get('question')}** — {label} {prob:.0%} "
-            f"(${volume:,.0f} volume, resolves {end_date}{wk_str})"
+            f"(${volume:,.0f} volume, resolves {end_date}{wk_str})\n"
+            f"  - Observed at (UTC): {retrieved_at}\n"
+            + (
+                f"  - Market URL: {market_url}"
+                if market_url
+                else "  - Market URL: unavailable from the provider; do not treat this item as directly source-linked"
+            )
         )
 
     return header + "\n".join(lines) + "\n"
