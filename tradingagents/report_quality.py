@@ -75,11 +75,24 @@ _INSIDER_QUALIFIER_RE = re.compile(
     r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not proof of (?:no|absence of) insider"
     r"|not exhaustive|no records were returned|empty result from one provider"
-    r"|không phải bằng chứng rằng không có|không chứng minh không có",
+    r"|not evidence that (?:there are|there were|any) no insider"
+    r"|không phải bằng chứng rằng không có|không chứng minh không có"
+    r"|không đồng nghĩa(?: với việc)? không có"
+    r"|không thể kết luận(?: rằng| là)? không có"
+    r"|không phải là bằng chứng khẳng định",
     re.IGNORECASE,
 )
 _MISSING_TRADE_LEVEL_RE = re.compile(
     r"(?:\*\*)?(?:entry price|stop[\s-]?loss|price target)(?:\*\*)?\s*[:：]\s*(?:not provided|not specified|n/?a|chưa có|không có)",
+    re.IGNORECASE,
+)
+_TRADE_PRICE_TOKEN = r"(?:\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
+_EQUAL_ENTRY_STOP_LOSS_RE = re.compile(
+    rf"(?:accumulate(?:\s+small position)?|entry(?:\s+price|\s+position)?|"
+    rf"mở\s+(?:một\s+)?vị thế(?:\s+thăm dò)?|tích lũy(?:\s+từng phần)?)"
+    rf"[\s\S]{{0,300}}?(?:at|tại|around)\s*(?P<entry>{_TRADE_PRICE_TOKEN})"
+    rf"[\s\S]{{0,300}}?(?:strict\s+)?(?:stop[\s-]?loss|cắt lỗ|mức cắt lỗ)"
+    rf"[\s\S]{{0,80}}?(?:at|tại|=|:)\s*(?P<stop>{_TRADE_PRICE_TOKEN})",
     re.IGNORECASE,
 )
 
@@ -424,10 +437,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     )
     fundamentals_insider_claim = (
         _INSIDER_ABSENCE_RE.search(fundamentals)
-        and (
-            _UNAVAILABLE_RE.search(fundamentals)
-            or not _INSIDER_QUALIFIER_RE.search(fundamentals)
-        )
+        and not _INSIDER_QUALIFIER_RE.search(fundamentals)
     )
     if downstream_insider_claim or fundamentals_insider_claim:
         findings.append({
@@ -552,6 +562,27 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                 "Treat the signal as directional analysis, not a fully specified execution plan."
             ),
         })
+
+    risk_text = "\\n".join((
+        _text(final_state.get("trader_investment_plan")),
+        _text(final_state.get("investment_plan")),
+        _text(final_state.get("risk_debate_state")),
+        _text(final_state.get("final_trade_decision")),
+    ))
+    for proposed_levels in _EQUAL_ENTRY_STOP_LOSS_RE.finditer(risk_text):
+        entry_digits = re.sub(r"\\D", "", proposed_levels.group("entry"))
+        stop_digits = re.sub(r"\\D", "", proposed_levels.group("stop"))
+        if entry_digits and entry_digits == stop_digits:
+            findings.append({
+                "severity": "HIGH",
+                "code": "TRADE_ENTRY_EQUALS_STOP_LOSS",
+                "finding": (
+                    f"A proposed trade uses the same price for entry ({proposed_levels.group('entry')}) "
+                    f"and stop-loss ({proposed_levels.group('stop')}). This is not a usable risk limit; "
+                    "reconcile entry, stop distance, fees/slippage, and position sizing before treating it as executable."
+                ),
+            })
+            break
 
     reported_rating = str(final_state.get("final_rating") or "").strip()
     decision_text = _text(final_state.get("final_trade_decision"))
