@@ -241,7 +241,6 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         label: _status(_text(final_state.get(key)))
         for label, key in report_keys.items()
     }
-    market = _text(final_state.get("market_report"))
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
