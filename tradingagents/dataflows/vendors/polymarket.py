@@ -94,7 +94,7 @@ def _topic_tokens(topic: str) -> set[str]:
     """Extract content tokens for a conservative local relevance check."""
     return {
         token for token in re.findall(r"[a-z0-9]+", (topic or "").casefold())
-        if len(token) > 1 and token not in _TOPIC_STOPWORDS
+        if len(token) > 1 and not token.isdigit() and token not in _TOPIC_STOPWORDS
     }
 
 
