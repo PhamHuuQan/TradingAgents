@@ -11,6 +11,7 @@ claim. Deterministic, no LLM involved.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import pandas as pd
 from stockstats import wrap
@@ -74,6 +75,9 @@ def build_verified_market_snapshot(
     # Volume); stockstats `wrap()` lowercases columns and adds indicator
     # columns, so read raw prices from `df` and indicators from `stock_df`.
     df = _verified_rows(symbol, as_of_date)
+    retrieved_at = datetime.now(UTC).isoformat()
+    canonical = normalize_symbol(symbol)
+    source_url = f"https://finance.yahoo.com/quote/{canonical}/history/"
     stock_df = wrap(df.copy())
 
     selected = tuple(indicators or DEFAULT_SNAPSHOT_INDICATORS)
@@ -95,6 +99,10 @@ def build_verified_market_snapshot(
         "",
         f"- Requested analysis date: {as_of_date}",
         f"- Latest trading row used: {latest_date}",
+        "- Source: Yahoo Finance chart history (yfinance)",
+        f"- Source URL: {source_url}",
+        f"- Retrieved at (UTC): {retrieved_at}",
+        "- Data-vintage limitation: vendor history can be retrospectively adjusted; retrieval time is recorded, but this does not prove the exact vintage publicly available on the requested trading date.",
         "- Rows after the requested analysis date are excluded before verification.",
         "",
         "### Latest verified OHLCV row",
