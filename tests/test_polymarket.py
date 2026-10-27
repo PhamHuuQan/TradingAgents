@@ -64,11 +64,11 @@ class PolymarketFilterTests(unittest.TestCase):
                     ],
                 },
                 {
-                    "title": "AFC Asian Cup 2027",
-                    "slug": "afc-asian-cup-2027-winner",
+                    "title": "AFC Asian Cup 2026",
+                    "slug": "afc-asian-cup-2026-winner",
                     "markets": [
                         _market(
-                            "AFC Asian Cup 2027 winner?",
+                            "AFC Asian Cup 2026 winner?",
                             0.50,
                             volume=50_000_000,
                             end_date="2027-12-31T00:00:00Z",
@@ -78,7 +78,7 @@ class PolymarketFilterTests(unittest.TestCase):
             ]
         }
         with mock.patch.object(polymarket, "_request", return_value=data):
-            out = polymarket.get_prediction_markets("Fed rate cut", limit=10)
+            out = polymarket.get_prediction_markets("Fed rate cut 2026", limit=10)
 
         self.assertIn("How many Fed rate cuts in 2026?", out)
         self.assertNotIn("AFC Asian Cup", out)
