@@ -123,7 +123,7 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
         for market in event.get("markets", [])
         if _is_forward_looking(market, now)
     ]
-    candidates.sort(key=lambda m: m.get("volumeNum") or 0, reverse=True)
+    candidates.sort(key=lambda pair: pair[1].get("volumeNum") or 0, reverse=True)
 
     header = (
         f'## Polymarket prediction markets: "{topic}"\n'
