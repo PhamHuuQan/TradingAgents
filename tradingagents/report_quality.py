@@ -73,6 +73,18 @@ _UNSUPPORTED_FINANCIAL_METRIC_RE = re.compile(
     r"|\b\d[\d,.]*\s*%\s*(?:ROE|return on equity|P/E|P/B|operating margin|profit margin|net margin)\b",
     re.IGNORECASE,
 )
+_UNSUPPORTED_VALUATION_CLAIM_RE = re.compile(
+    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|deep[- ]value)\b"
+    r"|(?:định giá thấp|được định giá thấp|đang bị thị trường định giá thấp|định giá hấp dẫn|mức định giá hấp dẫn|"
+    r"giá rẻ|món hời|món quà(?: từ trên trời rơi xuống)?)"
+    r"|priced irrationally low|trading below intrinsic value",
+    re.IGNORECASE,
+)
+_NUMERIC_VALUATION_MULTIPLE_RE = re.compile(
+    r"(?i)(?:\bP\s*/\s*E\b|\bP\s*/\s*B\b|\bEV\s*/\s*EBITDA\b|"
+    r"price[- ]to[- ]earnings|price[- ]to[- ]book)"
+    r"[^\n]{0,45}?[:=]?\s*\d[\d,.]*(?:\s*x|\s*times|倍)?"
+)
 _INSIDER_QUALIFIER_RE = re.compile(
     r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not proof of (?:no|absence of) insider"
@@ -250,6 +262,11 @@ def _has_source_linked_summary_metrics(text: str) -> bool:
     return metric_count >= 2 and bool(_urls(text))
 
 
+def _has_numeric_valuation_multiple(text: str) -> bool:
+    """True only when a valuation multiple is attached to a numeric value."""
+    return bool(_NUMERIC_VALUATION_MULTIPLE_RE.search(text or ""))
+
+
 def _downstream_text(state: dict[str, Any]) -> str:
     pieces = [
         _text(state.get("investment_plan")),
@@ -324,6 +341,21 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "Use only the exact metrics, reporting period, unit and growth rates it provides. Do not infer operating/free cash flow, cash balances, debt, "
             "liquidity, solvency, equity, margins, P/E, P/B, ROE, debt ratios, or insider activity unless another supplied source explicitly provides those values. "
             "State that those metrics remain unverified."
+        )
+    has_financial_data_limits = (
+        not fundamentals.strip()
+        or bool(_UNAVAILABLE_RE.search(fundamentals))
+        or bool(_NO_DATA_RE.search(fundamentals))
+        or bool(_PARTIAL_FUNDAMENTALS_RE.search(fundamentals))
+    )
+    if (
+        _requires_fundamentals(state)
+        and has_financial_data_limits
+        and not _has_numeric_valuation_multiple(fundamentals)
+    ):
+        guardrails.append(
+            "- VALUATION EVIDENCE LIMITATION: revenue/PBT/EPS growth or an oversold RSI does not establish that a stock is cheap or undervalued. "
+            "Do not claim undervaluation, a bargain price, or a discount to intrinsic value without a dated, sourced valuation multiple or valuation model inputs."
         )
     if news.strip() and _has_unlinked_news_source_cue(news):
         guardrails.append(
@@ -467,6 +499,22 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Downstream report assigns a numeric value to a financial metric that is not substantiated by the supplied "
                 "fundamentals data. Remove the value or cite a separate source with metric definition, unit and reporting period."
+            ),
+        })
+
+    if (
+        _requires_fundamentals(final_state)
+        and fundamentals_limitations
+        and _UNSUPPORTED_VALUATION_CLAIM_RE.search(downstream)
+        and not _has_numeric_valuation_multiple(fundamentals)
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_VALUATION_CLAIM",
+            "finding": (
+                "Downstream debate/decision text calls the stock undervalued, cheap, a bargain, or below intrinsic value "
+                "without a numeric, source-linked valuation multiple in the supplied fundamentals report. "
+                "Oversold technical indicators and earnings growth alone do not establish valuation."
             ),
         })
 
