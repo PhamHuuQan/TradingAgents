@@ -44,7 +44,13 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     r"|\bstrong (?:cash flow|balance sheet|financials)\b"
     r"|\brobust cash flow\b"
     r"|\b(?:operating |free )?cash flow.{0,30}\b(?:strong|stable|steady|robust|healthy|positive|improving|increased|grew)\b"
-    r"|\b(?:balance sheet|financial position|solvency|liquidity).{0,30}\b(?:strong|stable|healthy|robust|solid|sound|improved)\b",
+    r"|\b(?:balance sheet|financial position|solvency|liquidity).{0,30}\b(?:strong|stable|healthy|robust|solid|sound|improved)\b"
+    # Vietnamese phrasing seen in actual TradingAgents debate output.
+    r"|(?:nền tảng|sức khỏe|tình hình)\s+tài chính.{0,35}(?:[\"'“”‘’]?\s*)(?:thép|vững(?: mạnh| chắc)?|mạnh|tốt|xuất sắc|ổn định)"
+    r"|tài chính\s+[\"'“”‘’]?(?:thép|vững mạnh|vững chắc|mạnh|xuất sắc)"
+    r"|(?:dòng tiền|biên lợi nhuận|khả năng sinh lời|năng lực tài chính).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt|bền vững)"
+    r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)"
+    r"|(?:tăng trưởng|CAGR).{0,35}(?:ổn định|bền vững|đều đặn).{0,35}(?:qua các năm|trong dài hạn|dài hạn)?",
     re.IGNORECASE,
 )
 _INSIDER_ABSENCE_RE = re.compile(
