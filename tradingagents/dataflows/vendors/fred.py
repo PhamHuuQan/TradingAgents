@@ -306,12 +306,12 @@ def get_macro_data(
     Args:
         indicator: A friendly alias (e.g. "cpi", "unemployment", "10y_treasury")
             or a raw FRED series ID (e.g. "CPIAUCSL", "DGS10").
-        as_of_date: The as-of date (yyyy-mm-dd). It bounds the observation window
-            AND pins the data vintage: FRED is queried with the realtime bounds
-            set to ``as_of_date`` (clamped to FRED's own today) so a historical
-            run sees the values that were actually published by that date, not
-            later revisions. Without this, revision-prone series (CPI, GDP, ...)
-            would leak future information into a backtest (#1275).
+        as_of_date: The as-of date (yyyy-mm-dd), which bounds the observation window.
+            When ``FRED_API_KEY`` is configured, the API vintage is pinned to the
+            requested date (clamped to FRED's own today) to keep historical runs
+            look-ahead-safe (#1275). Without a key, the public chart-CSV fallback
+            is allowed only for live/current dates; it explicitly uses latest
+            values at retrieval time and must not be used for historical backtests.
         look_back_days: Trailing window length; ``None`` uses DEFAULT_LOOKBACK_DAYS.
 
     Returns:
