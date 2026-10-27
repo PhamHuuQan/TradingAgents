@@ -387,3 +387,77 @@ def test_rendered_quality_section_never_claims_external_fact_check():
     rendered = render_report_quality_markdown(build_report_quality_audit(_sample_state()))
     assert "REVIEW REQUIRED" in rendered
     assert "does not independently validate external sources" in rendered
+
+def test_source_linked_fpt_summary_is_partial_not_wholly_unavailable_or_unsupported_growth():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Theo thông cáo IR công bố ngày 21/10/2026. "
+        "Ngoại trừ 4 chỉ tiêu tổng quan được trích xuất từ thông cáo IR nói trên, "
+        "các cấu phần chi tiết hiện không có dữ liệu xác thực. "
+        "Doanh thu hợp nhất: Giá trị công bố: 40.023 tỷ VND; tăng trưởng YoY: 12,4%. "
+        "Lợi nhuận trước thuế (LNTT / PBT): 8.770 tỷ VND; tăng trưởng YoY: 17,0%. "
+        "LNST cổ đông công ty mẹ: 7.778 tỷ VND; EPS: 4.142 VND/cổ phiếu. "
+        "Nguồn: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Bảng cân đối kế toán không có dữ liệu xác nhận. "
+        "Báo cáo lưu chuyển tiền tệ hiện không khả dụng."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "FPT duy trì đà tăng trưởng ổn định ở cả doanh thu và lợi nhuận; "
+            "số liệu công bố cho thấy tăng trưởng hai chữ số."
+        )
+    }
+    state["investment_plan"] = "Recommendation: Hold. Revenue and PBT growth are source-reported."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["risk_debate_state"] = {"history": "Cash flow and balance-sheet details remain unverified."}
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"] == (
+        "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+    )
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+    # Sourced revenue/PBT growth is not an unsupported claim about financial condition.
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" not in codes
+
+
+def test_caveated_empty_insider_query_is_not_flagged_due_to_unrelated_unavailable_statements():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Không có bản ghi giao dịch nội bộ nào được trả về từ Yahoo Finance. "
+        "Đây chỉ là kết quả trả về rỗng từ một điểm cuối của bên thứ ba, "
+        "không đồng nghĩa và không thể kết luận là không có giao dịch nội bộ nào phát sinh tại HOSE. "
+        "Bảng cân đối kế toán không khả dụng (EntitlementError). "
+        "Source: https://finance.yahoo.com/quote/FPT/insider-transactions/; "
+        "retrieved at 2026-10-27T05:30:28Z."
+    )
+    state["investment_debate_state"] = {"history": "The Yahoo query returned no insider records."}
+    audit = build_report_quality_audit(state)
+    assert not any(item["code"] == "INSIDER_ABSENCE_UNVERIFIED" for item in audit["findings"])
+
+
+def test_equal_entry_and_stop_loss_price_is_flagged_as_unusable_execution_plan():
+    state = _sample_state()
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["risk_debate_state"] = {
+        "history": (
+            "FINAL TRANSACTION PROPOSAL: ACCUMULATE SMALL POSITION (SCALE-IN) AT 54.200 "
+            "WITH STRICT STOP LOSS AT 54.200."
+        )
+    }
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    equal_level_findings = [
+        item for item in audit["findings"]
+        if item["code"] == "TRADE_ENTRY_EQUALS_STOP_LOSS"
+    ]
+    assert equal_level_findings
+    assert equal_level_findings[0]["severity"] == "HIGH"
+
