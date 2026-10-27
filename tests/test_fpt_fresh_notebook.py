@@ -86,6 +86,7 @@ class FreshNotebookTests(unittest.TestCase):
         self.assertIn('"gemini-3.8-flash"', run_cell)
         self.assertNotIn('"gemini-3.6-flash"', run_cell)
         self.assertIn('config["checkpoint_enabled"] = True', run_cell)
+        self.assertIn('globals()["_TA_ANALYSIS_DATE"] = ANALYSIS_DATE', run_cell)
 
     def test_offline_self_test_has_no_api_credentials_or_network_calls(self):
         offline_cell = self.source[4]
