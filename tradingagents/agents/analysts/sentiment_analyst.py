@@ -175,9 +175,10 @@ def _append_sentiment_source_provenance(
     reddit_block: str,
 ) -> str:
     """Append deterministic citations/coverage for source blocks actually given to the model."""
-    if not report_text.strip() or "### Source URLs and coverage supplied to sentiment analysis" in report_text:
+    if not report_text.strip():
         return report_text
 
+    existing_heading = "### Source URLs and coverage supplied to sentiment analysis"
     lines = [
         "",
         "### Source URLs and coverage supplied to sentiment analysis",
@@ -188,6 +189,11 @@ def _append_sentiment_source_provenance(
         "",
     ]
     url_count = 0
+
+    # Replace a model-written source section, if any, with deterministic entries
+    # from the exact tool blocks rather than duplicating or trusting an incomplete index.
+    if existing_heading in report_text:
+        report_text = report_text.split(existing_heading, 1)[0].rstrip()
 
     # Keep article title, publisher, publication date and URL together so readers
     # can assess each news item without relying on model-generated citations.
