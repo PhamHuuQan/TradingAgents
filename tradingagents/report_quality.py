@@ -184,6 +184,14 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- MARKET DATA LIMITATION: no usable market/technical report is present. Do not state exact prices, indicators, support/resistance levels, "
             "or execution levels as verified without a separate named, dated source. Say which market data is unavailable."
         )
+    elif "verified market data snapshot" in market.casefold() and (
+        not re.search(r"(?im)^\\s*(?:[-*]\\s*)?source\\s*[:：]", market)
+        or not re.search(r"(?im)^\\s*(?:[-*]\\s*)?retrieved at(?: \\(utc\\))?\\s*[:：]", market)
+    ):
+        guardrails.append(
+            "- MARKET DATA PROVENANCE LIMITATION: a verified-snapshot heading is present but the report does not preserve both its provider and retrieval time. "
+            "Do not describe the snapshot as source-traceable until those fields are included."
+        )
     if _requires_fundamentals(state) and (
         not fundamentals.strip()
         or _UNAVAILABLE_RE.search(fundamentals)
@@ -241,6 +249,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         label: _status(_text(final_state.get(key)))
         for label, key in report_keys.items()
     }
+    market = _text(final_state.get("market_report"))
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
@@ -256,6 +265,19 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "The market/technical report is missing or unavailable. Exact price, volume, indicator, "
                 "support/resistance and trade-level claims are unverified without a separate source."
+            ),
+        })
+
+    if market.strip() and "verified market data snapshot" in market.casefold() and (
+        not re.search(r"(?im)^\\s*(?:[-*]\\s*)?source\\s*[:：]", market)
+        or not re.search(r"(?im)^\\s*(?:[-*]\\s*)?retrieved at(?: \\(utc\\))?\\s*[:：]", market)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "MARKET_SOURCE_METADATA_MISSING",
+            "finding": (
+                "A verified market-data snapshot is present but its provider and/or retrieval timestamp is missing. "
+                "Preserve those fields so exact OHLCV and indicator claims can be traced to a source."
             ),
         })
 
