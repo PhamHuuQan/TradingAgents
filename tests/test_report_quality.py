@@ -44,6 +44,38 @@ def test_unavailable_fundamentals_trigger_high_severity_and_guardrails():
     assert "Do not write 'no insider transactions'" in guardrails
 
 
+def test_unlinked_news_source_cue_is_flagged_even_if_other_items_have_urls():
+    state = _sample_state()
+    state["news_report"] = (
+        "Nguồn tin chính thức: Business Wire (Ngày công bố: 2026-10-20). "
+        "Xem chi tiết tại nguồn.\n"
+        + ("Bối cảnh mô tả không cung cấp liên kết riêng cho sự kiện này. " * 8)
+        + "\nPolymarket market-implied probability was 96%. "
+        "Market URL: https://polymarket.com/event/how-many-fed-rate-cuts-in-2026. "
+        "Observed at (UTC): 2026-10-27T04:40:00Z"
+    )
+
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "NEWS_ITEM_URLS_MISSING" for item in audit["findings"])
+    assert "NEWS ITEM LINK LIMITATION" in build_decision_evidence_guardrails(state)
+
+
+def test_unavailable_fundamentals_flag_unsupported_vietnamese_financial_strength_claims():
+    state = _sample_state()
+    claim = (
+        "FPT có nền tảng tài chính 'thép', sở hữu khả năng quản trị dòng tiền, "
+        "biên lợi nhuận và ngoại hối cực kỳ xuất sắc, tạo ra dòng tiền đều đặn."
+    )
+    state["investment_debate_state"]["history"] += "\n" + claim
+    state["investment_debate_state"]["bull_history"] = claim
+
+    audit = build_report_quality_audit(state)
+    assert any(
+        item["code"] == "UNSUPPORTED_FINANCIAL_STRENGTH"
+        for item in audit["findings"]
+    )
+
+
 def test_news_without_urls_is_flagged_and_asks_for_provenance():
     state = _sample_state()
     audit = build_report_quality_audit(state)
