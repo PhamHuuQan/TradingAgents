@@ -35,8 +35,8 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     re.IGNORECASE,
 )
 _INSIDER_ABSENCE_RE = re.compile(
-    r"không có (?:giao dịch|hoạt động giao dịch) nội bộ"
-    r"|chưa có (?:giao dịch|hoạt động giao dịch) nội bộ"
+    r"không có (?:báo cáo )?(?:giao dịch|hoạt động giao dịch) nội bộ"
+    r"|chưa có (?:báo cáo )?(?:giao dịch|hoạt động giao dịch) nội bộ"
     r"|no (?:unusual )?insider (?:transactions|trading|activity)"
     r"|no insider trades",
     re.IGNORECASE,
@@ -175,7 +175,18 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if _INSIDER_ABSENCE_RE.search(downstream) and not _INSIDER_QUALIFIER_RE.search(downstream):
+    downstream_insider_claim = (
+        _INSIDER_ABSENCE_RE.search(downstream)
+        and not _INSIDER_QUALIFIER_RE.search(downstream)
+    )
+    fundamentals_insider_claim = (
+        _INSIDER_ABSENCE_RE.search(fundamentals)
+        and (
+            _UNAVAILABLE_RE.search(fundamentals)
+            or not _INSIDER_QUALIFIER_RE.search(fundamentals)
+        )
+    )
+    if downstream_insider_claim or fundamentals_insider_claim:
         findings.append({
             "severity": "HIGH",
             "code": "INSIDER_ABSENCE_UNVERIFIED",
