@@ -5,6 +5,7 @@ text can inject; the Markdown report is unchanged.
 """
 
 import re
+from html import unescape
 
 import pytest
 
@@ -39,7 +40,7 @@ def test_the_html_page_is_written_unless_declined(tmp_path):
     page = _html(tmp_path / "html")
     assert "<h1" in page and "NVDA" in page and "Overweight" in page and "2026-09-26" in page
     assert '<table>' in page and "181.2" in page
-    assert "VI. Data Quality & Evidence Audit" in page
+    assert "VI. Data Quality & Evidence Audit" in unescape(page)
     assert "REVIEW REQUIRED" in page
     assert "does not independently validate external sources" in page
 
