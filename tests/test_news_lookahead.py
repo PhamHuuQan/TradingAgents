@@ -32,7 +32,7 @@ def test_news_formatter_preserves_publication_date_and_direct_source_url():
     out = ynews._format_articles([article])
 
     assert "Publication date: 2026-10-21" in out
-    assert "Source URL: https://fpt.com/en/news/earnings-update" in out
+    assert "Link: https://fpt.com/en/news/earnings-update" in out
 
 
 @pytest.mark.unit
@@ -46,7 +46,7 @@ def test_news_formatter_marks_missing_provenance_instead_of_fabricating_it():
     }])
 
     assert "Publication date: unavailable from the provider" in out
-    assert "Source URL: unavailable from the provider" in out
+    assert "Source URL unavailable from the provider" in out
 
 
 @pytest.mark.unit
