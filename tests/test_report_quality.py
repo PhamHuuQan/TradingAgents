@@ -547,3 +547,37 @@ def test_partial_fpt_summary_does_not_support_cash_machine_claims():
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
     assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
 
+def test_source_linked_9m_metrics_with_unavailable_detail_are_partial_not_unavailable():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "FPT ghi nhận doanh thu 40.023 tỷ VND, tăng 12,4%; "
+        "lợi nhuận trước thuế 8.770 tỷ VND, tăng 17,0%; "
+        "lợi nhuận sau thuế cổ đông công ty mẹ 7.778 tỷ VND, tăng 13,3%; "
+        "EPS 4.142 VND/cổ phiếu, tăng 12,8%. "
+        "Nguồn: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "Dữ liệu không khả dụng: bảng cân đối kế toán, báo cáo lưu chuyển tiền tệ "
+        "và báo cáo kết quả kinh doanh chi tiết không thể truy xuất do EntitlementError."
+    )
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+
+
+def test_news_items_with_inline_publication_dates_are_not_flagged_as_undated():
+    state = _sample_state()
+    state["news_report"] = (
+        "Source records returned by news tools:\\n"
+        "FPT partnership — Business Wire; publication date: 2026-10-20; "
+        "URL: https://example.test/fpt-news\\n"
+        "IBM AI announcement — PR Newswire; publication date: 2026-10-27; "
+        "URL: https://example.test/ibm-news"
+    )
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["news_url_count"] == 2
+    assert "NEWS_PUBLICATION_DATES_MISSING" not in codes
+
