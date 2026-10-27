@@ -260,23 +260,35 @@ def _append_sentiment_source_provenance(
     st_no_messages = "no stocktwits messages" in st_folded
     st_screened_all = "none of the" in st_folded and "messages is about" in st_folded
     # Provider rows may be indented; recognize them before deciding that no message was supplied.
-    st_has_message_rows = bool(re.search(r"(?m)^\s*\[\d{4}-\d{2}-\d{2}\b", stocktwits_block or ""))
-    st_has_missing_permalink = "source url unavailable from the provider" in st_folded
+    st_has_message_rows = bool(
+        re.search(r"(?m)^\s*(?:[-*]\s*)?\[\s*\d{4}[-/]\d{2}[-/]\d{2}\b", stocktwits_block or "")
+    )
+    # Count explicit missing-link markers separately from found permalinks so
+    # partially linked feeds do not hide other fetched messages without URLs.
+    st_missing_permalink_count = len(re.findall(
+        r"(?i)(?:source|message|post)\s+(?:url|permalink)\s+unavailable from the provider",
+        stocktwits_block or "",
+    ))
+    st_has_missing_permalink = st_missing_permalink_count > 0
     if st_posts:
         for url in dict.fromkeys(st_posts[:10]):
             lines.append(f"- Message permalink: {url}")
             url_count += 1
         if len(set(st_posts)) > 10:
             lines.append(f"- {len(set(st_posts)) - 10} additional message permalinks omitted from this index.")
+
+    if st_has_missing_permalink or (st_has_message_rows and not st_posts):
+        lines.append(
+            "- Message URL unavailable from the provider for one or more fetched StockTwits messages; "
+            "the stream endpoint is not an individual message permalink."
+        )
     elif st_no_messages:
         lines.append("- The fetched block reports no matching messages in the stated window; this is feed output, not proof of zero discussion everywhere.")
     elif st_screened_all:
         lines.append("- The screening step retained no on-topic StockTwits messages; no individual post is asserted as evidence.")
-    elif st_has_message_rows or st_has_missing_permalink:
-        lines.append("- Message URL unavailable from the provider for one or more fetched StockTwits messages; the stream endpoint is not an individual message permalink.")
     elif any(token in st_folded for token in ("unavailable", "error", "failed")):
         lines.append("- The provider block marks the feed unavailable; no conclusion about underlying market discussion is justified.")
-    else:
+    elif not st_posts:
         lines.append("- No individual message permalink was supplied in the fetched block; do not present a specific post as verified.")
     lines.append("")
 
