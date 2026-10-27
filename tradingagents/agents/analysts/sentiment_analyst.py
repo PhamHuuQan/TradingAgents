@@ -261,6 +261,7 @@ def _append_sentiment_source_provenance(
     st_screened_all = "none of the" in st_folded and "messages is about" in st_folded
     # Provider rows may be indented; recognize them before deciding that no message was supplied.
     st_has_message_rows = bool(re.search(r"(?m)^\s*\[\d{4}-\d{2}-\d{2}\b", stocktwits_block or ""))
+    st_has_missing_permalink = "source url unavailable from the provider" in st_folded
     if st_posts:
         for url in dict.fromkeys(st_posts[:10]):
             lines.append(f"- Message permalink: {url}")
@@ -271,7 +272,7 @@ def _append_sentiment_source_provenance(
         lines.append("- The fetched block reports no matching messages in the stated window; this is feed output, not proof of zero discussion everywhere.")
     elif st_screened_all:
         lines.append("- The screening step retained no on-topic StockTwits messages; no individual post is asserted as evidence.")
-    elif st_has_message_rows:
+    elif st_has_message_rows or st_has_missing_permalink:
         lines.append("- Message URL unavailable from the provider for one or more fetched StockTwits messages; the stream endpoint is not an individual message permalink.")
     elif any(token in st_folded for token in ("unavailable", "error", "failed")):
         lines.append("- The provider block marks the feed unavailable; no conclusion about underlying market discussion is justified.")
@@ -287,6 +288,7 @@ def _append_sentiment_source_provenance(
     lines.append("**Reddit**")
     reddit_folded = (reddit_block or "").casefold()
     rd_has_post_rows = bool(re.search(r"(?m)^\s*\[\d{4}-\d{2}-\d{2}\]", reddit_block or ""))
+    rd_has_missing_permalink = "source url unavailable from the provider" in reddit_folded
     if rd_urls:
         for url in dict.fromkeys(rd_urls[:10]):
             lines.append(f"- Post permalink: {url}")
@@ -295,7 +297,7 @@ def _append_sentiment_source_provenance(
             lines.append(f"- {len(set(rd_urls)) - 10} additional post permalinks omitted from this index.")
     elif "no reddit posts found" in reddit_folded or "<no posts found mentioning" in reddit_folded:
         lines.append("- The fetched search block reports no matching posts in the stated window; this is not proof of zero discussion everywhere.")
-    elif rd_has_post_rows or "source url unavailable from the provider" in reddit_folded:
+    elif rd_has_post_rows or rd_has_missing_permalink:
         lines.append("- Post permalink unavailable from the provider for one or more fetched Reddit items.")
     elif "unavailable" in reddit_folded or "fetch failed" in reddit_folded:
         lines.append("- The Reddit source block marks the fetch unavailable; it must not be described as confirmed silence.")
