@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 import yfinance as yf
@@ -101,7 +102,17 @@ def get_fundamentals(
     if not lines:
         raise_for_empty(ticker, canonical, "fundamental fields")
 
-    return f"# Company Fundamentals for {canonical}\n\n" + "\n".join(lines)
+    retrieved_at = datetime.now(UTC).isoformat()
+    source_url = f"https://finance.yahoo.com/quote/{canonical}/financials/"
+    provenance = (
+        f"# Company Fundamentals for {canonical}\n\n"
+        "- Source: Yahoo Finance (yfinance Ticker.info)\n"
+        f"- Retrieved at: {retrieved_at}\n"
+        f"- Source URL: {source_url}\n"
+        "- Note: this is a current profile snapshot; Yahoo does not provide the first-publication "
+        "time for each profile field. Do not use it as point-in-time data for a historical backtest.\n\n"
+    )
+    return provenance + "\n".join(lines)
 
 
 def _statement(ticker, freq, as_of_date, title, quarterly_attr, annual_attr) -> str:
@@ -115,7 +126,22 @@ def _statement(ticker, freq, as_of_date, title, quarterly_attr, annual_attr) -> 
     data = yf_retry(lambda: getattr(yf.Ticker(canonical), attr))
     if data is None or data.empty:
         raise_for_empty(ticker, canonical, f"{what} data")
-    return f"# {title} data for {canonical} ({freq})\n" + data.to_csv()
+    retrieved_at = datetime.now(UTC).isoformat()
+    source_slug = {
+        "Balance Sheet": "balance-sheet",
+        "Cash Flow": "cash-flow",
+        "Income Statement": "financials",
+    }.get(title, "financials")
+    source_url = f"https://finance.yahoo.com/quote/{canonical}/{source_slug}/"
+    provenance = (
+        f"# {title} data for {canonical} ({freq})\n\n"
+        "- Source: Yahoo Finance (yfinance)\n"
+        f"- Retrieved at: {retrieved_at}\n"
+        f"- Source URL: {source_url}\n"
+        "- Note: statement period end is not the first-publication timestamp; use only for current "
+        "snapshot analysis, not as historical point-in-time data.\n\n"
+    )
+    return provenance + data.to_csv()
 
 
 def get_balance_sheet(
@@ -155,15 +181,29 @@ def get_insider_transactions(
     if withheld:
         return withheld
     data = yf_retry(lambda: yf.Ticker(canonical).insider_transactions)
+    retrieved_at = datetime.now(UTC).isoformat()
+    source_url = f"https://finance.yahoo.com/quote/{canonical}/insider-transactions/"
 
-    # Empty is normal here (many valid symbols have no insider filings),
-    # so report it plainly rather than treating the symbol as invalid.
+    # Empty may simply mean this endpoint returned no records. That is not proof
+    # that no insider activity occurred across all filings/sources.
     if data is None or data.empty:
         if not vendor_reachable(YAHOO_HOST):
             raise VendorUnavailableError("Yahoo Finance is unreachable; insider filings were not retrieved")
-        return f"No insider transactions reported for symbol '{canonical}'"
+        return (
+            f"No insider transaction records were returned by Yahoo Finance for '{canonical}'.\n"
+            f"- Retrieved at: {retrieved_at}\n"
+            f"- Source URL: {source_url}\n"
+            "- Important limitation: this is an empty result from one provider endpoint, not proof "
+            "that no insider activity occurred. Check official filings before making an absence claim."
+        )
 
-    return f"# Insider Transactions data for {canonical}\n" + data.to_csv()
+    return (
+        f"# Insider Transactions data for {canonical}\n\n"
+        "- Source: Yahoo Finance (yfinance)\n"
+        f"- Retrieved at: {retrieved_at}\n"
+        f"- Source URL: {source_url}\n\n"
+        + data.to_csv()
+    )
 
 
 def get_company_profile(ticker: str) -> dict:
