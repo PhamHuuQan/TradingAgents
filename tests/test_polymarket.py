@@ -48,9 +48,47 @@ _SEARCH = {
 
 @pytest.mark.unit
 class PolymarketFilterTests(unittest.TestCase):
+    def test_irrelevant_high_volume_sports_market_is_filtered_out(self):
+        data = {
+            "events": [
+                {
+                    "title": "Fed policy",
+                    "slug": "fed-policy-outlook-2026",
+                    "markets": [
+                        _market(
+                            "How many Fed rate cuts in 2026?",
+                            0.72,
+                            volume=100_000,
+                            end_date="2030-12-31T00:00:00Z",
+                        )
+                    ],
+                },
+                {
+                    "title": "AFC Asian Cup 2027",
+                    "slug": "afc-asian-cup-2027-winner",
+                    "markets": [
+                        _market(
+                            "AFC Asian Cup 2027 winner?",
+                            0.50,
+                            volume=50_000_000,
+                            end_date="2027-12-31T00:00:00Z",
+                        )
+                    ],
+                },
+            ]
+        }
+        with mock.patch.object(polymarket, "_request", return_value=data):
+            out = polymarket.get_prediction_markets("Fed rate cut", limit=10)
+
+        self.assertIn("How many Fed rate cuts in 2026?", out)
+        self.assertNotIn("AFC Asian Cup", out)
+        self.assertNotIn("$50,000,000 volume", out)
+
+
+
     def test_closed_and_past_markets_are_excluded(self):
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
-            out = polymarket.get_prediction_markets("anything", limit=10)
+            out = polymarket.get_prediction_markets("open", limit=10)
         self.assertIn("Open big?", out)
         self.assertIn("Open small?", out)
         self.assertNotIn("Resolved already?", out)  # closed
@@ -58,12 +96,12 @@ class PolymarketFilterTests(unittest.TestCase):
 
     def test_ranked_by_volume(self):
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
-            out = polymarket.get_prediction_markets("anything", limit=10)
+            out = polymarket.get_prediction_markets("open", limit=10)
         self.assertLess(out.index("Open big?"), out.index("Open small?"))
 
     def test_limit_caps_results(self):
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
-            out = polymarket.get_prediction_markets("anything", limit=1)
+            out = polymarket.get_prediction_markets("open", limit=1)
         self.assertIn("Open big?", out)
         self.assertNotIn("Open small?", out)
 
@@ -72,7 +110,7 @@ class PolymarketFilterTests(unittest.TestCase):
 class PolymarketFormatTests(unittest.TestCase):
     def test_probability_volume_and_weekly_change_render(self):
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
-            out = polymarket.get_prediction_markets("anything", limit=10)
+            out = polymarket.get_prediction_markets("open", limit=10)
         self.assertIn("Yes 76%", out)
         self.assertIn("$5,000,000 volume", out)
         self.assertIn("resolves 2030-12-31", out)
@@ -89,14 +127,14 @@ class PolymarketFormatTests(unittest.TestCase):
 
     def test_missing_provider_market_slug_is_not_replaced_with_a_guessed_url(self):
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
-            out = polymarket.get_prediction_markets("anything", limit=10)
+            out = polymarket.get_prediction_markets("open", limit=10)
         self.assertIn("Market URL: unavailable from the provider", out)
         self.assertNotIn("https://polymarket.com/event/", out)
 
     def test_weekly_change_omitted_when_absent(self):
         # "Open small?" has wk=None -> no 1-week clause on its line.
         with mock.patch.object(polymarket, "_request", return_value=_SEARCH):
-            out = polymarket.get_prediction_markets("anything", limit=10)
+            out = polymarket.get_prediction_markets("open", limit=10)
         small_line = next(ln for ln in out.splitlines() if "Open small?" in ln)
         self.assertNotIn("1-week", small_line)
 
