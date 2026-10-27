@@ -34,7 +34,8 @@ _PARTIAL_FUNDAMENTALS_RE = re.compile(
     r"|ngoại trừ\s+(?:4|bốn)\s+chỉ tiêu tổng quan"
     r"|các cấu phần chi tiết.{0,220}không có dữ liệu xác thực"
     r"|bảng cân đối kế toán.{0,220}(?:không khả dụng|không có dữ liệu xác nhận|DATA_UNAVAILABLE)"
-    r"|báo cáo lưu chuyển tiền tệ.{0,220}(?:không khả dụng|không có dữ liệu)",
+    r"|báo cáo lưu chuyển tiền tệ.{0,220}(?:không khả dụng|không có dữ liệu|không thể xác thực)"
+    r"|(?:toàn bộ )?dữ liệu chi tiết.{0,240}(?:không thể xác thực|không khả dụng|không có dữ liệu)",
     re.IGNORECASE,
 )
 _FINANCIAL_STRENGTH_RE = re.compile(
