@@ -57,3 +57,25 @@ def test_no_snapshot_means_no_fabricated_provenance_section():
     report = "Report without source evidence"
 
     assert _append_verified_market_provenance(report, messages) == report
+
+def test_later_failed_snapshot_does_not_reuse_older_snapshot_metadata():
+    verified = """## Verified SSI market data snapshot for FPT
+
+- Requested as-of date: 2026-10-27
+- Latest returned trading row: 2026-10-27
+- Source: ssi-fastconnect-v3
+- Source URL: https://api.ssi.com.vn/api/v3/data/ohlc
+- Retrieved at: 2026-10-27T12:30:00+07:00
+"""
+    messages = [
+        ToolMessage(content=verified, tool_call_id="snapshot-ok", name="get_verified_market_snapshot"),
+        ToolMessage(
+            content="DATA_UNAVAILABLE: no market snapshot",
+            tool_call_id="snapshot-failed",
+            name="get_verified_market_snapshot",
+        ),
+    ]
+    report = "Report without current source evidence"
+
+    assert _append_verified_market_provenance(report, messages) == report
+
