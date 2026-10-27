@@ -26,6 +26,7 @@ def load_fallback_symbols():
 
     wanted = {
         "is_transient_gemini_error",
+        "is_daily_quota_error",
         "_gemini_status",
         "GeminiFallbackRunnable",
     }
@@ -81,13 +82,14 @@ class FreshNotebookTests(unittest.TestCase):
 
     def test_model_candidates_start_with_flash_lite_fallbacks(self):
         run_cell = self.source[5]
-        self.assertLess(run_cell.index('"gemini-3.1-flash-lite"'), run_cell.index('"gemini-3.5-flash-lite"'))
-        self.assertIn('"gemini-3.6-flash"', run_cell)
+        self.assertLess(run_cell.index('"gemini-3.5-flash-lite"'), run_cell.index('"gemini-3.1-flash-lite"'))
         self.assertIn('"gemini-3.8-flash"', run_cell)
+        self.assertNotIn('"gemini-3.6-flash"', run_cell)
+        self.assertIn('config["checkpoint_enabled"] = True', run_cell)
 
     def test_offline_self_test_has_no_api_credentials_or_network_calls(self):
         offline_cell = self.source[4]
-        self.assertIn("OFFLINE SELF-TEST PASSED: 4/4 cases", offline_cell)
+        self.assertIn("OFFLINE SELF-TEST PASSED: 5/5 cases", offline_cell)
         self.assertNotIn("GOOGLE_API_KEY", offline_cell)
         self.assertNotIn("ChatGoogleGenerativeAI", offline_cell)
         self.assertNotIn("requests.", offline_cell)
@@ -111,6 +113,21 @@ class FreshNotebookTests(unittest.TestCase):
         self.assertEqual(second_chain.invoke("test"), "OK:backup-again")
         self.assertEqual(second_primary.calls, 0)
         self.assertEqual(second_backup.calls, 1)
+
+    def test_transient_all_models_fail_then_retry_pass_recovers(self):
+        state = {"active_index": 0}
+        chain = self.Fallback(
+            [
+                FakeModel("one", ["503 UNAVAILABLE"]),
+                FakeModel("two", ["503 UNAVAILABLE"]),
+            ],
+            ["one", "two"],
+            state,
+            sleep_fn=lambda _seconds: None,
+        )
+        self.assertEqual(chain.invoke("test"), "OK:one")
+        self.assertEqual(chain.models[0].calls, 2)
+        self.assertEqual(chain.models[1].calls, 1)
 
     def test_structured_output_path_can_fallback_too(self):
         state = {"active_index": 0}
@@ -141,12 +158,20 @@ class FreshNotebookTests(unittest.TestCase):
     def test_all_transient_models_fail_with_sanitized_message(self):
         state = {"active_index": 0}
         chain = self.Fallback(
-            [FakeModel("one", ["503 UNAVAILABLE"]), FakeModel("two", ["503 UNAVAILABLE"])],
+            [
+                FakeModel("one", ["503 UNAVAILABLE"] * 3),
+                FakeModel("two", ["503 UNAVAILABLE"] * 3),
+            ],
             ["one", "two"],
             state,
+            sleep_fn=lambda _seconds: None,
         )
-        with self.assertRaisesRegex(RuntimeError, "last_model=two, status=503"):
+        with self.assertRaisesRegex(RuntimeError, "after 3 passes"):
             chain.invoke("test")
+        counts = (chain.models[0].calls, chain.models[1].calls)
+        with self.assertRaisesRegex(RuntimeError, "No additional model requests were sent"):
+            chain.invoke("structured fallback must not duplicate calls")
+        self.assertEqual(counts, (chain.models[0].calls, chain.models[1].calls))
 
     def test_download_cell_validates_archive_without_running_model(self):
         download_cell = self.source[6]
