@@ -1,3 +1,6 @@
+import re
+
+from langchain_core.messages import ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.analysts.turn import take_turn
@@ -10,6 +13,41 @@ TOOLS = (
     get_indicators,
     get_verified_market_snapshot,
 )
+
+
+def _append_verified_market_provenance(report: str, messages) -> str:
+    """Append provider/source metadata from the actual verified snapshot tool result."""
+    if not report.strip() or "### Market Data Provenance" in report:
+        return report
+
+    snapshot_messages = [
+        message for message in messages or ()
+        if isinstance(message, ToolMessage)
+        and (
+            getattr(message, "name", None) == "get_verified_market_snapshot"
+            or "Verified SSI market data snapshot" in str(getattr(message, "content", ""))
+            or "Verified market data snapshot" in str(getattr(message, "content", ""))
+        )
+    ]
+    if not snapshot_messages:
+        return report
+
+    snapshot = str(snapshot_messages[-1].content)
+    fields = (
+        ("Provider", r"(?im)^\\s*(?:[-*]\\s*)?Source\\s*[:：]\\s*(.+)$"),
+        ("Source URL", r"(?im)^\\s*(?:[-*]\\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\\s*[:：]\\s*(.+)$"),
+        ("Retrieved at", r"(?im)^\\s*(?:[-*]\\s*)?Retrieved at(?: \\(UTC\\))?\\s*[:：]\\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\\s*(?:[-*]\\s*)?Requested as-of date\\s*[:：]\\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\\s*(?:[-*]\\s*)?Latest returned trading row\\s*[:：]\\s*(.+)$"),
+    )
+    lines = ["", "### Market Data Provenance", ""]
+    for label, pattern in fields:
+        match = re.search(pattern, snapshot)
+        if match:
+            lines.append(f"- {label}: {match.group(1).strip()}")
+        elif label in {"Provider", "Source URL", "Retrieved at"}:
+            lines.append(f"- {label}: not supplied by provider")
+    return report.rstrip() + "\\n" + "\\n".join(lines) + "\\n"
 
 
 def create_market_analyst(llm):
@@ -77,6 +115,8 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
         prompt = prompt.partial(instrument_context=instrument_context)
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        if report:
+            report = _append_verified_market_provenance(report, state.get("messages", []))
 
         return {
             "messages": [result],
