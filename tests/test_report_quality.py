@@ -139,6 +139,13 @@ def test_fundamentals_without_a_source_url_are_flagged_when_values_are_present()
     assert audit["fundamentals_url_count"] == 0
 
 
+def test_linked_news_without_any_publication_date_field_is_flagged():
+    state = _sample_state()
+    state["news_report"] = "A dated-looking story title: https://example.test/news"
+    audit = build_report_quality_audit(state)
+    assert any(item["code"] == "NEWS_PUBLICATION_DATES_MISSING" for item in audit["findings"])
+
+
 def test_news_item_without_publication_date_is_flagged_even_with_a_url():
     state = _sample_state()
     state["news_report"] = (
