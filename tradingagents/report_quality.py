@@ -101,6 +101,10 @@ _SOCIAL_POST_URL_MISSING_RE = re.compile(
     r"Source URL unavailable from the provider|post permalink unavailable|message URL unavailable",
     re.IGNORECASE,
 )
+_NEWS_ITEM_URL_MISSING_RE = re.compile(
+    r"Source URL unavailable from the provider|article URL unavailable|news link unavailable",
+    re.IGNORECASE,
+)
 
 
 def _text(value: Any) -> str:
@@ -170,6 +174,16 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Label interpretation as inference. Never invent financial values, citations, publication dates, market probabilities, or insider-activity conclusions.",
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
     ]
+    market = _text(state.get("market_report"))
+    if (
+        not market.strip()
+        or _UNAVAILABLE_RE.search(market)
+        or _NO_DATA_RE.search(market)
+    ):
+        guardrails.append(
+            "- MARKET DATA LIMITATION: no usable market/technical report is present. Do not state exact prices, indicators, support/resistance levels, "
+            "or execution levels as verified without a separate named, dated source. Say which market data is unavailable."
+        )
     if _requires_fundamentals(state) and (
         not fundamentals.strip()
         or _UNAVAILABLE_RE.search(fundamentals)
@@ -227,11 +241,24 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         label: _status(_text(final_state.get(key)))
         for label, key in report_keys.items()
     }
+    market = _text(final_state.get("market_report"))
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
     downstream = _downstream_text(final_state)
     findings: list[dict[str, str]] = []
+
+    if source_statuses["Market report"] in {
+        "MISSING", "LIMITED / SOURCE UNAVAILABLE", "NO USABLE DATA RETURNED"
+    }:
+        findings.append({
+            "severity": "HIGH",
+            "code": "MARKET_DATA_UNAVAILABLE",
+            "finding": (
+                "The market/technical report is missing or unavailable. Exact price, volume, indicator, "
+                "support/resistance and trade-level claims are unverified without a separate source."
+            ),
+        })
 
     if _requires_fundamentals(final_state) and source_statuses["Fundamentals report"] in {
         "MISSING", "LIMITED / SOURCE UNAVAILABLE", "NO USABLE DATA RETURNED"
@@ -333,6 +360,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "News report contains no direct source URLs. Named company events and macro claims are not "
                 "auditable from the generated report alone."
+            ),
+        })
+
+    if news.strip() and _NEWS_ITEM_URL_MISSING_RE.search(news):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "NEWS_ITEM_URLS_MISSING",
+            "finding": (
+                "One or more news items lack an individual source URL even though other report links may be present. "
+                "Do not use the unlinked item as independently traceable evidence."
             ),
         })
 
