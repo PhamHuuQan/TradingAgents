@@ -83,13 +83,13 @@ _MISSING_NEWS_DATE_RE = re.compile(
     r"publication date:\s*unavailable|no publication date|undated (?:source|article)",
     re.IGNORECASE,
 )
-_FRED_SOURCE_CLAIM_RE = re.compile(r"\\bFRED\\s*:|FRED series|Federal Reserve Economic Data", re.IGNORECASE)
+_FRED_SOURCE_CLAIM_RE = re.compile(r"\bFRED\s*:|FRED series|Federal Reserve Economic Data", re.IGNORECASE)
 _POLYMARKET_CLAIM_RE = re.compile(
     r"Polymarket|prediction[- ]market|market[- ]implied probability",
     re.IGNORECASE,
 )
-_POLYMARKET_URL_RE = re.compile(r"https?://(?:www\\.)?polymarket\\.com/", re.IGNORECASE)
-_POLYMARKET_API_URL_RE = re.compile(r"https?://gamma-api\\.polymarket\\.com/", re.IGNORECASE)
+_POLYMARKET_URL_RE = re.compile(r"https?://(?:www\.)?polymarket\.com/", re.IGNORECASE)
+
 _MARKET_URL_MISSING_RE = re.compile(
     r"Market URL:\\s*(?:unavailable|not provided|missing)|market link unavailable",
     re.IGNORECASE,
@@ -340,7 +340,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         })
 
     if news.strip() and _FRED_SOURCE_CLAIM_RE.search(news) and not re.search(
-        r"https?://(?:api\\.)?stlouisfed\\.org/series/", news, re.IGNORECASE
+        r"https?://fred\.stlouisfed\.org/series/", news, re.IGNORECASE
     ):
         findings.append({
             "severity": "MEDIUM",
@@ -362,7 +362,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                     "The generic Gamma API endpoint is not a substitute for the specific market page."
                 ),
             })
-        if not re.search(r"Observed at \\(UTC\\):|Retrieved at \\(UTC\\):", news, re.IGNORECASE):
+        if not re.search(r"Observed at \(UTC\):|Retrieved at \(UTC\):", news, re.IGNORECASE):
             findings.append({
                 "severity": "MEDIUM",
                 "code": "PREDICTION_MARKET_TIMESTAMP_MISSING",
