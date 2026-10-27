@@ -42,7 +42,9 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     r"|biên lợi nhuận\s+(?:xuất sắc|cao|mạnh|ổn định)"
     r"|financial (?:position|foundation|health).{0,45}\b(?:strong|robust|excellent|solid)\b"
     r"|\bstrong (?:cash flow|balance sheet|financials)\b"
-    r"|\brobust cash flow\b",
+    r"|\brobust cash flow\b"
+    r"|\b(?:operating |free )?cash flow.{0,30}\b(?:strong|stable|steady|robust|healthy|positive|improving|increased|grew)\b"
+    r"|\b(?:balance sheet|financial position|solvency|liquidity).{0,30}\b(?:strong|stable|healthy|robust|solid|sound|improved)\b",
     re.IGNORECASE,
 )
 _INSIDER_ABSENCE_RE = re.compile(
