@@ -185,8 +185,8 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "or execution levels as verified without a separate named, dated source. Say which market data is unavailable."
         )
     elif "verified market data snapshot" in market.casefold() and (
-        not re.search(r"(?im)^\\s*(?:[-*]\\s*)?source\\s*[:：]", market)
-        or not re.search(r"(?im)^\\s*(?:[-*]\\s*)?retrieved at(?: \\(utc\\))?\\s*[:：]", market)
+        not re.search(r"(?im)^\s*(?:[-*]\s*)?source\s*[:：]", market)
+        or not re.search(r"(?im)^\s*(?:[-*]\s*)?retrieved at(?: \(utc\))?\s*[:：]", market)
     ):
         guardrails.append(
             "- MARKET DATA PROVENANCE LIMITATION: a verified-snapshot heading is present but the report does not preserve both its provider and retrieval time. "
@@ -269,8 +269,8 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         })
 
     if market.strip() and "verified market data snapshot" in market.casefold() and (
-        not re.search(r"(?im)^\\s*(?:[-*]\\s*)?source\\s*[:：]", market)
-        or not re.search(r"(?im)^\\s*(?:[-*]\\s*)?retrieved at(?: \\(utc\\))?\\s*[:：]", market)
+        not re.search(r"(?im)^\s*(?:[-*]\s*)?source\s*[:：]", market)
+        or not re.search(r"(?im)^\s*(?:[-*]\s*)?retrieved at(?: \(utc\))?\s*[:：]", market)
     ):
         findings.append({
             "severity": "MEDIUM",
