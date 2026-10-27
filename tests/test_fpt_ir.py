@@ -133,6 +133,7 @@ def test_router_reaches_fpt_ir_after_vnstock_and_yahoo_are_unavailable(monkeypat
     set_config({"data_vendors": {"fundamental_data": "vnstock,yfinance,fpt_ir"}})
 
     calls = []
+
     def unavailable_vnstock(*args, **kwargs):
         calls.append("vnstock")
         raise VendorUnavailableError("EntitlementError")
