@@ -134,8 +134,8 @@ _TRADE_LEVEL_FIELD_RE = re.compile(
 
 
 _MARKET_REFERENCE_PRICE_RE = re.compile(
-    r"(?i)(?:giá\\s+(?:hiện tại|đóng cửa|gần nhất)|(?:closing|current|last)\\s+price|\\bclose\\b)"
-    r"[^\\n]{0,45}?(\\d[\\d,.]*\\d|\\d)"
+    r"(?i)(?:giá\s+(?:hiện tại|đóng cửa|gần nhất)|(?:closing|current|last)\s+price|\bclose\b)"
+    r"[^\n]{0,45}?(\d[\d,.]*\d|\d)"
 )
 
 def _parse_trade_price_token(value: str) -> float | None:
