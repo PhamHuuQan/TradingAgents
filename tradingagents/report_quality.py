@@ -548,6 +548,146 @@ def _market_numeric_discrepancies(
     return discrepancies, unreconciled
 
 
+_MACRO_NUMERIC_CLAIM_PATTERNS: dict[str, tuple[str, ...]] = {
+    "DGS10": (
+        r"(?i)\bDGS10\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+        r"(?i)\b(?:10[- ]year|10y)\s+(?:U\.S\.\s+)?Treasury\s+(?:security\s+)?yield\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+    ),
+    "DGS2": (
+        r"(?i)\bDGS2\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+        r"(?i)\b2[- ]year\s+(?:U\.S\.\s+)?Treasury\s+(?:security\s+)?yield\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+    ),
+    "DGS30": (
+        r"(?i)\bDGS30\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+        r"(?i)\b30[- ]year\s+(?:U\.S\.\s+)?Treasury\s+(?:security\s+)?yield\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+    ),
+    "FEDFUNDS": (
+        r"(?i)\bFEDFUNDS\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+        r"(?i)\b(?:Federal Funds Effective Rate|federal funds rate|Fed funds rate)\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+    ),
+    "UNRATE": (
+        r"(?i)\bUNRATE\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+        r"(?i)\b(?:U\.S\.\s+)?unemployment rate\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)\s*%?",
+    ),
+    "VIXCLS": (
+        r"(?i)\bVIXCLS\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)",
+        r"(?i)\bVIX(?: index| level)?\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])\s*(-?\d[\d.,]*)",
+    ),
+    "T10Y2Y": (
+        r"(?i)\bT10Y2Y\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)",
+        r"(?i)\b(?:10[- ]year\s*(?:minus|[-/])\s*2[- ]year|10y\s*(?:minus|[-/])\s*2y)\s+(?:Treasury\s+)?(?:yield\s+)?spread\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)",
+    ),
+    "DTWEXBGS": (
+        r"(?i)\bDTWEXBGS\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])?\s*(-?\d[\d.,]*)",
+        r"(?i)\b(?:broad\s+)?U\.S\.\s+dollar index\b[^\n]{0,45}?(?:at|is|was|of|around|approximately|stood at|[:=])\s*(-?\d[\d.,]*)",
+    ),
+}
+
+
+_MACRO_FORECAST_CUE_RE = re.compile(
+    r"(?i)\b(?:forecast|forecasted|project(?:ed|ion)?|expect(?:ed|ation)?|estimate(?:d)?|"
+    r"market[- ]implied|prediction market|probability|will likely|is likely to|could reach|"
+    r"may reach|dự báo|kỳ vọng|ước tính|xác suất|có thể đạt|có khả năng sẽ)\b"
+)
+_MACRO_HISTORICAL_CUE_RE = re.compile(
+    r"(?i)\b(?:historical(?:ly)?|in the past|previously|last year|years ago|"
+    r"trong quá khứ|năm ngoái|trước đây)\b|\b(?:19|20)\d{2}\b"
+)
+
+
+def _verified_macro_series_values(text: str) -> dict[str, tuple[float, str, str]]:
+    """Return latest FRED values preserved in the tool-provenance appendix.
+
+    The parser only accepts series records with a direct FRED series URL and a
+    labeled latest observation date. It does not treat URLs alone as numeric evidence.
+    """
+    marker = re.search(
+        r"(?im)^\s*#{1,6}\s*macro and prediction-market records returned by tools\s*$",
+        text or "",
+    )
+    if not marker:
+        return {}
+    appendix = text[marker.end():]
+    starts = list(re.finditer(
+        r"(?im)^\s*-\s*\*\*get_macro_indicators\s+—\s*(.+?)\*\*\s*$",
+        appendix,
+    ))
+    values: dict[str, tuple[float, str, str]] = {}
+    for index, start in enumerate(starts):
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(appendix)
+        block = appendix[start.end():end]
+        url_match = re.search(
+            r"(?im)^\s*-\s*Source URL\s*[:：]\s*https?://fred\.stlouisfed\.org/series/([A-Z0-9]+)\s*$",
+            block,
+        )
+        if not url_match:
+            continue
+        series_id = url_match.group(1).upper()
+        latest_match = re.search(
+            r"(?im)^\s*-\s*\**Latest\**\s*:\s*\**\s*(-?[\d,.]+)\s*\((\d{4}-\d{2}-\d{2})\)",
+            block,
+        )
+        unit_match = re.search(r"(?im)^\s*-\s*Units\s*[:：]\s*(.+?)\s*$", block)
+        if not latest_match or not unit_match:
+            continue
+        latest_value = _parse_trade_price_token(latest_match.group(1))
+        if latest_value is None:
+            continue
+        values[series_id] = (latest_value, unit_match.group(1).strip(), latest_match.group(2))
+    return values
+
+
+def _macro_numeric_claims(text: str) -> list[tuple[str, float, str]]:
+    """Extract current, directly named FRED metric values; ignore forecasts/history."""
+    claims: list[tuple[str, float, str]] = []
+    for series_id, patterns in _MACRO_NUMERIC_CLAIM_PATTERNS.items():
+        for pattern in patterns:
+            for match in re.finditer(pattern, text or ""):
+                context = text[max(0, match.start() - 70):min(len(text), match.end() + 45)]
+                if _MACRO_FORECAST_CUE_RE.search(context) or _MACRO_HISTORICAL_CUE_RE.search(context):
+                    continue
+                token = match.group(1)
+                value = _parse_trade_price_token(token)
+                if value is not None:
+                    claims.append((series_id, value, token))
+    return list(dict.fromkeys(claims))
+
+
+def _macro_numeric_discrepancies(
+    news_report: str,
+) -> tuple[list[tuple[str, float, float, str, str]], list[tuple[str, str]]]:
+    """Compare current macro claims to latest source-linked FRED values in the report.
+
+    This compares only a short allowlist of unambiguous, directly comparable
+    series. It deliberately does not compare forecasts, market probabilities,
+    historical claims, or ambiguous inflation/GDP transformations.
+    """
+    narrative = re.split(
+        r"(?im)^\s*#{1,6}\s*(?:source records returned by news tools|macro and prediction-market records returned by tools|unavailable or empty tool responses)\s*$",
+        news_report or "",
+        maxsplit=1,
+    )[0]
+    source_values = _verified_macro_series_values(news_report)
+    discrepancies: list[tuple[str, float, float, str, str]] = []
+    unreconciled: list[tuple[str, str]] = []
+    seen = set()
+    for series_id, reported, token in _macro_numeric_claims(narrative):
+        source = source_values.get(series_id)
+        if source is None:
+            item = (series_id, token)
+            if item not in unreconciled:
+                unreconciled.append(item)
+            continue
+        expected, unit, observation_date = source
+        tolerance = max(0.02, abs(expected) * 0.0005)
+        if abs(reported - expected) > tolerance:
+            identity = (series_id, reported, expected)
+            if identity not in seen:
+                seen.add(identity)
+                discrepancies.append((series_id, reported, expected, token, unit))
+    return discrepancies, unreconciled
+
+
 def _downstream_text(state: dict[str, Any]) -> str:
     pieces = [
         _text(state.get("investment_plan")),
@@ -765,6 +905,33 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Numeric price/indicator claims are present but the market report is missing a labeled provider, direct source URL, and/or retrieval timestamp. "
                 "Preserve all three fields so exact OHLCV and indicator claims can be traced to a source."
+            ),
+        })
+
+    macro_discrepancies, macro_unreconciled = _macro_numeric_discrepancies(news)
+    if macro_discrepancies:
+        examples = "; ".join(
+            f"{series_id}: report={reported:g}, FRED={expected:g} {unit} (observation {observation_date})"
+            for series_id, reported, expected, _token, unit in macro_discrepancies[:5]
+            for _source in [ _verified_macro_series_values(news).get(series_id, (expected, unit, "")) ]
+            for observation_date in [_source[2]]
+        )
+        findings.append({
+            "severity": "HIGH",
+            "code": "MACRO_NUMERIC_CLAIM_MISMATCH",
+            "finding": (
+                "A current macroeconomic number in the news/market context conflicts with the latest source-linked FRED value preserved in the tool appendix. "
+                f"Correct the narrative or explicitly identify and source the distinct observation/date. Discrepancies: {examples}."
+            ),
+        })
+    if macro_unreconciled:
+        series_labels = ", ".join(dict.fromkeys(series_id for series_id, _token in macro_unreconciled))
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED",
+            "finding": (
+                "A directly named macro series appears with a numeric value, but no matching latest value with a direct FRED series URL, units and observation date "
+                f"was preserved in the tool appendix. Metrics: {series_labels}. A prose citation alone does not establish numeric agreement."
             ),
         })
 
