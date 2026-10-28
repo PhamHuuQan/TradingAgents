@@ -1121,3 +1121,15 @@ def test_numeric_stop_loss_order_instruction_is_flagged_without_portfolio_contex
         item["code"] for item in audit["findings"]
     }
 
+
+def test_unsupported_high_probability_of_support_break_is_flagged_without_backtest():
+    state = _sample_state()
+    state["investment_debate_state"] = {
+        "history": "Phe Gấu cho rằng xác suất thủng hỗ trợ là rất cao vì lực bán đang áp đảo."
+    }
+    audit = build_report_quality_audit(state)
+    assert "UNSUPPORTED_DIRECTIONAL_PROBABILITY" in {
+        item["code"] for item in audit["findings"]
+    }
+    assert "DIRECTIONAL PROBABILITY LIMITATION" in build_decision_evidence_guardrails(state)
+
