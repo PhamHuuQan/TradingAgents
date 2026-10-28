@@ -754,7 +754,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "severity": "MEDIUM",
             "code": "SOCIAL_SILENCE_EXTRAPOLATION",
             "finding": (
-                "Downstream analysis generalizes an unavailable provider or an empty search window into market-wide social silence, "
+                "Sentiment or downstream analysis generalizes an unavailable provider or an empty search window into market-wide social silence, "
                 "investor inattention, or weak liquidity. A provider failure and a successful zero-result query are different, "
                 "and neither alone establishes overall investor attention or the stock's trading liquidity."
             ),
