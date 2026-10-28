@@ -206,7 +206,6 @@ def _csv_response(frame: object, symbol: str, title: str, period: str, source: s
         f"# {title} for {symbol} from Vnstock {source.upper()}\n"
         f"# Provider source: vnstock-{source}; source evidence: {source_evidence}\n"
         f"# Period: {period}; retrieved at: {fetched_at.isoformat()}\n"
-        "# Source documentation: https://vnstocks.com/docs/vnstock/co-ban-fundamental\n"
         "# Vnstock explicit source requests do not silently switch to another provider.\n"
         "# Availability is fetch-time only; this response has no historical first-publication time.\n"
         "# Use only for current-date analysis, not historical point-in-time backtests.\n\n"
@@ -343,7 +342,7 @@ def get_vnstock_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
         f"# Current {selected_source.upper()} fundamentals for {symbol}",
         "",
         f"- Source: vnstock-{selected_source}",
-        f"- Source documentation: https://vnstocks.com/docs/vnstock/co-ban-fundamental",
+        "- Retrieval library: Vnstock; this is not the issuer filing URL.",
         f"- Retrieved at: {fetched_at.isoformat()}",
         "- Statement periods are reported by the source; this fetch timestamp is not their historical publication time.",
         "- This is a current snapshot. It is withheld for historical as-of dates.",
