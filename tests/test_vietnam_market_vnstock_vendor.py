@@ -64,12 +64,13 @@ class FakeClient:
         self.kbs_balance_frame = FakeFrame(balance.rows, source="kbs")
         self.kbs_cash_flow_frame = FakeFrame(cash_flow.rows, source="kbs")
         self.failed_sources = set()
+        self.failed_requests = set()
         self.calls = []
 
     def _fetch(self, name, period, format, source, vci_frame, kbs_frame):
         self.calls.append((name, period, format, source))
-        if source in self.failed_sources:
-            raise RuntimeError(f"simulated {source.upper()} source outage")
+        if source in self.failed_sources or (source, name) in self.failed_requests:
+            raise RuntimeError(f"simulated {source.upper()} {name} outage")
         return vci_frame if source == "vci" else kbs_frame
 
     def income_statement(self, *, period, format, source):
@@ -152,6 +153,21 @@ def test_vnstock_fundamentals_summary_falls_back_as_a_complete_kbs_set(fake_vnst
     assert "Latest total equity: 200,000,000,000 VND" in output
     assert [call[3] for call in fake_vnstock.calls] == [
         "vci", "kbs", "kbs", "kbs"
+    ]
+
+
+@pytest.mark.unit
+def test_vnstock_summary_never_mixes_partial_vci_with_kbs_statements(fake_vnstock):
+    # VCI returns the income statement but fails on the balance sheet. The full
+    # three-statement set must be retried with KBS rather than mixing providers.
+    fake_vnstock.failed_requests.add(("vci", "balance_sheet"))
+
+    output = vnstock_fundamentals.get_vnstock_fundamentals("FPT", "2026-10-25")
+
+    assert "# Current KBS fundamentals for FPT" in output
+    assert "- Source: vnstock-kbs" in output
+    assert [call[3] for call in fake_vnstock.calls] == [
+        "vci", "vci", "kbs", "kbs", "kbs"
     ]
 
 
