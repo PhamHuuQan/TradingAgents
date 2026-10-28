@@ -24,6 +24,7 @@ on:
       - "tradingagents/graph/trading_graph.py"
       - "tradingagents/report_html.py"
       - "tradingagents/agents/analysts/**"
+      - "tradingagents/agents/structured.py"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
       - "tradingagents/agents/risk_mgmt/**"
@@ -158,6 +159,7 @@ jobs:
             tradingagents/agents/tools.py \
             tradingagents/graph/trading_graph.py \
             tradingagents/report_html.py \
+            tradingagents/agents/structured.py \
             tradingagents/agents/analysts/market_analyst.py \
             tradingagents/agents/analysts/fundamentals_analyst.py \
             tradingagents/agents/analysts/news_analyst.py \
