@@ -16,8 +16,10 @@ _UNAVAILABLE_RE = re.compile(
     r"|temporarily unavailable|currently unavailable|tạm thời (?:chưa )?khả dụng|không thể trích xuất|không lấy được dữ liệu"
     r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)"
     r"|(?:revenue|profit before tax|PBT|profit after tax|PAT|EPS|financial statement|financial ratio)"
-    r"\s+(?:details?|values?|metrics?)\s+(?:are|were|is|was)\s+unavailable"
-    r"|values?\s+(?:were|was)\s+not supplied",
+    r"\s+(?:details?|values?|metrics?)\s+(?:are|were|is|was)?\s*(?:unavailable|not available|not supplied)"
+    r"|values?\s+(?:were|was|are)\s+not supplied"
+    r"|(?:provider|source|feed|vendor|StockTwits|Reddit|Yahoo Finance|FRED|Vnstock)\b.{0,60}\b(?:unavailable|failed|error|timeout|timed out|not accessible)\b"
+    r"|\b(?:HTTPError|TimeoutError|ConnectionError)\b",
     re.IGNORECASE,
 )
 _NO_DATA_RE = re.compile(
@@ -237,6 +239,7 @@ _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"|sự im lặng.{0,80}(?:từ )?(?:thị trường|cộng đồng|diễn đàn|nhà đầu tư)"
     r"|absence of catalysts.{0,80}(?:shows|suggests|indicates|reflects)"
     r"|cạn kiệt thanh khoản quan tâm"
+    r"|low investor attention|low retail attention|limited investor interest|investor interest is low"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
     r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)"
@@ -337,12 +340,41 @@ def _text(value: Any) -> str:
     return str(value)
 
 
-def _status(text: str) -> str:
+def _status(text: str, source_kind: str | None = None) -> str:
+    """Classify coverage without letting a failed secondary feed erase usable evidence."""
     if not text.strip():
         return "MISSING"
-    if _NO_DATA_RE.search(text):
+
+    has_no_data = bool(_NO_DATA_RE.search(text))
+    has_unavailable = bool(_UNAVAILABLE_RE.search(text))
+    has_urls = bool(_urls(text))
+
+    if source_kind == "market_report":
+        has_numeric_market_claim = bool(_MARKET_NUMERIC_CLAIM_RE.search(text))
+        has_snapshot_provenance = not _market_provenance_missing(text)
+        if has_numeric_market_claim and has_urls and has_snapshot_provenance:
+            if has_no_data or has_unavailable:
+                return "PARTIAL COVERAGE — SOURCE-LINKED MARKET DATA; SECONDARY FEED UNAVAILABLE"
+            return "AVAILABLE — SOURCE-LINKED MARKET DATA"
+
+    if source_kind in {"news_report", "sentiment_report"} and has_urls:
+        label = "NEWS" if source_kind == "news_report" else "SENTIMENT"
+        if has_unavailable or has_no_data:
+            return f"PARTIAL COVERAGE — SOURCE-LINKED {label}; SECONDARY FEED UNAVAILABLE"
+        return f"AVAILABLE — SOURCE-LINKED {label}"
+
+    if source_kind == "fundamentals_report":
+        has_summary_metrics = _has_source_linked_summary_metrics(text)
+        if has_summary_metrics and (
+            _PARTIAL_FUNDAMENTALS_RE.search(text) or has_unavailable or has_no_data
+        ):
+            return "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+        if has_summary_metrics:
+            return "AVAILABLE — SOURCE-LINKED SUMMARY METRICS"
+
+    if has_no_data:
         return "NO USABLE DATA RETURNED"
-    if _UNAVAILABLE_RE.search(text):
+    if has_unavailable:
         return "LIMITED / SOURCE UNAVAILABLE"
     return "PRESENT — NOT INDEPENDENTLY VERIFIED"
 
@@ -541,7 +573,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         "Fundamentals report": "fundamentals_report",
     }
     source_statuses = {
-        label: _status(_text(final_state.get(key)))
+        label: _status(_text(final_state.get(key)), source_kind=key)
         for label, key in report_keys.items()
     }
     market = _text(final_state.get("market_report"))
