@@ -82,6 +82,11 @@ on:
       - "tradingagents/agents/risk_mgmt/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
+      - "tests/test_yahoo_rate_limit.py"
+      - "tests/test_memory_log.py"
+      - "tests/test_structured_agents.py"
+      - "tests/test_vietnam_market_ssi.py"
+      - "tests/test_model_validation.py"
       - "tests/test_structured_agent_prompts.py"
       - "tests/test_market_provenance.py"
       - "tests/test_sentiment_provenance.py"
@@ -135,6 +140,7 @@ jobs:
             tests/test_market_provenance.py \
             tests/test_sentiment_provenance.py \
             tests/test_vietnam_market_ssi_vendor.py \
+            tests/test_vietnam_market_ssi.py \
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_provenance.py \
