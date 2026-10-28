@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/report-evidence-quality-20261027
+      - fix/report-provenance-audit-20261028
     paths:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
@@ -136,6 +137,7 @@ jobs:
             tradingagents/agents/tools.py \
             tradingagents/graph/trading_graph.py \
             tradingagents/report_html.py \
+            tradingagents/agents/analysts/market_analyst.py \
             tradingagents/agents/analysts/fundamentals_analyst.py \
             tradingagents/agents/analysts/news_analyst.py \
             tradingagents/agents/analysts/sentiment_analyst.py \
