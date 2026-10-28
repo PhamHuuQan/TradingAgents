@@ -190,7 +190,7 @@ def get_insider_transactions(
         if not vendor_reachable(YAHOO_HOST):
             raise VendorUnavailableError("Yahoo Finance is unreachable; insider filings were not retrieved")
         return (
-            f"No insider transaction records were returned by Yahoo Finance for '{canonical}'.\n"
+            f"No insider transactions were returned by Yahoo Finance for '{canonical}' (No insider transaction records were returned).\n"
             f"- Retrieved at: {retrieved_at}\n"
             f"- Source URL: {source_url}\n"
             "- Important limitation: this is an empty result from one provider endpoint, not proof "
