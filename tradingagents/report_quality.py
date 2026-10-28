@@ -98,6 +98,13 @@ _UNSUPPORTED_REVERSAL_PROBABILITY_RE = re.compile(
     r"|highly likely.{0,60}(?:bounce|rebound|reversal)",
     re.IGNORECASE,
 )
+_UNSUPPORTED_DIRECTIONAL_PROBABILITY_RE = re.compile(
+    r"(?:xác suất|khả năng).{0,70}(?:thủng hỗ trợ|phá vỡ hỗ trợ|mất mốc hỗ trợ|giảm sâu|rơi tiếp|"
+    r"tiếp tục giảm|sụt giảm|bán tháo|giảm giá|breakdown|break support).{0,40}"
+    r"(?:rất cao|cao|lớn|gần như chắc chắn|áp đảo)"
+    r"|(?:very high|high) probability.{0,80}(?:break(?:ing)? support|breakdown|fall further|sell[- ]off|decline further)",
+    re.IGNORECASE,
+)
 _REVERSAL_EVIDENCE_RE = re.compile(
     r"\bbacktest(?:ed|ing)?\b|\bwin rate\b|\bhit rate\b|historical (?:frequency|hit rate|reversal rate)"
     r"|sample of \d+|based on \d+ (?:observations|trades|cases)"
@@ -413,6 +420,7 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
         "- TRADE-LEVEL CONSISTENCY: keep entry, stop-loss and target in the same currency and price scale. For a buy, the target must be strictly above entry and stop-loss below entry; never label an entry/support price as a profit target.",
         "- REVERSAL PROBABILITY LIMITATION: RSI below 30 or proximity to a Bollinger band does not quantify reversal odds. Do not call a bounce high-probability unless a cited historical test gives its sample, time horizon, and hit rate.",
+        "- DIRECTIONAL PROBABILITY LIMITATION: do not call a support break, selloff, continuation move, or rebound 'high probability' without a cited quantitative method/backtest, defined sample, and time horizon. State it as a scenario, not a measured probability.",
         "- CAPITAL-FLOW INFERENCE LIMITATION: OHLC prices, moving averages, RSI, MACD, Bollinger bands, or volume alone do not prove that institutional investors or 'smart money' are exiting, accumulating, or selling net. State that flow direction is unknown unless the supplied evidence contains quantified, source-linked flow data.",
         "- NUMERIC RISK-PROBABILITY LIMITATION: do not assign a percentage to loss risk, rebound probability, or reversal odds without a cited quantitative method/backtest, defined sample and time horizon. Do not use unsupported claims such as '99% risk' based only on technical indicators.",
     ]
@@ -682,6 +690,19 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         })
 
     if (
+        _UNSUPPORTED_DIRECTIONAL_PROBABILITY_RE.search(downstream)
+        and not _REVERSAL_EVIDENCE_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "UNSUPPORTED_DIRECTIONAL_PROBABILITY",
+            "finding": (
+                "The report describes a directional risk (such as support breaking or a further selloff) as highly probable "
+                "without a cited quantitative method, defined sample, and time horizon. Rephrase as a possible scenario or provide reproducible evidence."
+            ),
+        })
+
+    if (
         _UNSUPPORTED_NUMERIC_RISK_RE.search(downstream)
         and not _REVERSAL_EVIDENCE_RE.search(downstream)
     ):
@@ -882,7 +903,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
 
     if news_narrative.strip() and _POLYMARKET_PROBABILITY_RE.search(news_narrative):
         has_market_url = bool(_POLYMARKET_URL_RE.search(news_narrative))
-        if not has_market_url or _MARKET_URL_MISSING_RE.search(news):
+        if not has_market_url or _MARKET_URL_MISSING_RE.search(news_narrative):
             findings.append({
                 "severity": "MEDIUM",
                 "code": "PREDICTION_MARKET_URL_MISSING",
