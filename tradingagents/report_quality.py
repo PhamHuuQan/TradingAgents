@@ -413,6 +413,141 @@ def _has_numeric_valuation_multiple(text: str) -> bool:
     return bool(_NUMERIC_VALUATION_MULTIPLE_RE.search(text or ""))
 
 
+# These patterns intentionally focus on explicit *numeric current-market claims*,
+# not qualitative phrases such as "RSI is oversold". A URL is not enough to
+# establish that the number in the model's prose matches the fetched data.
+_MARKET_NUMERIC_CLAIM_PATTERNS: dict[str, tuple[str, ...]] = {
+    "close": (
+        r"(?i)\b(?:current|closing|last|share|stock)\s+price\b[^\n]{0,40}?"
+        r"(?:at|is|of|around|approximately|[:=])?\s*(-?\d[\d.,]*)",
+        r"(?i)\b(?:giá hiện tại|giá đóng cửa|giá gần nhất|giá cổ phiếu)\b[^\n]{0,40}?"
+        r"(?:ở mức|tại|là|khoảng|[:=])?\s*(-?\d[\d.,]*)",
+        r"(?i)\bclose(?:\s+price)?\s*(?::|=|\b(?:at|is|of)\b)?\s*(-?\d[\d.,]*)",
+    ),
+    "close_10_ema": (
+        r"(?i)\bEMA\s*[- ]?10\b[^\n]{0,35}?(-?\d[\d.,]*)",
+    ),
+    "close_50_sma": (
+        r"(?i)\bSMA\s*[- ]?50\b[^\n]{0,35}?(-?\d[\d.,]*)",
+    ),
+    "close_200_sma": (
+        r"(?i)\bSMA\s*[- ]?200\b[^\n]{0,35}?(-?\d[\d.,]*)",
+    ),
+    "rsi": (
+        r"(?i)\bRSI(?:\s*\d+)?(?:\s*[:=]\s*|\s+(?:at|is|of|around|approximately|"
+        r"ở mức|tại|là|đạt)\s+|\s+)(-?\d[\d.,]*)",
+    ),
+    "macd": (
+        r"(?i)\bMACD\b(?!\s*(?:hist(?:ogram)?|signal|macdh|macds))"
+        r"(?:\s*[:=]\s*|\s+(?:at|is|of|around|approximately|ở mức|tại|là)\s+|\s+)"
+        r"(-?\d[\d.,]*)",
+    ),
+    "macds": (
+        r"(?i)\bMACD\s*(?:signal|signal line|macds)\b[^\n]{0,35}?(-?\d[\d.,]*)",
+    ),
+    "macdh": (
+        r"(?i)\b(?:MACD\s*(?:histogram|hist|macdh)|histogram)\b"
+        r"(?:\s*[:=]\s*|\s+(?:is|at|of|approximately|ở mức|là)\s+|\s+)"
+        r"(-?\d[\d.,]*)",
+    ),
+    "atr": (
+        r"(?i)\bATR(?:\s*\d+)?(?:\s*[:=]\s*|\s+(?:at|is|of|around|approximately|ở mức|là)\s+|\s+)"
+        r"(-?\d[\d.,]*)",
+    ),
+    "boll_lb": (
+        r"(?i)(?:\blower Bollinger(?: band)?|Bollinger(?: band)? lower|dải Bollinger dưới)"
+        r"[^\n]{0,35}?(-?\d[\d.,]*)",
+    ),
+    "boll_ub": (
+        r"(?i)(?:\bupper Bollinger(?: band)?|Bollinger(?: band)? upper|dải Bollinger trên)"
+        r"[^\n]{0,35}?(-?\d[\d.,]*)",
+    ),
+}
+
+
+def _market_narrative(text: str) -> str:
+    """Exclude source appendices from the text whose claims are independently checked."""
+    return re.split(
+        r"(?im)^\s*#{1,6}\s*(?:market data provenance|verified numeric evidence)\s*$",
+        text or "",
+        maxsplit=1,
+    )[0]
+
+
+def _verified_market_snapshot_values(text: str) -> dict[str, float]:
+    """Read the numeric evidence appendix copied from the verified snapshot tool."""
+    appendix = re.split(
+        r"(?im)^\s*#{1,6}\s*verified numeric evidence\s*$",
+        text or "",
+        maxsplit=1,
+    )
+    if len(appendix) < 2:
+        return {}
+    evidence = re.split(r"(?m)^\s*#{1,6}\s+", appendix[1], maxsplit=1)[0]
+    values: dict[str, float] = {}
+    for line in evidence.splitlines():
+        match = re.match(
+            r"(?i)^\s*-\s*Verified (OHLCV|indicator)\s+([A-Za-z][A-Za-z0-9_]*)\s*:\s*(-?[\d.,]+)\s*$",
+            line,
+        )
+        if not match:
+            continue
+        kind, label, token = match.groups()
+        key = label.casefold()
+        if kind.casefold() == "ohlcv":
+            key = {"close": "close"}.get(key, f"ohlcv_{key}")
+        parsed = _parse_trade_price_token(token)
+        if parsed is not None:
+            values[key] = parsed
+    return values
+
+
+def _market_numeric_claims(text: str) -> list[tuple[str, float, str]]:
+    """Extract explicit current-price/indicator values for deterministic comparison."""
+    narrative = _market_narrative(text)
+    claims: list[tuple[str, float, str]] = []
+    for metric, patterns in _MARKET_NUMERIC_CLAIM_PATTERNS.items():
+        for pattern in patterns:
+            for match in re.finditer(pattern, narrative):
+                token = match.group(1)
+                parsed = _parse_trade_price_token(token)
+                if parsed is not None:
+                    claims.append((metric, parsed, token))
+    # One sentence can match two patterns for the same label; deduplicate identical claims.
+    return list(dict.fromkeys(claims))
+
+
+def _market_numeric_discrepancies(
+    text: str,
+) -> tuple[list[tuple[str, float, float, str]], list[tuple[str, str]]]:
+    """Compare narrative values with the independently generated numeric snapshot.
+
+    A claim is considered unreconciled when the report names a metric but the
+    snapshot appendix does not contain that metric. This does not prove external
+    truth: it only verifies internal consistency with the source data that was
+    fetched and preserved by the deterministic snapshot tool.
+    """
+    snapshot = _verified_market_snapshot_values(text)
+    discrepancies: list[tuple[str, float, float, str]] = []
+    unreconciled: list[tuple[str, str]] = []
+    seen: set[tuple[str, float, float]] = set()
+    for metric, reported, token in _market_numeric_claims(text):
+        expected = snapshot.get(metric)
+        if expected is None:
+            item = (metric, token)
+            if item not in unreconciled:
+                unreconciled.append(item)
+            continue
+        # Permit display rounding but not meaningful value/scale mismatches.
+        tolerance = max(0.03, abs(expected) * 0.0005)
+        if abs(reported - expected) > tolerance:
+            identity = (metric, reported, expected)
+            if identity not in seen:
+                seen.add(identity)
+                discrepancies.append((metric, reported, expected, token))
+    return discrepancies, unreconciled
+
+
 def _downstream_text(state: dict[str, Any]) -> str:
     pieces = [
         _text(state.get("investment_plan")),
@@ -630,6 +765,33 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Numeric price/indicator claims are present but the market report is missing a labeled provider, direct source URL, and/or retrieval timestamp. "
                 "Preserve all three fields so exact OHLCV and indicator claims can be traced to a source."
+            ),
+        })
+
+    market_discrepancies, market_unreconciled = _market_numeric_discrepancies(market)
+    if market_discrepancies:
+        examples = "; ".join(
+            f"{metric}: report={reported:g}, verified={expected:g}"
+            for metric, reported, expected, _token in market_discrepancies[:5]
+        )
+        findings.append({
+            "severity": "HIGH",
+            "code": "MARKET_NUMERIC_CLAIM_MISMATCH",
+            "finding": (
+                "At least one explicit current-price/technical-indicator value in the market narrative conflicts "
+                "with the deterministic verified snapshot. Recalculate or correct the narrative from the preserved "
+                f"source values. Discrepancies: {examples}."
+            ),
+        })
+    if market_unreconciled:
+        labels = ", ".join(dict.fromkeys(metric for metric, _token in market_unreconciled))
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "MARKET_CLAIMS_NOT_RECONCILED_TO_SNAPSHOT",
+            "finding": (
+                "The narrative includes exact current-market numbers that cannot be compared with the verified numeric "
+                f"snapshot; the relevant values were absent from the evidence appendix or no validated snapshot was preserved. Metrics: {labels}. "
+                "A source URL and retrieval timestamp alone do not confirm that the number in the prose is correct."
             ),
         })
 
