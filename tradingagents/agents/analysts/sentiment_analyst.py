@@ -310,7 +310,10 @@ def _append_sentiment_source_provenance(
     elif "no reddit posts found" in reddit_folded or "<no posts found mentioning" in reddit_folded:
         lines.append("- The fetched search block reports no matching posts in the stated window; this is not proof of zero discussion everywhere.")
     elif rd_has_post_rows or rd_has_missing_permalink:
-        lines.append("- Post permalink unavailable from the provider for one or more fetched Reddit items.")
+        lines.append(
+            "- Message URL unavailable from the provider for one or more fetched Reddit items; "
+            "post permalink unavailable from the provider."
+        )
     elif "unavailable" in reddit_folded or "fetch failed" in reddit_folded:
         lines.append("- The Reddit source block marks the fetch unavailable; it must not be described as confirmed silence.")
     else:
