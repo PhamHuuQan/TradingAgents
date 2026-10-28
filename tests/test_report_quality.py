@@ -676,11 +676,11 @@ def test_report5_style_source_linked_earnings_summary_is_partial_not_unavailable
 def test_hold_plan_does_not_require_new_entry_or_upside_target():
     state = _sample_state()
     state["trader_investment_plan"] = (
-        "Action: Hold\\nEntry Price: not provided\\n"
-        "Stop Loss: not provided\\nPosition Sizing: not provided"
+        "Action: Hold\nEntry Price: not provided\n"
+        "Stop Loss: not provided\nPosition Sizing: not provided"
     )
     state["final_rating"] = "Hold"
-    state["final_trade_decision"] = "Rating: Hold\\nPrice Target: not provided"
+    state["final_trade_decision"] = "Rating: Hold\nPrice Target: not provided"
 
     audit = build_report_quality_audit(state)
     assert not any(item["code"] == "TRADE_PLAN_LEVELS_MISSING" for item in audit["findings"])
@@ -949,9 +949,9 @@ def test_report_flags_unsupported_capital_flow_and_numeric_risk_claims():
     state = _sample_state()
     state["asset_type"] = "stock"
     state["market_report"] = (
-        "FPT close 54,000; RSI 21.76; MACD -2077.44.\\n"
-        "Provider: ssi-fastconnect-v3\\n"
-        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\\n"
+        "FPT close 54,000; RSI 21.76; MACD -2077.44.\n"
+        "Provider: ssi-fastconnect-v3\n"
+        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\n"
         "Retrieved at: 2026-10-28T17:22:36+07:00"
     )
     state["fundamentals_report"] = (
