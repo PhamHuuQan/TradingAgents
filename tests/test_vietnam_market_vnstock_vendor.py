@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from tradingagents.dataflows import config as config_module, router
+from tradingagents.dataflows import config as config_module, date_window, router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
 from tradingagents.dataflows.vendors import vnstock_fundamentals
@@ -96,8 +96,12 @@ class FakeClient:
 def fake_vnstock(monkeypatch):
     client = FakeClient()
     monkeypatch.setattr(vnstock_fundamentals, "_fundamental_client", lambda symbol: client)
-    # Current CI host date may be UTC while our synthetic statements are dated in 2025.
+    # Freeze both references: the adapter imports get_current_date directly,
+    # while withhold_undated_statements resolves it through date_window at call time.
+    # Keep the explicit as-of date equal to simulated today so these tests exercise
+    # the source adapters rather than the historical-data safety guard.
     monkeypatch.setattr(vnstock_fundamentals, "get_current_date", lambda: "2026-10-25")
+    monkeypatch.setattr(date_window, "get_current_date", lambda: "2026-10-25")
     return client
 
 
@@ -186,6 +190,7 @@ def test_vnstock_statement_withholds_historical_request_before_loading_client(mo
     loader = Mock(return_value=client)
     monkeypatch.setattr(vnstock_fundamentals, "_fundamental_client", loader)
     monkeypatch.setattr(vnstock_fundamentals, "get_current_date", lambda: "2026-10-25")
+    monkeypatch.setattr(date_window, "get_current_date", lambda: "2026-10-25")
 
     output = vnstock_fundamentals.get_vnstock_income_statement(
         "FPT", "quarterly", "2026-10-01"
