@@ -58,6 +58,8 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     r"|tài chính\s+[\"'“”‘’]?(?:thép|vững mạnh|vững chắc|mạnh|xuất sắc)"
     r"|(?:dòng tiền|biên lợi nhuận|khả năng sinh lời|năng lực tài chính).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt|bền vững)"
     r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)"
+    r"|(?:cải thiện|mở rộng|tăng).{0,45}biên lợi nhuận hoạt động"
+    r"|operating margin.{0,45}(?:expanded|improved|increased|widened)"
     r"|cỗ máy in tiền.{0,30}(?:mạnh|bền vững|ổn định|đều đặn)",
     re.IGNORECASE,
 )
@@ -196,6 +198,9 @@ _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"hoàn toàn không có (?:dữ liệu|thảo luận).{0,100}(?:stocktwits|reddit|mạng xã hội|nhà đầu tư)?"
     r"|vắng bóng hoàn toàn.{0,100}(?:thảo luận|cộng đồng|nhà đầu tư)"
     r"|trống rỗng hoàn toàn.{0,100}(?:kênh tin tức|diễn đàn|thảo luận|cộng đồng|nhà đầu tư)"
+    r"|mức độ quan tâm.{0,70}(?:không đáng kể|gần như không có|rất thấp|thấp)"
+    r"|sự thiếu hụt thông tin định hướng.{0,90}(?:tổ chức|thị trường)"
+    r"|dòng tiền thông minh.{0,75}(?:đang theo dõi|vẫn đang theo dõi|bắt đầu gom|đang gom)"
     r"|cạn kiệt thanh khoản quan tâm"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
