@@ -236,6 +236,7 @@ def get_model_options(provider: str, mode: str) -> list[ModelOption]:
 # menu, and the explicit ID of a model listed under a shorter name. Known to
 # validation so a config naming one runs without an unknown-model warning.
 LEGACY_MODELS: dict[str, list[str]] = {
+    "google": ["gemini-3.5-flash"],  # Deprecated alias; routed to Gemini 3.6 Flash by Google.
     "openai": ["gpt-5.4", "gpt-5.4-mini", "gpt-5.6-sol"],
     "xai": ["grok-4.20-0309-reasoning", "grok-4.20-0309-non-reasoning",
             "grok-4.20-multi-agent-0309"],
