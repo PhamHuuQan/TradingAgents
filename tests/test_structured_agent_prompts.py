@@ -54,7 +54,11 @@ def test_trader_prompt_states_constraint():
         "investment_plan": "**Recommendation**: Buy",
         "market_report": "Current price $189.5; ATR 4.2.",
     })
-    assert NO_EXTERNAL_TOOLS in _prompt_text(captured["prompt"])
+    prompt_text = _prompt_text(captured["prompt"])
+    assert NO_EXTERNAL_TOOLS in prompt_text
+    assert "PRICE-UNIT CONSISTENCY" in prompt_text
+    assert "same full-VND scale" in prompt_text
+    assert "do not invent a new entry or mandatory stop-loss" in prompt_text
 
 
 @pytest.mark.unit

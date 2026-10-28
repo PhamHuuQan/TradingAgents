@@ -60,6 +60,14 @@ def create_trader(llm):
                     "instrument's quote currency (for example 189.5), never a percentage "
                     "or a range; convert a percentage distance to the price level it "
                     "implies, or omit the field if you cannot state a number. "
+                    + "PRICE-UNIT CONSISTENCY: Use the exact quote currency and numeric "
+                    "scale shown in the Technical Market Report. For Vietnamese equities, "
+                    "if the market price is shown as 55,400 VND, express execution levels "
+                    "in that same full-VND scale (for example 55,000), not shorthand such "
+                    "as 55.0 or 55.4. Never mix full VND integers with thousands/decimal "
+                    "shorthand. If scale is ambiguous, omit the level rather than guess. "
+                    "For Hold without portfolio entry/position details, do not invent a "
+                    "new entry or mandatory stop-loss. "
                     + NO_EXTERNAL_TOOLS
                     + evidence_guardrails
                     + get_language_instruction()
