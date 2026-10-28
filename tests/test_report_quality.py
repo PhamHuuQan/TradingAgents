@@ -1018,3 +1018,38 @@ def test_explicitly_excluded_sports_result_in_raw_tool_log_is_not_flagged_as_use
         item["code"] for item in audit["findings"]
     }
 
+
+def test_missing_portfolio_context_flags_assumed_current_position_and_standard_weight():
+    state = _sample_state()
+    state.pop("portfolio_context", None)
+    state["investment_debate_state"] = {
+        "history": (
+            "Khuyến nghị duy trì vị thế hiện tại đối với FPT với tỷ trọng trung bình trong danh mục chuẩn."
+        )
+    }
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_trade_decision"] = "Rating: Hold"
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "UNSUPPORTED_PORTFOLIO_CONTEXT_ACTION" in codes
+    assert "standard portfolio" in build_decision_evidence_guardrails(state)
+
+
+def test_explicit_portfolio_context_allows_position_specific_hold_language():
+    state = _sample_state()
+    state["portfolio_context"] = (
+        "User holds 100 shares of FPT, cost basis VND 55,000 per share, "
+        "with a stated maximum portfolio allocation of 10%."
+    )
+    state["investment_debate_state"] = {
+        "history": "Maintain current holdings with a medium allocation in the standard portfolio."
+    }
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_trade_decision"] = "Rating: Hold"
+    audit = build_report_quality_audit(state)
+    assert "UNSUPPORTED_PORTFOLIO_CONTEXT_ACTION" not in {
+        item["code"] for item in audit["findings"]
+    }
+
