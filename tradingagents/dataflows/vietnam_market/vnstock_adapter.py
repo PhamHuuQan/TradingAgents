@@ -1,4 +1,4 @@
-"""Normalize documented Vnstock VCI statement rows into our fact contract.
+"""Normalize documented Vnstock VCI/KBS VAS statement rows into our fact contract.
 
 This module imports no Vnstock or pandas package. The source adapter is kept
 pure so normalized semantics can be tested without third-party API calls.
@@ -19,7 +19,7 @@ class VnstockNormalizationError(ValueError):
     """Raised when Vnstock statement rows cannot safely be normalized."""
 
 
-_VCI_METRICS = {
+_VAS_METRICS = {
     "income_statement": {
         "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY": "net_income",
     },
@@ -30,6 +30,8 @@ _VCI_METRICS = {
         "CF_NET_CASH_FLOWS_FROM_OPERATING_ACTIVITIES": "operating_cash_flow",
     },
 }
+# Backward-compatible alias for callers/tests that used the original VCI name.
+_VCI_METRICS = _VAS_METRICS
 _CURRENCY_UNITS = {"vnd", "vnđ", "đồng", "dong"}
 
 
@@ -133,14 +135,17 @@ def normalize_vnstock_vci_statements(
     balance_sheet: object,
     cash_flow: object,
     fetched_at: datetime,
+    *,
+    source: str = "vci",
 ) -> list[FundamentalFact]:
-    """Normalize VCI quarterly parent NPAT, total equity and operating cash flow.
+    """Normalize a small, explicit subset of VAS metrics from VCI or KBS.
 
     fetched_at is recorded as available_at because statement rows do not include
     a historical publication/first-availability timestamp. The function must
     not be presented as recovering historical information availability.
-    VCI quarterly income and cashflow endpoints are documented as standalone
-    quarterly flows; this normalizer intentionally supports VCI only.
+    Both providers use Vnstock V5's documented common VAS metric IDs. For KBS,
+    flow metrics remain raw period observations: callers must not sum them into
+    TTM totals until standalone-quarter semantics have been independently verified.
     """
     if (
         not isinstance(symbol, str)
@@ -156,7 +161,10 @@ def normalize_vnstock_vci_statements(
     ):
         raise VnstockNormalizationError("fetched_at must be timezone-aware")
     fetched_at = fetched_at.astimezone(UTC)
-    source = "vnstock-vci"
+    normalized_source = source.strip().lower() if isinstance(source, str) else ""
+    if normalized_source not in {"vci", "kbs"}:
+        raise VnstockNormalizationError("source must be 'vci' or 'kbs'")
+    source = f"vnstock-{normalized_source}"
     inputs = {
         "income_statement": income_statement,
         "balance_sheet": balance_sheet,
@@ -168,7 +176,7 @@ def normalize_vnstock_vci_statements(
     for report, table in inputs.items():
         _validate_table_metadata(table, report=report, symbol=normalized_symbol, source=source)
         records = _as_records(table, report)
-        metric_map = _VCI_METRICS[report]
+        metric_map = _VAS_METRICS[report]
         for row_index, row in enumerate(records, start=1):
             item_id = str(row.get("id", "")).strip().upper()
             metric = metric_map.get(item_id)
@@ -191,7 +199,7 @@ def normalize_vnstock_vci_statements(
             key = (metric, start, end)
             if key in seen:
                 raise VnstockNormalizationError(
-                    f"duplicate normalized VCI fact for {normalized_symbol}/{metric}/{row.get('period')}"
+                    f"duplicate normalized {normalized_source.upper()} fact for {normalized_symbol}/{metric}/{row.get('period')}"
                 )
             seen.add(key)
             facts.append(
@@ -210,7 +218,7 @@ def normalize_vnstock_vci_statements(
             )
     if not facts:
         raise VnstockNormalizationError(
-            "No supported VCI statement facts found. Check Vnstock version, source, "
+            f"No supported {normalized_source.upper()} statement facts found. Check Vnstock version, source, "
             "format='long', and exact semantic IDs."
         )
     return sorted(
