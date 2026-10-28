@@ -50,6 +50,7 @@ on:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
       - "tradingagents/dataflows/vendors/fpt_ir.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
       - "tradingagents/dataflows/vendors/yahoo/fundamentals.py"
       - "tradingagents/dataflows/vendors/yahoo/news.py"
       - "tradingagents/dataflows/vendors/yahoo/snapshot.py"
@@ -69,6 +70,7 @@ on:
       - "tests/test_market_provenance.py"
       - "tests/test_sentiment_provenance.py"
       - "tests/test_vietnam_market_ssi_vendor.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
       - "tests/test_news_provenance.py"
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
@@ -110,6 +112,7 @@ jobs:
             tests/test_market_provenance.py \
             tests/test_sentiment_provenance.py \
             tests/test_vietnam_market_ssi_vendor.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
@@ -127,6 +130,7 @@ jobs:
             tradingagents/report_quality.py \
             tradingagents/reporting.py \
             tradingagents/dataflows/vendors/fpt_ir.py \
+            tradingagents/dataflows/vendors/vnstock_fundamentals.py \
             tradingagents/dataflows/vendors/yahoo/fundamentals.py \
             tradingagents/dataflows/vendors/yahoo/news.py \
             tradingagents/dataflows/vendors/yahoo/snapshot.py \
@@ -150,6 +154,7 @@ jobs:
             tests/test_market_provenance.py \
             tests/test_sentiment_provenance.py \
             tests/test_vietnam_market_ssi_vendor.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
