@@ -874,3 +874,24 @@ def test_market_price_and_trade_level_with_mixed_thousands_decimal_scale_are_fla
 
     assert "TRADE_LEVEL_UNIT_MISMATCH" in codes
 
+
+def test_vietnamese_mua_re_claim_is_flagged_without_verified_valuation_data():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Financial statements unavailable (EntitlementError); "
+        "P/E, P/B and ROE are unavailable."
+    )
+    state["investment_debate_state"] = {
+        "history": "FPT is an cơ hội mua rẻ không tưởng near technical support."
+    }
+    state["investment_plan"] = "Recommendation: Hold"
+    state["trader_investment_plan"] = (
+        "Action: Hold\nEntry Price: not provided\nStop Loss: not provided"
+    )
+    state["final_trade_decision"] = "Rating: Hold\nPrice Target: not provided"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "UNSUPPORTED_VALUATION_CLAIM" in codes
+
