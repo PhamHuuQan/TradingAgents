@@ -738,7 +738,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     # the analyst explicitly excluded. Relevance checks should assess the narrative,
     # not flag a source merely because it appears in the raw audit trail.
     news_for_relevance = re.split(
-        r"(?im)^\\s*(?:source records returned by news tools|macro and prediction-market records returned by tools)",
+        r"(?im)^\s*(?:source records returned by news tools|macro and prediction-market records returned by tools)",
         news,
         maxsplit=1,
     )[0]
@@ -746,7 +746,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         r"(?i)(?:thị trường dự đoán về )?thể thao.{0,100}(?:được loại trừ|đã loại trừ|không đưa vào phân tích|excluded|not included)"
         r"|(?:AFC Asian Cup|sports prediction market).{0,100}(?:được loại trừ|đã loại trừ|không đưa vào phân tích|excluded|not included)"
     )
-    news_for_relevance = "\\n".join(
+    news_for_relevance = "\n".join(
         line for line in news_for_relevance.splitlines()
         if not exclusion_only_line.search(line)
     )
