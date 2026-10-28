@@ -49,6 +49,7 @@ on:
   pull_request:
     branches:
       - feature/vietnam-market-foundation
+      - feature/report-evidence-quality-20261027
     paths:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
