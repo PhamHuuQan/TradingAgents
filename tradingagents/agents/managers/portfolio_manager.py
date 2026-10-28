@@ -89,6 +89,13 @@ Write these sections, in this order, starting with the rating on its own line:
             final_trade_decision = llm.invoke(prompt).content
             final_rating = parse_rating(final_trade_decision)
 
+        if not (isinstance(state.get("portfolio_context"), str) and state["portfolio_context"].strip()):
+            final_trade_decision = final_trade_decision.rstrip() + (
+                "\\n\\n**Portfolio Context Limitation**: Current holdings, cost basis, portfolio allocation, "
+                "cash, and personal risk limits were not provided. Any price threshold discussed above "
+                "is a conditional technical review level, not a personalized mandatory stop-loss or order instruction."
+            )
+
         new_risk_debate_state = {
             "history": risk_debate_state["history"],
             "aggressive_history": risk_debate_state["aggressive_history"],

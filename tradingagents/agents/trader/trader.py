@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from langchain_core.messages import AIMessage
 
 from tradingagents.report_quality import build_decision_evidence_guardrails
@@ -17,6 +19,30 @@ from tradingagents.agents.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
+
+
+
+def _clear_uncontextualized_hold_stop_loss(trader_plan: str, state: dict) -> str:
+    """Do not turn a generic Hold into a personalized stop-loss instruction.
+
+    A support/invalidation level may still be discussed elsewhere as a conditional
+    technical trigger. The Trader's execution field is not personalized without
+    explicit holdings/cost-basis/risk context from the caller.
+    """
+    portfolio_context = state.get("portfolio_context")
+    if isinstance(portfolio_context, str) and portfolio_context.strip():
+        return trader_plan
+    if not re.search(
+        r"(?im)^\s*(?:\*\*)?Action(?:\*\*)?\s*[:：]\s*Hold\b",
+        trader_plan or "",
+    ):
+        return trader_plan
+    return re.sub(
+        r"(?im)^(\s*(?:[-*]\s*)?(?:\*\*)?Stop Loss(?:\*\*)?\s*[:：])\s*.*$",
+        r"\1 not provided",
+        trader_plan or "",
+        count=1,
+    )
 
 
 def create_trader(llm):
@@ -101,6 +127,7 @@ def create_trader(llm):
             render_trader_proposal,
             "Trader",
         )
+        trader_plan = _clear_uncontextualized_hold_stop_loss(trader_plan, state)
 
         return {
             "messages": [AIMessage(content=trader_plan)],

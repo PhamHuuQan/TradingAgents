@@ -216,3 +216,64 @@ def test_risk_debaters_receive_social_coverage_guardrail():
         assert "SOCIAL COVERAGE LIMITATION" in prompt
         assert "Do not infer low retail interest" in prompt
         assert "smart-money accumulation/distribution" in prompt
+
+
+
+@pytest.mark.unit
+def test_hold_trader_clears_stop_loss_without_explicit_portfolio_context():
+    from tradingagents.agents.schemas import TraderAction, TraderProposal
+
+    captured = {}
+    llm = _capturing_llm(
+        captured,
+        TraderProposal(
+            action=TraderAction.HOLD,
+            reasoning="Maintain the current position and wait.",
+            stop_loss=52000.0,
+            position_sizing="Maintain current position",
+        ),
+    )
+    output = create_trader(llm)({
+        "company_of_interest": "FPT",
+        "investment_plan": "Recommendation: Hold",
+        "market_report": "FPT close 55,400 VND; support 54,075 VND.",
+    })["trader_investment_plan"]
+
+    assert "**Action**: Hold" in output
+    assert "**Stop Loss**: not provided" in output
+    assert "52000.0" not in output
+
+
+@pytest.mark.unit
+def test_portfolio_manager_discloses_missing_personal_portfolio_context():
+    from tradingagents.agents.schemas import PortfolioDecision, PortfolioRating
+
+    captured = {}
+    llm = _capturing_llm(
+        captured,
+        PortfolioDecision(
+            rating=PortfolioRating.HOLD,
+            executive_summary="Set a stop-loss at 52,000.",
+            investment_thesis="The price trend is weak.",
+        ),
+    )
+    risk = {
+        "history": "Risk debate",
+        "aggressive_history": "Aggressive",
+        "conservative_history": "Conservative",
+        "neutral_history": "Neutral",
+        "current_aggressive_response": "",
+        "current_conservative_response": "",
+        "current_neutral_response": "",
+        "latest_speaker": "Neutral",
+        "count": 1,
+    }
+    output = create_portfolio_manager(llm)({
+        "company_of_interest": "FPT",
+        "risk_debate_state": risk,
+        "investment_plan": "Recommendation: Hold",
+        "trader_investment_plan": "Action: Hold",
+    })["final_trade_decision"]
+
+    assert "Portfolio Context Limitation" in output
+    assert "not a personalized mandatory stop-loss or order instruction" in output

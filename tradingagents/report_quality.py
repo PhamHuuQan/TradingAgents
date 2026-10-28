@@ -201,6 +201,8 @@ _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"|mức độ quan tâm.{0,70}(?:không đáng kể|gần như không có|rất thấp|thấp)"
     r"|sự thiếu hụt thông tin định hướng.{0,90}(?:tổ chức|thị trường)"
     r"|dòng tiền thông minh.{0,75}(?:đang theo dõi|vẫn đang theo dõi|bắt đầu gom|đang gom)"
+    r"|sự im lặng.{0,80}(?:từ )?(?:thị trường|cộng đồng|diễn đàn|nhà đầu tư)"
+    r"|absence of catalysts.{0,80}(?:shows|suggests|indicates|reflects)"
     r"|cạn kiệt thanh khoản quan tâm"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
@@ -457,6 +459,10 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- SOCIAL COVERAGE LIMITATION: distinguish provider failure, a successful empty query, and a record without an individual permalink. "
             "An empty Yahoo Finance/StockTwits/Reddit result only describes that provider and requested window. Do not infer low retail interest, lack of institutional information or catalysts, market-wide silence, low liquidity, smart-money accumulation/distribution, or any price direction from it. "
             "State the exact provider, date window, and sample/coverage limitation; require separate evidence for any broader claim."
+        )
+    if not (isinstance(state.get("portfolio_context"), str) and state["portfolio_context"].strip()):
+        guardrails.append(
+            "- PORTFOLIO CONTEXT LIMITATION: current holdings, cost basis, allocation, cash, and personal risk limits were not supplied. Do not assume the user owns the asset or is fully invested. For Hold, do not invent a personalized mandatory stop-loss; any numeric price threshold from the debate must be labelled as a conditional review/invalidation level, not an order instruction."
         )
     if fundamentals.strip() and not _urls(fundamentals) and not (
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
