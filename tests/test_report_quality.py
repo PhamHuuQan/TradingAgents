@@ -732,6 +732,24 @@ def test_fpt_insider_empty_result_with_explicit_nonproof_language_is_qualified()
 
 
 
+def test_report5_sentiment_does_not_turn_provider_outage_into_low_investor_attention():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "StockTwits: source unavailable due to HTTPError. "
+        "Reddit: no matching posts were returned in the requested window; "
+        "this is not proof of zero discussion everywhere. "
+        "Các nguồn mạng xã hội (StockTwits, Reddit) hoàn toàn im ắng hoặc không thể truy cập. "
+        "Sự thiếu vắng dữ liệu từ các kênh bán lẻ cho thấy mức độ quan tâm của cộng đồng "
+        "nhà đầu tư cá nhân trên các nền tảng này là rất thấp hoặc không đáng kể."
+    )
+    state["investment_debate_state"] = {"history": "Hold pending better evidence."}
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+
+
 def test_market_wide_social_silence_is_not_inferred_from_unavailable_and_empty_feeds():
     state = _sample_state()
     state["sentiment_report"] = (
