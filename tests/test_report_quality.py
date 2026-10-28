@@ -961,7 +961,7 @@ def test_report_flags_unsupported_capital_flow_and_numeric_risk_claims():
     )
     state["investment_debate_state"] = {
         "history": (
-            "Bear Analyst: The price drop proves large institutional money is exiting. "
+            "Bear Analyst: Đà giảm giá chứng minh dòng tiền lớn đang rút ra không thương tiếc. "
             "Rủi ro cụt tay là 99% chỉ vì giá đang giảm mạnh."
         )
     }
@@ -990,7 +990,7 @@ def test_quantified_source_linked_flow_data_can_support_flow_direction_claim():
         "Source URL: https://example.test/foreign-flow"
     )
     state["investment_debate_state"] = {
-        "history": "Khối ngoại bán ròng cho thấy dòng tiền bên ngoài giảm trong phiên này."
+        "history": "Khối ngoại bán ròng 125,4 tỷ VND; dòng tiền lớn đang rút ra trong phiên này."
     }
     state["risk_debate_state"] = {"history": "Observe flow data."}
     state["investment_plan"] = "Recommendation: Hold."
