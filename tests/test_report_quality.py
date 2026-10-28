@@ -853,3 +853,24 @@ def test_publication_dates_alone_do_not_count_as_source_linked_financial_metrics
     assert "FUNDAMENTALS_UNAVAILABLE" in {
         item["code"] for item in audit["findings"]
     }
+
+
+def test_market_price_and_trade_level_with_mixed_thousands_decimal_scale_are_flagged():
+    state = _sample_state()
+    state["market_report"] = (
+        "FPT market report. Giá hiện tại (55.400); RSI 25,43.\n"
+        "Provider: ssi-fastconnect-v3\n"
+        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\n"
+        "Retrieved at: 2026-10-27T17:37:49+07:00"
+    )
+    state["trader_investment_plan"] = (
+        "Action: Hold\nEntry Price: not provided\nStop Loss: 51.5\n"
+        "Position Sizing: giữ nguyên tỷ trọng hiện tại"
+    )
+    state["final_trade_decision"] = "Rating: Hold\nPrice Target: not provided"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "TRADE_LEVEL_UNIT_MISMATCH" in codes
+
