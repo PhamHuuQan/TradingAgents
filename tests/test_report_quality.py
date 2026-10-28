@@ -899,6 +899,30 @@ def test_market_price_and_trade_level_with_mixed_thousands_decimal_scale_are_fla
     assert "TRADE_LEVEL_UNIT_MISMATCH" in codes
 
 
+def test_source_linked_vietnamese_markdown_table_is_partial_coverage():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "| Chỉ tiêu | Giá trị | Tăng trưởng YoY |\n"
+        "|---|---:|---:|\n"
+        "| Doanh thu | 40.023 tỷ VND | +12,4% |\n"
+        "| Lợi nhuận trước thuế (PBT) | 8.770 tỷ VND | +17,0% |\n"
+        "| Lợi nhuận sau thuế (PAT) | 7.778 tỷ VND | +13,3% |\n"
+        "| EPS | 4.142 VND/cổ phiếu | +12,8% |\n"
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0\n"
+        "Bảng cân đối kế toán không khả dụng (EntitlementError); "
+        "báo cáo lưu chuyển tiền tệ không khả dụng."
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"] == (
+        "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+    )
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+
+
 def test_vietnamese_mua_re_claim_is_flagged_without_verified_valuation_data():
     state = _sample_state()
     state["fundamentals_report"] = (
