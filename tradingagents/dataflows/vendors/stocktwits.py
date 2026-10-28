@@ -163,9 +163,13 @@ def fetch_stocktwits_messages(
             parsed_url = urlparse(raw_url.strip())
             if parsed_url.scheme == "https" and parsed_url.hostname in {"stocktwits.com", "www.stocktwits.com"}:
                 message_url = raw_url.strip()
+        missing_url_marker = (
+            "  Source URL unavailable from the provider; "
+            "Message URL unavailable from the provider"
+        )
         lines.append(
             f"[{created} · @{user} · {tag}] {body}\n"
-            + (f"  Source URL: {message_url}" if message_url else "  Source URL unavailable from the provider; Message URL unavailable from the provider")
+            + (f"  Source URL: {message_url}" if message_url else missing_url_marker)
         )
 
     total = bullish + bearish + unlabeled
