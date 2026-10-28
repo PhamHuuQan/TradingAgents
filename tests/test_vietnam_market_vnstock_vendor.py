@@ -233,15 +233,35 @@ def test_vnstock_router_is_explicit_only_in_default_chain(monkeypatch):
 @pytest.mark.parametrize(
     ("metadata", "message"),
     [
-        ({}, "metadata source is None"),
-        ({"source": "vci", "format": "long"}, "metadata ticker"),
-        ({"source": "vci", "symbol": "FPT"}, "metadata format"),
         ({"source": "kbs", "symbol": "FPT", "format": "long"}, "expected 'vci'"),
+        ({"source": "vci", "symbol": "VCB", "format": "long"}, "metadata ticker"),
+        ({"source": "vci", "symbol": "FPT", "format": "wide"}, "metadata format"),
     ],
 )
-def test_vnstock_statement_response_requires_complete_matching_metadata(metadata, message):
+def test_vnstock_rejects_conflicting_response_metadata(metadata, message):
     client = FakeClient()
     client.income_frame.attrs = metadata
 
     with pytest.raises(VendorUnavailableError, match=message):
         vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement")
+
+
+@pytest.mark.unit
+def test_vnstock_accepts_explicit_source_when_provider_omits_optional_attrs():
+    client = FakeClient()
+    # The VCI provider may expose no attrs; the request explicitly selects VCI
+    # and the long-form data contract is independently checked by required columns.
+    client.income_frame.attrs = {}
+    vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement", "vci")
+
+    # KBS reports source/ticker but may omit format. Existing metadata must match,
+    # while long-form columns establish the returned shape.
+    client.kbs_balance_frame.attrs = {
+        "source": "KBS",
+        "symbol": "FPT",
+        "report_type": "balance_sheet",
+        "period": "quarter",
+    }
+    vnstock_fundamentals._validate_frame(
+        client.kbs_balance_frame, "FPT", "balance_sheet", "kbs"
+    )
