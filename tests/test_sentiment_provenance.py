@@ -1,4 +1,22 @@
-from tradingagents.agents.analysts.sentiment_analyst import _append_sentiment_source_provenance
+from tradingagents.agents.analysts.sentiment_analyst import (
+    _append_sentiment_source_provenance,
+    _build_system_message,
+)
+
+
+def test_sentiment_prompt_distinguishes_provider_failure_from_zero_results():
+    prompt = _build_system_message(
+        ticker="FPT",
+        start_date="2026-10-20",
+        end_date="2026-10-27",
+        news_block="News unavailable: timeout.",
+        stocktwits_block="StockTwits unavailable: HTTPError.",
+        reddit_block="No Reddit posts found in the requested window.",
+    )
+
+    assert "A provider outage means the data is unavailable" in prompt
+    assert "successful zero-result query means only that no matching posts were returned" in prompt
+    assert "do not infer low retail interest, weak liquidity" in prompt
 
 
 def test_sentiment_report_preserves_fetched_article_and_post_links():
