@@ -14,7 +14,9 @@ _UNAVAILABLE_RE = re.compile(
     r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|EntitlementError|VendorUnavailableError)\b"
     r"|data\s+(?:is\s+)?unavailable|not available|unavailable via (?:the )?api"
     r"|temporarily unavailable|currently unavailable|tạm thời (?:chưa )?khả dụng|không thể trích xuất|không lấy được dữ liệu"
-    r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)",
+    r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)"
+    r"|(?:revenue|profit before tax|profit after tax|PBT|PAT|EPS) details?[^.\n]{0,50}\b(?:are|were|is|was)?\s*(?:unavailable|not available|not supplied)\b"
+    r"|values?\s+(?:were|was|are)\s+not supplied",
     re.IGNORECASE,
 )
 _NO_DATA_RE = re.compile(
@@ -74,10 +76,10 @@ _UNSUPPORTED_FINANCIAL_METRIC_RE = re.compile(
     re.IGNORECASE,
 )
 _UNSUPPORTED_VALUATION_CLAIM_RE = re.compile(
-    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|deep[- ]value)\b"
+    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain(?:[- ]priced)?|deep[- ]value)\b"
     r"|(?:định giá thấp|được định giá thấp|đang bị thị trường định giá thấp|định giá hấp dẫn|mức định giá hấp dẫn|"
     r"giá rẻ|mua rẻ|chiết khấu sâu|vùng giá chiết khấu|giá chiết khấu|món hời|món quà(?: từ trên trời rơi xuống)?)"
-    r"|priced irrationally low|trading below intrinsic value",
+    r"|gift at this price|priced irrationally low|trading below intrinsic value",
     re.IGNORECASE,
 )
 _NUMERIC_VALUATION_MULTIPLE_RE = re.compile(
@@ -273,12 +275,41 @@ def _text(value: Any) -> str:
     return str(value)
 
 
-def _status(text: str) -> str:
+def _status(text: str, source_kind: str | None = None) -> str:
+    """Classify coverage without letting a failed secondary feed erase usable evidence."""
     if not text.strip():
         return "MISSING"
-    if _NO_DATA_RE.search(text):
+
+    has_no_data = bool(_NO_DATA_RE.search(text))
+    has_unavailable = bool(_UNAVAILABLE_RE.search(text))
+    has_urls = bool(_urls(text))
+
+    if source_kind == "market_report":
+        has_numeric_market_claim = bool(_MARKET_NUMERIC_CLAIM_RE.search(text))
+        has_snapshot_provenance = not _market_provenance_missing(text)
+        if has_numeric_market_claim and has_urls and has_snapshot_provenance:
+            if has_no_data or has_unavailable:
+                return "PARTIAL COVERAGE — SOURCE-LINKED MARKET DATA; SECONDARY FEED UNAVAILABLE"
+            return "AVAILABLE — SOURCE-LINKED MARKET DATA"
+
+    if source_kind in {"news_report", "sentiment_report"} and has_urls:
+        label = "NEWS" if source_kind == "news_report" else "SENTIMENT"
+        if has_unavailable or has_no_data:
+            return f"PARTIAL COVERAGE — SOURCE-LINKED {label}; SECONDARY FEED UNAVAILABLE"
+        return f"AVAILABLE — SOURCE-LINKED {label}"
+
+    if source_kind == "fundamentals_report":
+        has_summary_metrics = _has_source_linked_summary_metrics(text)
+        if has_summary_metrics and (
+            _PARTIAL_FUNDAMENTALS_RE.search(text) or has_unavailable or has_no_data
+        ):
+            return "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+        if has_summary_metrics:
+            return "AVAILABLE — SOURCE-LINKED SUMMARY METRICS"
+
+    if has_no_data:
         return "NO USABLE DATA RETURNED"
-    if _UNAVAILABLE_RE.search(text):
+    if has_unavailable:
         return "LIMITED / SOURCE UNAVAILABLE"
     return "PRESENT — NOT INDEPENDENTLY VERIFIED"
 
@@ -394,6 +425,8 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
             "- FUNDAMENTALS LIMITATION: usable source-linked earnings metrics and financial statements/ratios "
             "are unavailable in the supplied fundamentals report. Do not invent revenue, PBT, PAT, EPS, "
             "cash flow, margins, solvency, valuation ratios, or a strong financial position. State the limitation."
+            "- Do not assert strong/weak cash flow, a healthy balance sheet, low debt, or attractive P/E/P/B "
+            "unless those specific metrics are supported by a named, dated source in the supplied evidence."
         )
     if _requires_fundamentals(state) and (
         fundamentals_fully_unavailable or fundamentals_are_partial
@@ -468,7 +501,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         "Fundamentals report": "fundamentals_report",
     }
     source_statuses = {
-        label: _status(_text(final_state.get(key)))
+        label: _status(_text(final_state.get(key)), source_kind=key)
         for label, key in report_keys.items()
     }
     market = _text(final_state.get("market_report"))
