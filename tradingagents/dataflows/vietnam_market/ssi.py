@@ -315,9 +315,34 @@ def authenticated_ssi_provider_from_env() -> Iterator[SSIMarketDataProvider]:
             ) from None
 
         if response.status_code != 200:
+            # SSI documents structured REST errors with top-level code/msg fields.
+            # Surface only these fields (never the raw body), redact credentials
+            # in case a proxy/vendor response accidentally echoes submitted values.
+            detail_parts: list[str] = []
+            try:
+                error_payload = response.json()
+            except (ValueError, TypeError):
+                error_payload = None
+            if isinstance(error_payload, Mapping):
+                error_code = error_payload.get("code")
+                error_message = error_payload.get("msg") or error_payload.get("message")
+                if isinstance(error_code, (str, int)) and str(error_code).strip():
+                    detail_parts.append(f"SSI code={str(error_code).strip()[:80]}")
+                if isinstance(error_message, str) and error_message.strip():
+                    safe_message = error_message.strip()
+                    for credential_value in credentials.values():
+                        if isinstance(credential_value, str) and credential_value:
+                            safe_message = safe_message.replace(credential_value, "[REDACTED]")
+                    safe_message = safe_message.replace("\\r", " ").replace("\\n", " ")
+                    safe_message = " ".join(safe_message.split())[:240]
+                    if safe_message:
+                        detail_parts.append(f"SSI message={safe_message!r}")
+            detail = "; " + "; ".join(detail_parts) if detail_parts else ""
             raise RuntimeError(
-                f"SSI authentication failed (HTTP {response.status_code}); "
-                "check key/secret, key status, and Market Data permissions"
+                f"SSI authentication failed (HTTP {response.status_code}{detail}); "
+                "check that the API Key/Secret pair matches, the key belongs to "
+                "the Production environment used by this endpoint, and the key is "
+                "active with Market Data permission"
             )
         try:
             token_payload = response.json()

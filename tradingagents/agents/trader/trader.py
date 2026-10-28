@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from langchain_core.messages import AIMessage
 
 from tradingagents.report_quality import build_decision_evidence_guardrails
@@ -17,6 +19,30 @@ from tradingagents.agents.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
+
+
+
+def _clear_uncontextualized_hold_stop_loss(trader_plan: str, state: dict) -> str:
+    """Do not turn a generic Hold into a personalized stop-loss instruction.
+
+    A support/invalidation level may still be discussed elsewhere as a conditional
+    technical trigger. The Trader's execution field is not personalized without
+    explicit holdings/cost-basis/risk context from the caller.
+    """
+    portfolio_context = state.get("portfolio_context")
+    if isinstance(portfolio_context, str) and portfolio_context.strip():
+        return trader_plan
+    if not re.search(
+        r"(?im)^\s*(?:\*\*)?Action(?:\*\*)?\s*[:：]\s*Hold\b",
+        trader_plan or "",
+    ):
+        return trader_plan
+    return re.sub(
+        r"(?im)^(\s*(?:[-*]\s*)?(?:\*\*)?Stop Loss(?:\*\*)?\s*[:：])\s*.*$",
+        r"\1 not provided",
+        trader_plan or "",
+        count=1,
+    )
 
 
 def create_trader(llm):
@@ -60,6 +86,14 @@ def create_trader(llm):
                     "instrument's quote currency (for example 189.5), never a percentage "
                     "or a range; convert a percentage distance to the price level it "
                     "implies, or omit the field if you cannot state a number. "
+                    + "PRICE-UNIT CONSISTENCY: Use the exact quote currency and numeric "
+                    "scale shown in the Technical Market Report. For Vietnamese equities, "
+                    "if the market price is shown as 55,400 VND, express execution levels "
+                    "in that same full-VND scale (for example 55,000), not shorthand such "
+                    "as 55.0 or 55.4. Never mix full VND integers with thousands/decimal "
+                    "shorthand. If scale is ambiguous, omit the level rather than guess. "
+                    "For Hold without portfolio entry/position details, do not invent a "
+                    "new entry or mandatory stop-loss. "
                     + NO_EXTERNAL_TOOLS
                     + evidence_guardrails
                     + get_language_instruction()
@@ -93,6 +127,7 @@ def create_trader(llm):
             render_trader_proposal,
             "Trader",
         )
+        trader_plan = _clear_uncontextualized_hold_stop_loss(trader_plan, state)
 
         return {
             "messages": [AIMessage(content=trader_plan)],

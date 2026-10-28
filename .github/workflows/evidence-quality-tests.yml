@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/report-evidence-quality-20261027
+      - fix/report-provenance-audit-20261028
     paths:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
@@ -17,20 +18,27 @@ on:
       - "tradingagents/dataflows/vendors/reddit.py"
       - "tradingagents/dataflows/vendors/stocktwits.py"
       - "tradingagents/dataflows/router.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
+      - "tradingagents/dataflows/vietnam_market/vnstock_adapter.py"
       - "tradingagents/agents/tools.py"
       - "tradingagents/graph/trading_graph.py"
       - "tradingagents/report_html.py"
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/risk_mgmt/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
+      - "tests/test_structured_agent_prompts.py"
       - "tests/test_market_provenance.py"
       - "tests/test_sentiment_provenance.py"
       - "tests/test_vietnam_market_ssi_vendor.py"
       - "tests/test_news_provenance.py"
       - "tests/test_fpt_ir.py"
+      - "tests/test_fundamentals_provenance.py"
       - "tests/test_fundamentals_units.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_vietnam_market_vnstock.py"
       - "tests/test_news_lookahead.py"
       - "tests/test_yahoo_snapshot.py"
       - "tests/test_fred.py"
@@ -44,6 +52,7 @@ on:
   pull_request:
     branches:
       - feature/vietnam-market-foundation
+      - feature/report-evidence-quality-20261027
     paths:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
@@ -56,20 +65,27 @@ on:
       - "tradingagents/dataflows/vendors/reddit.py"
       - "tradingagents/dataflows/vendors/stocktwits.py"
       - "tradingagents/dataflows/router.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
+      - "tradingagents/dataflows/vietnam_market/vnstock_adapter.py"
       - "tradingagents/agents/tools.py"
       - "tradingagents/graph/trading_graph.py"
       - "tradingagents/report_html.py"
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/risk_mgmt/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
+      - "tests/test_structured_agent_prompts.py"
       - "tests/test_market_provenance.py"
       - "tests/test_sentiment_provenance.py"
       - "tests/test_vietnam_market_ssi_vendor.py"
       - "tests/test_news_provenance.py"
       - "tests/test_fpt_ir.py"
+      - "tests/test_fundamentals_provenance.py"
       - "tests/test_fundamentals_units.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_vietnam_market_vnstock.py"
       - "tests/test_news_lookahead.py"
       - "tests/test_yahoo_snapshot.py"
       - "tests/test_fred.py"
@@ -105,12 +121,16 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_report_quality.py \
+            tests/test_structured_agent_prompts.py \
             tests/test_market_provenance.py \
             tests/test_sentiment_provenance.py \
             tests/test_vietnam_market_ssi_vendor.py \
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
+            tests/test_fundamentals_provenance.py \
             tests/test_fundamentals_units.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
+            tests/test_vietnam_market_vnstock.py \
             tests/test_news_lookahead.py \
             tests/test_yahoo_snapshot.py \
             tests/test_fred.py \
@@ -133,9 +153,12 @@ jobs:
             tradingagents/dataflows/vendors/reddit.py \
             tradingagents/dataflows/vendors/stocktwits.py \
             tradingagents/dataflows/router.py \
+            tradingagents/dataflows/vendors/vnstock_fundamentals.py \
+            tradingagents/dataflows/vietnam_market/vnstock_adapter.py \
             tradingagents/agents/tools.py \
             tradingagents/graph/trading_graph.py \
             tradingagents/report_html.py \
+            tradingagents/agents/analysts/market_analyst.py \
             tradingagents/agents/analysts/fundamentals_analyst.py \
             tradingagents/agents/analysts/news_analyst.py \
             tradingagents/agents/analysts/sentiment_analyst.py \
@@ -143,14 +166,21 @@ jobs:
             tradingagents/agents/researchers/bear_researcher.py \
             tradingagents/agents/managers/research_manager.py \
             tradingagents/agents/managers/portfolio_manager.py \
+            tradingagents/agents/risk_mgmt/aggressive_debator.py \
+            tradingagents/agents/risk_mgmt/conservative_debator.py \
+            tradingagents/agents/risk_mgmt/neutral_debator.py \
             tradingagents/agents/trader/trader.py \
             tests/test_report_quality.py \
+            tests/test_structured_agent_prompts.py \
             tests/test_market_provenance.py \
             tests/test_sentiment_provenance.py \
             tests/test_vietnam_market_ssi_vendor.py \
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
+            tests/test_fundamentals_provenance.py \
             tests/test_fundamentals_units.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
+            tests/test_vietnam_market_vnstock.py \
             tests/test_news_lookahead.py \
             tests/test_yahoo_snapshot.py \
             tests/test_fred.py \

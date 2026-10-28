@@ -383,6 +383,10 @@ Community discussion, without vote or comment counts. Subreddit character matter
 
 9. **Preserve provenance.** Include direct URLs for the Yahoo Finance articles and source/post URLs when present in the source blocks. State the date window and actual sample count for each source where available. An empty source, provider error, and verified absence are different states. Never invent a link, post, headline, event, or sample count; if a source block lacks provenance, label it unverified and reduce confidence.
 
+10. **EMPTY-FEED INFERENCE LIMIT.** A zero-result search, missing headline list, provider error, or symbol stream with no messages only describes that provider and query window. Do not infer low retail interest, silence across the whole market, lack of institutional information, absence of catalysts, low liquidity, smart-money accumulation/distribution, or a price direction from empty feeds alone. State exactly which source returned no items or failed, and require separate evidence for any broader claim.
+
+11. **NO AGGREGATED-SILENCE NARRATIVE.** Do not write that "all sources are silent", "complete absence of data", "market-wide silence", or "the lack of discussion shows..." merely because one or more feeds are empty. Make one separate, bounded statement per provider (queried, successful-empty, failed/unavailable, or records returned); don't turn a collection of incomplete feeds into a global sentiment conclusion. When sources are all empty or unavailable, say the sentiment is unobservable from these inputs rather than claiming Neutral based on evidence of market-wide silence.
+
 ## Output fields
 
 Fill the following fields:

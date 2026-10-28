@@ -54,7 +54,11 @@ def test_trader_prompt_states_constraint():
         "investment_plan": "**Recommendation**: Buy",
         "market_report": "Current price $189.5; ATR 4.2.",
     })
-    assert NO_EXTERNAL_TOOLS in _prompt_text(captured["prompt"])
+    prompt_text = _prompt_text(captured["prompt"])
+    assert NO_EXTERNAL_TOOLS in prompt_text
+    assert "PRICE-UNIT CONSISTENCY" in prompt_text
+    assert "same full-VND scale" in prompt_text
+    assert "do not invent a new entry or mandatory stop-loss" in prompt_text
 
 
 @pytest.mark.unit
@@ -166,3 +170,111 @@ def test_the_sentiment_prompt_names_the_subreddits_searched(monkeypatch):
     text = _prompt_text(captured["prompt"])
     assert "r/Bitcoin, r/CryptoCurrency, r/CryptoMarkets" in text
     assert "wallstreetbets" not in text
+
+
+
+@pytest.mark.unit
+def test_risk_debaters_receive_social_coverage_guardrail():
+    from copy import deepcopy
+    from tradingagents.agents.risk_mgmt.aggressive_debator import create_aggressive_debator
+    from tradingagents.agents.risk_mgmt.conservative_debator import create_conservative_debator
+    from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
+
+    source_limited_state = {
+        "company_of_interest": "FPT",
+        "asset_type": "stock",
+        "market_report": "FPT market report",
+        "sentiment_report": (
+            "StockTwits provider unavailable due to HTTPError. "
+            "Reddit returned no matching posts in the requested window; "
+            "this is not proof of zero discussion everywhere."
+        ),
+        "news_report": "News report not available.",
+        "fundamentals_report": "DATA_UNAVAILABLE: balance sheet and cash flow.",
+        "trader_investment_plan": "Action: Hold",
+        "risk_debate_state": {
+            "history": "",
+            "aggressive_history": "",
+            "conservative_history": "",
+            "neutral_history": "",
+            "current_aggressive_response": "",
+            "current_conservative_response": "",
+            "current_neutral_response": "",
+            "count": 0,
+        },
+    }
+
+    for factory in (
+        create_aggressive_debator,
+        create_conservative_debator,
+        create_neutral_debator,
+    ):
+        llm = MagicMock()
+        llm.invoke.return_value.content = "Risk argument."
+        factory(llm)(deepcopy(source_limited_state))
+        prompt = llm.invoke.call_args.args[0]
+        assert "SOCIAL COVERAGE LIMITATION" in prompt
+        assert "Do not infer low retail interest" in prompt
+        assert "smart-money accumulation/distribution" in prompt
+
+
+
+@pytest.mark.unit
+def test_hold_trader_clears_stop_loss_without_explicit_portfolio_context():
+    from tradingagents.agents.schemas import TraderAction, TraderProposal
+
+    captured = {}
+    llm = _capturing_llm(
+        captured,
+        TraderProposal(
+            action=TraderAction.HOLD,
+            reasoning="Maintain the current position and wait.",
+            stop_loss=52000.0,
+            position_sizing="Maintain current position",
+        ),
+    )
+    output = create_trader(llm)({
+        "company_of_interest": "FPT",
+        "investment_plan": "Recommendation: Hold",
+        "market_report": "FPT close 55,400 VND; support 54,075 VND.",
+    })["trader_investment_plan"]
+
+    assert "**Action**: Hold" in output
+    assert "**Stop Loss**: not provided" in output
+    assert "52000.0" not in output
+
+
+@pytest.mark.unit
+def test_portfolio_manager_discloses_missing_personal_portfolio_context():
+    from tradingagents.agents.schemas import PortfolioDecision, PortfolioRating
+
+    captured = {}
+    llm = _capturing_llm(
+        captured,
+        PortfolioDecision(
+            rating=PortfolioRating.HOLD,
+            executive_summary="Set a stop-loss at 52,000.",
+            investment_thesis="The price trend is weak.",
+        ),
+    )
+    risk = {
+        "history": "Risk debate",
+        "aggressive_history": "Aggressive",
+        "conservative_history": "Conservative",
+        "neutral_history": "Neutral",
+        "current_aggressive_response": "",
+        "current_conservative_response": "",
+        "current_neutral_response": "",
+        "latest_speaker": "Neutral",
+        "count": 1,
+    }
+    output = create_portfolio_manager(llm)({
+        "company_of_interest": "FPT",
+        "risk_debate_state": risk,
+        "investment_plan": "Recommendation: Hold",
+        "trader_investment_plan": "Action: Hold",
+    })["final_trade_decision"]
+
+    assert "Portfolio Context Limitation" in output
+    assert "not a personalized mandatory stop-loss or order instruction" in output
+    assert "\n\n**Portfolio Context Limitation**" in output

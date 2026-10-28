@@ -14,7 +14,10 @@ _UNAVAILABLE_RE = re.compile(
     r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|EntitlementError|VendorUnavailableError)\b"
     r"|data\s+(?:is\s+)?unavailable|not available|unavailable via (?:the )?api"
     r"|temporarily unavailable|currently unavailable|tạm thời (?:chưa )?khả dụng|không thể trích xuất|không lấy được dữ liệu"
-    r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)",
+    r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)"
+    r"|(?:revenue|profit before tax|PBT|profit after tax|PAT|EPS|financial statement|financial ratio)"
+    r"\s+(?:details?|values?|metrics?)\s+(?:are|were|is|was)\s+unavailable"
+    r"|values?\s+(?:were|was)\s+not supplied",
     re.IGNORECASE,
 )
 _NO_DATA_RE = re.compile(
@@ -55,6 +58,8 @@ _FINANCIAL_STRENGTH_RE = re.compile(
     r"|tài chính\s+[\"'“”‘’]?(?:thép|vững mạnh|vững chắc|mạnh|xuất sắc)"
     r"|(?:dòng tiền|biên lợi nhuận|khả năng sinh lời|năng lực tài chính).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt|bền vững)"
     r"|(?:quản trị|quản lý|kiểm soát|tạo ra|duy trì|sở hữu).{0,55}(?:dòng tiền|biên lợi nhuận|khả năng sinh lời).{0,45}(?:đều đặn|ổn định|mạnh|vững chắc|dồi dào|xuất sắc|cao|tốt)"
+    r"|(?:cải thiện|mở rộng|tăng).{0,45}biên lợi nhuận hoạt động"
+    r"|operating margin.{0,45}(?:expanded|improved|increased|widened)"
     r"|cỗ máy in tiền.{0,30}(?:mạnh|bền vững|ổn định|đều đặn)",
     re.IGNORECASE,
 )
@@ -74,7 +79,8 @@ _UNSUPPORTED_FINANCIAL_METRIC_RE = re.compile(
     re.IGNORECASE,
 )
 _UNSUPPORTED_VALUATION_CLAIM_RE = re.compile(
-    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|deep[- ]value)\b"
+    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|bargain|deep[- ]value)\b"
+    r"|\bgift at this price\b"
     r"|(?:định giá thấp|được định giá thấp|đang bị thị trường định giá thấp|định giá hấp dẫn|mức định giá hấp dẫn|"
     r"giá rẻ|mua rẻ|chiết khấu sâu|vùng giá chiết khấu|giá chiết khấu|món hời|món quà(?: từ trên trời rơi xuống)?)"
     r"|priced irrationally low|trading below intrinsic value",
@@ -92,10 +98,36 @@ _UNSUPPORTED_REVERSAL_PROBABILITY_RE = re.compile(
     r"|highly likely.{0,60}(?:bounce|rebound|reversal)",
     re.IGNORECASE,
 )
+_UNSUPPORTED_DIRECTIONAL_PROBABILITY_RE = re.compile(
+    r"(?:xác suất|khả năng).{0,70}(?:thủng hỗ trợ|phá vỡ hỗ trợ|mất mốc hỗ trợ|giảm sâu|rơi tiếp|"
+    r"tiếp tục giảm|sụt giảm|bán tháo|giảm giá|breakdown|break support).{0,40}"
+    r"(?:rất cao|cao|lớn|gần như chắc chắn|áp đảo)"
+    r"|(?:very high|high) probability.{0,80}(?:break(?:ing)? support|breakdown|fall further|sell[- ]off|decline further)",
+    re.IGNORECASE,
+)
 _REVERSAL_EVIDENCE_RE = re.compile(
     r"\bbacktest(?:ed|ing)?\b|\bwin rate\b|\bhit rate\b|historical (?:frequency|hit rate|reversal rate)"
     r"|sample of \d+|based on \d+ (?:observations|trades|cases)"
     r"|kiểm định lịch sử|tỷ lệ thành công lịch sử|mẫu gồm \d+",
+    re.IGNORECASE,
+)
+_UNSUPPORTED_NUMERIC_RISK_RE = re.compile(
+    r"(?:rủi ro|xác suất|khả năng|nguy cơ|risk|probability|chance)"
+    r"[^\n.!?]{0,70}\b\d{1,3}(?:[.,]\d+)?\s*%"
+    r"|\b\d{1,3}(?:[.,]\d+)?\s*%[^\n.!?]{0,70}"
+    r"(?:rủi ro|xác suất|khả năng|nguy cơ|risk|probability|chance)",
+    re.IGNORECASE,
+)
+_CAPITAL_FLOW_INFERENCE_RE = re.compile(
+    r"(?:dòng tiền\s+(?:lớn|tổ chức|thông minh).{0,65}(?:rút ra|thoát ra|đang rời|tháo chạy|đang gom|thu gom|tích lũy)"
+    r"|(?:institutional|smart money|large capital|large institutional money|institutional money|institutional capital)\s+(?:flows?\s+)?(?:(?:are|is)\s+)?(?:exiting|flowing out|accumulating|buying up|selling off|withdrawing)"
+    r"|(?:khối ngoại|nhà đầu tư tổ chức).{0,55}(?:rút vốn|bán tháo|gom hàng|thoát hàng|đang bán ròng))",
+    re.IGNORECASE,
+)
+_CAPITAL_FLOW_QUANTIFIED_EVIDENCE_RE = re.compile(
+    r"(?:khối ngoại.{0,50}(?:mua ròng|bán ròng).{0,45}\d[\d,.]*"
+    r"|(?:foreign net (?:buy|sell)|institutional net (?:buy|sell)|net foreign (?:buying|selling))"
+    r".{0,55}\d[\d,.]*)",
     re.IGNORECASE,
 )
 _INSIDER_QUALIFIER_RE = re.compile(
@@ -111,6 +143,13 @@ _INSIDER_QUALIFIER_RE = re.compile(
     r"|kết quả trống từ một nguồn cung cấp dữ liệu duy nhất"
     r"|không phải là bằng chứng(?: xác thực)?(?: tuyệt đối)?[\s\S]{0,120}(?:không có|không diễn ra)"
     r"|không chứng minh(?: được)?(?: rằng)? không có",
+    re.IGNORECASE,
+)
+_UNSUPPORTED_PORTFOLIO_ACTION_RE = re.compile(
+    r"\b(?:maintain|keep|retain)\s+(?:your\s+|the\s+)?(?:current|existing)\s+(?:holdings|position|allocation|weight|exposure)\b"
+    r"|(?:duy trì|giữ nguyên|tiếp tục duy trì)\s+(?:vị thế hiện tại|tỷ trọng hiện tại|cổ phiếu đang nắm giữ)"
+    r"|tỷ trọng trung bình trong danh mục chuẩn"
+    r"|medium allocation in (?:the )?standard portfolio",
     re.IGNORECASE,
 )
 _MISSING_TRADE_LEVEL_RE = re.compile(
@@ -172,7 +211,7 @@ _MISSING_NEWS_DATE_RE = re.compile(
     r"publication date:\s*unavailable|no publication date|undated (?:source|article)",
     re.IGNORECASE,
 )
-_FRED_SOURCE_CLAIM_RE = re.compile(r"\bFRED\s*:|FRED series|Federal Reserve Economic Data", re.IGNORECASE)
+_FRED_SOURCE_CLAIM_RE = re.compile(r"\bFRED\b|Federal Reserve Economic Data", re.IGNORECASE)
 _POLYMARKET_PROBABILITY_RE = re.compile(
     r"(?:Polymarket|prediction[- ]market|market[- ]implied)[\s\S]{0,120}\b\d+(?:\.\d+)?\s*%"
     r"|\b\d+(?:\.\d+)?\s*%[\s\S]{0,100}(?:Polymarket|prediction[- ]market|market[- ]implied)",
@@ -191,10 +230,19 @@ _SOCIAL_POST_URL_MISSING_RE = re.compile(
 _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"hoàn toàn không có (?:dữ liệu|thảo luận).{0,100}(?:stocktwits|reddit|mạng xã hội|nhà đầu tư)?"
     r"|vắng bóng hoàn toàn.{0,100}(?:thảo luận|cộng đồng|nhà đầu tư)"
+    r"|trống rỗng hoàn toàn.{0,100}(?:kênh tin tức|diễn đàn|thảo luận|cộng đồng|nhà đầu tư)"
+    r"|mức độ quan tâm.{0,70}(?:không đáng kể|gần như không có|rất thấp|thấp)"
+    r"|sự thiếu hụt thông tin định hướng.{0,90}(?:tổ chức|thị trường)"
+    r"|dòng tiền thông minh.{0,75}(?:đang theo dõi|vẫn đang theo dõi|bắt đầu gom|đang gom)"
+    r"|sự im lặng.{0,80}(?:từ )?(?:thị trường|cộng đồng|diễn đàn|nhà đầu tư)"
+    r"|absence of catalysts.{0,80}(?:shows|suggests|indicates|reflects)"
     r"|cạn kiệt thanh khoản quan tâm"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
-    r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)",
+    r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)"
+    r"|thiếu hụt hoàn toàn.{0,70}(?:dữ liệu|thông tin|nguồn)"
+    r"|sự im lặng của mọi nguồn.{0,70}(?:thông tin|dữ liệu|cung cấp)"
+    r"|mọi nguồn cung cấp thông tin.{0,70}(?:im lặng|không ghi nhận)",
     re.IGNORECASE,
 )
 _SOCIAL_COVERAGE_LIMITATION_RE = re.compile(
@@ -214,6 +262,25 @@ _NEWS_UNLINKED_SOURCE_CUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
+_NEWS_PLACEHOLDER_CITATION_RE = re.compile(
+    r"(?i)\b(?:report link|placeholder link|source link unavailable|link unavailable)\b"
+)
+_TECHNICAL_CROSSOVER_CLAIM_RE = re.compile(r"(?i)\b(?:death cross|golden cross)\b")
+_TECHNICAL_CROSSOVER_DATE_RE = re.compile(
+    r"(?i)(?:\b(?:death cross|golden cross)\b[^\n]{0,100}"
+    r"(?:\b(?:on|occurred|formed|crossed|happened|xảy ra|hình thành)\b)[^\n]{0,35}"
+    r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})"
+    r"|(?:crossover date|crossing date|ngày giao cắt|thời điểm giao cắt)[^\n]{0,40}"
+    r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4}))"
+)
+_UNSUPPORTED_STOP_LOSS_INSTRUCTION_RE = re.compile(
+    r"(?i)(?:\b(?:đặt|thiết lập|cần đặt|nên đặt|phải đặt|set|place|put)\b)"
+    r"[^\n.!?]{0,50}(?:stop[\s-]?loss|cắt lỗ|ngưỡng cắt lỗ)"
+    r"[^\n.!?]{0,70}\d[\d,.]*"
+    r"|(?:stop[\s-]?loss|cắt lỗ|ngưỡng cắt lỗ)[^\n.!?]{0,40}"
+    r"(?:at|tại|ở)\s*\d[\d,.]*"
+)
 
 _MARKET_SOURCE_LINE_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?(?:source|provider|nguồn(?: dữ liệu)?)\s*[:：]"
@@ -353,6 +420,9 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
         "- TRADE-LEVEL CONSISTENCY: keep entry, stop-loss and target in the same currency and price scale. For a buy, the target must be strictly above entry and stop-loss below entry; never label an entry/support price as a profit target.",
         "- REVERSAL PROBABILITY LIMITATION: RSI below 30 or proximity to a Bollinger band does not quantify reversal odds. Do not call a bounce high-probability unless a cited historical test gives its sample, time horizon, and hit rate.",
+        "- DIRECTIONAL PROBABILITY LIMITATION: do not call a support break, selloff, continuation move, or rebound 'high probability' without a cited quantitative method/backtest, defined sample, and time horizon. State it as a scenario, not a measured probability.",
+        "- CAPITAL-FLOW INFERENCE LIMITATION: OHLC prices, moving averages, RSI, MACD, Bollinger bands, or volume alone do not prove that institutional investors or 'smart money' are exiting, accumulating, or selling net. State that flow direction is unknown unless the supplied evidence contains quantified, source-linked flow data.",
+        "- NUMERIC RISK-PROBABILITY LIMITATION: do not assign a percentage to loss risk, rebound probability, or reversal odds without a cited quantitative method/backtest, defined sample and time horizon. Do not use unsupported claims such as '99% risk' based only on technical indicators.",
     ]
     market = _text(state.get("market_report"))
     if (
@@ -390,7 +460,9 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         guardrails.append(
             "- FUNDAMENTALS LIMITATION: usable source-linked earnings metrics and financial statements/ratios "
             "are unavailable in the supplied fundamentals report. Do not invent revenue, PBT, PAT, EPS, "
-            "cash flow, margins, solvency, valuation ratios, or a strong financial position. State the limitation."
+            "cash flow, margins, solvency, valuation ratios, or a strong financial position. "
+            "Do not assert strong/weak cash flow, balance-sheet strength, or liquidity without a source for that exact metric. "
+            "State the limitation."
         )
     if _requires_fundamentals(state) and (
         fundamentals_fully_unavailable or fundamentals_are_partial
@@ -442,9 +514,13 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         )
     if sentiment.strip() and _SOCIAL_COVERAGE_LIMITATION_RE.search(sentiment):
         guardrails.append(
-            "- SOCIAL COVERAGE LIMITATION: distinguish an unavailable provider from a successful empty search result. "
-            "Do not generalize either into market-wide silence, lack of investor attention, or low stock liquidity; "
-            "state the exact provider and date window instead."
+            "- SOCIAL COVERAGE LIMITATION: distinguish provider failure, a successful empty query, and a record without an individual permalink. "
+            "An empty Yahoo Finance/StockTwits/Reddit result only describes that provider and requested window. Do not infer low retail interest, lack of institutional information or catalysts, market-wide silence, low liquidity, smart-money accumulation/distribution, or any price direction from it. "
+            "State the exact provider, date window, and sample/coverage limitation; require separate evidence for any broader claim."
+        )
+    if not (isinstance(state.get("portfolio_context"), str) and state["portfolio_context"].strip()):
+        guardrails.append(
+            "- PORTFOLIO CONTEXT LIMITATION: current holdings, cost basis, allocation, cash, and personal risk limits were not supplied. Do not assume the user owns the asset or is fully invested. Do not tell the user to maintain or change an existing position, specify a portfolio allocation/weight, or refer to a 'standard portfolio' unless that portfolio is explicitly defined in the supplied context. For Hold, describe the recommendation conditionally (if already held, reassess against stated evidence; if not held, do not imply an existing position). Do not invent a personalized mandatory stop-loss; any numeric price threshold from the debate must be labelled as a conditional review/invalidation level, not an order instruction."
         )
     if fundamentals.strip() and not _urls(fundamentals) and not (
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
@@ -472,6 +548,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
+    news_narrative = re.split(
+        r"(?im)^\s*#{0,6}\s*(?:source records returned by news tools|macro and prediction-market records returned by tools|unavailable or empty tool responses)\s*$",
+        news,
+        maxsplit=1,
+    )[0]
+    sentiment_narrative = re.split(
+        r"(?im)^\s*#{0,6}\s*source urls and coverage supplied to sentiment analysis\s*$",
+        sentiment,
+        maxsplit=1,
+    )[0]
     fundamentals_has_summary_metrics = _has_source_linked_summary_metrics(fundamentals)
     fundamentals_has_unavailable_sections = bool(
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
@@ -603,6 +689,89 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
+    if (
+        _UNSUPPORTED_DIRECTIONAL_PROBABILITY_RE.search(downstream)
+        and not _REVERSAL_EVIDENCE_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "UNSUPPORTED_DIRECTIONAL_PROBABILITY",
+            "finding": (
+                "The report describes a directional risk (such as support breaking or a further selloff) as highly probable "
+                "without a cited quantitative method, defined sample, and time horizon. Rephrase as a possible scenario or provide reproducible evidence."
+            ),
+        })
+
+    if (
+        _UNSUPPORTED_NUMERIC_RISK_RE.search(downstream)
+        and not _REVERSAL_EVIDENCE_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_NUMERIC_RISK_PROBABILITY",
+            "finding": (
+                "Downstream analysis assigns a numeric percentage to risk, loss, or probability without a cited "
+                "quantitative method, defined sample, and time horizon. Remove the percentage or provide a reproducible source."
+            ),
+        })
+
+    if (
+        _CAPITAL_FLOW_INFERENCE_RE.search(downstream)
+        and not _CAPITAL_FLOW_QUANTIFIED_EVIDENCE_RE.search("\n".join((market, news, sentiment, fundamentals)))
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_CAPITAL_FLOW_INFERENCE",
+            "finding": (
+                "Downstream analysis infers institutional or 'smart money' inflows/outflows from price/technical signals "
+                "without quantified, source-linked flow evidence. OHLC and momentum indicators do not identify investor class or net capital flow."
+            ),
+        })
+
+    has_portfolio_context = (
+        isinstance(final_state.get("portfolio_context"), str)
+        and bool(final_state["portfolio_context"].strip())
+    )
+    if not has_portfolio_context and _UNSUPPORTED_PORTFOLIO_ACTION_RE.search(downstream):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_PORTFOLIO_CONTEXT_ACTION",
+            "finding": (
+                "The recommendation assumes existing holdings or specifies an allocation/weight although no portfolio context was supplied. "
+                "State Hold conditionally and leave holdings, position size and allocation unspecified until the user's portfolio is known."
+            ),
+        })
+
+    if (
+        _TECHNICAL_CROSSOVER_CLAIM_RE.search(market)
+        and not _TECHNICAL_CROSSOVER_DATE_RE.search(market)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "TECHNICAL_CROSSOVER_DATE_UNVERIFIED",
+            "finding": (
+                "The market report names a Death Cross/Golden Cross but supplies no dated crossover event. "
+                "SMA50 below SMA200 establishes the current ordering, not when the crossover occurred."
+            ),
+        })
+
+    has_portfolio_context_for_trade = (
+        isinstance(final_state.get("portfolio_context"), str)
+        and bool(final_state["portfolio_context"].strip())
+    )
+    if (
+        not has_portfolio_context_for_trade
+        and _UNSUPPORTED_STOP_LOSS_INSTRUCTION_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_STOP_LOSS_INSTRUCTION",
+            "finding": (
+                "The debate contains an executable stop-loss instruction with a numeric level although no user portfolio context was supplied. "
+                "Rephrase it as a conditional review/invalidation threshold rather than a personalized order instruction."
+            ),
+        })
+
     downstream_insider_claim = (
         _INSIDER_ABSENCE_RE.search(downstream)
         and not _INSIDER_QUALIFIER_RE.search(downstream)
@@ -669,6 +838,22 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         })
 
     asset_type = str(final_state.get("asset_type") or "stock").strip().casefold()
+    # Tool-provenance blocks may faithfully preserve irrelevant search results that
+    # the analyst explicitly excluded. Relevance checks should assess the narrative,
+    # not flag a source merely because it appears in the raw audit trail.
+    news_for_relevance = re.split(
+        r"(?im)^\s*(?:source records returned by news tools|macro and prediction-market records returned by tools)",
+        news,
+        maxsplit=1,
+    )[0]
+    exclusion_only_line = re.compile(
+        r"(?i)(?:thị trường dự đoán về )?thể thao.{0,100}(?:được loại trừ|đã loại trừ|không đưa vào phân tích|excluded|not included)"
+        r"|(?:AFC Asian Cup|sports prediction market).{0,100}(?:được loại trừ|đã loại trừ|không đưa vào phân tích|excluded|not included)"
+    )
+    news_for_relevance = "\n".join(
+        line for line in news_for_relevance.splitlines()
+        if not exclusion_only_line.search(line)
+    )
     sports_market_mention = re.search(
         r"(?is)(?:polymarket|prediction market|thị trường dự báo).{0,260}"
         r"(?:afc asian cup|world cup|champions league|premier league|nba|nfl|mlb|nhl|"
@@ -676,8 +861,8 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         r"|(?:afc asian cup|world cup|champions league|premier league|nba|nfl|mlb|nhl|"
         r"olympics?|grand prix|football|soccer|basketball|tennis|sports event|sự kiện thể thao)"
         r".{0,260}(?:polymarket|prediction market|thị trường dự báo)",
-        news,
-    ) if news.strip() else None
+        news_for_relevance,
+    ) if news_for_relevance.strip() else None
     if sports_market_mention and asset_type not in {"sports", "sports event"}:
         findings.append({
             "severity": "MEDIUM",
@@ -689,8 +874,23 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _FRED_SOURCE_CLAIM_RE.search(news) and not re.search(
-        r"https?://fred\.stlouisfed\.org/series/", news, re.IGNORECASE
+    if news_narrative.strip():
+        placeholder_without_url = any(
+            _NEWS_PLACEHOLDER_CITATION_RE.search(line) and not _urls(line)
+            for line in news_narrative.splitlines()
+        )
+        if placeholder_without_url:
+            findings.append({
+                "severity": "MEDIUM",
+                "code": "NEWS_PLACEHOLDER_CITATIONS",
+                "finding": (
+                    "The news narrative contains generic placeholder citation text such as 'Report Link' without a target URL. "
+                    "A URL appearing later in the raw tool-evidence appendix does not link that narrative claim to its source."
+                ),
+            })
+
+    if news_narrative.strip() and _FRED_SOURCE_CLAIM_RE.search(news_narrative) and not re.search(
+        r"https?://fred\.stlouisfed\.org/series/", news_narrative, re.IGNORECASE
     ):
         findings.append({
             "severity": "MEDIUM",
@@ -701,9 +901,9 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _POLYMARKET_PROBABILITY_RE.search(news):
-        has_market_url = bool(_POLYMARKET_URL_RE.search(news))
-        if not has_market_url or _MARKET_URL_MISSING_RE.search(news):
+    if news_narrative.strip() and _POLYMARKET_PROBABILITY_RE.search(news_narrative):
+        has_market_url = bool(_POLYMARKET_URL_RE.search(news_narrative))
+        if not has_market_url or _MARKET_URL_MISSING_RE.search(news_narrative):
             findings.append({
                 "severity": "MEDIUM",
                 "code": "PREDICTION_MARKET_URL_MISSING",
@@ -712,7 +912,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                     "The generic Gamma API endpoint is not a substitute for the specific market page."
                 ),
             })
-        if not re.search(r"Observed at \(UTC\):|Retrieved at \(UTC\):", news, re.IGNORECASE):
+        if not re.search(r"Observed at \(UTC\):|Retrieved at \(UTC\):", news_narrative, re.IGNORECASE):
             findings.append({
                 "severity": "MEDIUM",
                 "code": "PREDICTION_MARKET_TIMESTAMP_MISSING",
@@ -739,6 +939,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Sentiment report contains no direct source URLs. Preserve source name, sample size/window, "
                 "and links so readers can distinguish an empty feed from unavailable coverage."
+            ),
+        })
+
+    if _SOCIAL_SILENCE_CLAIM_RE.search(sentiment_narrative):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "SENTIMENT_EMPTY_FEED_OVERSTATEMENT",
+            "finding": (
+                "The sentiment narrative uses absolute or market-wide silence language despite bounded, provider-specific feeds. "
+                "Describe only what each queried provider returned for the stated window; do not claim every source or the entire market was silent."
             ),
         })
 

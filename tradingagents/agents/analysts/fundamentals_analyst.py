@@ -1,3 +1,6 @@
+import re
+
+from langchain_core.messages import ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.analysts.turn import take_turn
@@ -18,6 +21,112 @@ TOOLS = (
     get_income_statement,
     get_insider_transactions,
 )
+
+
+
+_FUNDAMENTALS_TOOL_NAMES = {
+    "get_fundamentals",
+    "get_balance_sheet",
+    "get_cashflow",
+    "get_income_statement",
+    "get_insider_transactions",
+}
+
+
+def _append_fundamentals_tool_evidence(report: str, messages) -> str:
+    """Append source metadata from the exact fundamentals ToolMessages.
+
+    This is a provenance index, not an independent validation of the source.
+    It preserves only source/period/retrieval metadata and explicit failure
+    markers, rather than duplicating full statements in the final report.
+    """
+    if not report.strip():
+        return report
+
+    heading = "### Source records returned by fundamental tools"
+    if heading in report:
+        report = report.split(heading, 1)[0].rstrip()
+
+    records = []
+    failures = []
+    metadata_re = re.compile(
+        r"(?i)^\s*(?:[-*]\s*)?(?:source|source url|data url|api endpoint|"
+        r"retrieved at(?:\s*\([^)]*\))?|publication date|reporting period|"
+        r"financial period|scope|as[- ]of date|observation window|data vintage)\s*[:：]"
+    )
+    failure_re = re.compile(
+        r"(?i)\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|EntitlementError|"
+        r"VendorUnavailableError|VendorNotConfiguredError|permission denied|"
+        r"forbidden|unavailable|could not retrieve|no records were returned)\b"
+    )
+
+    for message in messages or ():
+        if not isinstance(message, ToolMessage):
+            continue
+        tool_name = str(getattr(message, "name", "") or "")
+        if tool_name not in _FUNDAMENTALS_TOOL_NAMES:
+            continue
+
+        raw_content = getattr(message, "content", "")
+        if isinstance(raw_content, list):
+            content = "\n".join(
+                str(item.get("text", "")) if isinstance(item, dict) else str(item)
+                for item in raw_content
+            )
+        else:
+            content = str(raw_content or "")
+        content = (
+            content.replace("\\r\\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\n")
+        )
+        if not content.strip():
+            continue
+
+        title_match = re.search(r"(?m)^\s*#{1,6}\s+(.+?)\s*$", content)
+        title = title_match.group(1).strip() if title_match else tool_name
+        metadata = []
+        for line in content.splitlines():
+            if metadata_re.match(line):
+                clean_line = line.strip()
+                if clean_line not in metadata:
+                    metadata.append(clean_line)
+
+        has_direct_url = any(
+            re.match(r"(?i)^\s*(?:[-*]\s*)?(?:source url|data url|api endpoint)\s*[:：]\s*https?://", line)
+            for line in metadata
+        )
+        key = (tool_name, title, tuple(metadata))
+        if metadata and has_direct_url and key not in records:
+            records.append(key)
+        elif failure_re.search(content):
+            detail = re.sub(r"\s+", " ", content).strip()[:280]
+            item = (tool_name, detail)
+            if item not in failures:
+                failures.append(item)
+
+    if not records and not failures:
+        return report
+
+    lines = [
+        "",
+        heading,
+        "",
+        "- The entries below are copied from tool responses. They identify returned provenance and failures; they do not independently verify the claims.",
+        "",
+    ]
+    for tool_name, title, metadata in records[:20]:
+        lines.append(f"- **{tool_name} — {title}**")
+        lines.extend(f"  - {item.lstrip('-* ')}" for item in metadata)
+    if len(records) > 20:
+        lines.append(f"- {len(records) - 20} additional source records omitted from this index.")
+    if failures:
+        lines.extend(["", "**Unavailable or empty tool responses**"])
+        for tool_name, detail in failures[:10]:
+            lines.append(f"- {tool_name}: {detail}")
+        if len(failures) > 10:
+            lines.append(f"- {len(failures) - 10} additional failure records omitted.")
+    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 def create_fundamentals_analyst(llm):
@@ -56,6 +165,8 @@ def create_fundamentals_analyst(llm):
         prompt = prompt.partial(instrument_context=instrument_context)
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        if report:
+            report = _append_fundamentals_tool_evidence(report, state.get("messages", []))
 
         return {
             "messages": [result],

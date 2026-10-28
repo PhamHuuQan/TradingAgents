@@ -89,6 +89,107 @@ def _append_news_tool_evidence(report: str, messages) -> str:
     return report.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
+
+_AUXILIARY_EVIDENCE_TOOLS = {"get_macro_indicators", "get_prediction_markets"}
+
+
+def _append_macro_prediction_tool_evidence(report: str, messages) -> str:
+    """Append source metadata, observed values and market URLs returned by tools."""
+    if not report.strip():
+        return report
+
+    heading = "### Macro and prediction-market records returned by tools"
+    if heading in report:
+        report = report.split(heading, 1)[0].rstrip()
+
+    records = []
+    failures = []
+    metadata_re = re.compile(
+        r"(?i)^\s*(?:[-*]\s*)?(?:source|source url|data url|api endpoint|"
+        r"retrieved at(?:\s*\([^)]*\))?|units|frequency|observation window|"
+        r"data vintage|market url|observed at(?:\s*\([^)]*\))?)\s*[:：]"
+    )
+    key_value_re = re.compile(
+        r"(?i)^\s*(?:\*\*latest:\*\*|\*\*change from\b|-\s+\*\*.+\*\*\s+[—-]|"
+        r"no observations\b|no open prediction markets\b|prediction-market query filtered|"
+        r"data_unavailable|no_data_available|vendorunavailableerror|"
+        r"vendornotconfigurederror|error:|failed:)"
+    )
+    failure_re = re.compile(
+        r"(?i)\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|"
+        r"VendorNotConfiguredError|EntitlementError|timed out|timeout|provider failed)\b"
+    )
+
+    for message in messages or ():
+        if not isinstance(message, ToolMessage):
+            continue
+        tool_name = str(getattr(message, "name", "") or "")
+        if tool_name not in _AUXILIARY_EVIDENCE_TOOLS:
+            continue
+        raw_content = getattr(message, "content", "")
+        if isinstance(raw_content, list):
+            content = "\n".join(
+                str(item.get("text", "")) if isinstance(item, dict) else str(item)
+                for item in raw_content
+            )
+        else:
+            content = str(raw_content or "")
+        content = content.replace("\\n", "\n").replace("\\r", "\n")
+        if not content.strip():
+            continue
+
+        chunks = re.split(r"(?m)(?=^#{1,6}\s+)", content)
+        for chunk in chunks:
+            chunk_lines = chunk.splitlines()
+            if not chunk_lines:
+                continue
+            title = next(
+                (line.strip().lstrip("#").strip() for line in chunk_lines
+                 if re.match(r"^\s*#{1,6}\s+", line)),
+                tool_name,
+            )
+            kept = []
+            for line in chunk_lines:
+                if metadata_re.match(line) or key_value_re.match(line):
+                    clean_line = line.strip()
+                    if clean_line and clean_line not in kept:
+                        kept.append(clean_line)
+            has_source = any(
+                re.match(r"(?i)^\s*(?:[-*]\s*)?(?:source url|data url|market url|api endpoint)\s*[:：]\s*https?://", line)
+                for line in kept
+            )
+            if kept and (has_source or failure_re.search(chunk)):
+                key = (tool_name, title, tuple(kept))
+                if key not in records:
+                    records.append(key)
+            elif failure_re.search(chunk):
+                detail = re.sub(r"\s+", " ", chunk).strip()[:260]
+                item = (tool_name, detail)
+                if item not in failures:
+                    failures.append(item)
+
+    if not records and not failures:
+        return report
+
+    lines = [
+        "",
+        heading,
+        "",
+        "- These are exact metadata/value lines preserved from the macro and prediction-market tool results; probabilities are market-implied, not certainties.",
+        "",
+    ]
+    for tool_name, title, kept in records[:20]:
+        lines.append(f"- **{tool_name} — {title}**")
+        lines.extend(f"  - {line.lstrip('-* ')}" for line in kept)
+    if len(records) > 20:
+        lines.append(f"- {len(records) - 20} additional tool records omitted from this index.")
+    if failures:
+        lines.extend(["", "**Unavailable tool responses**"])
+        for tool_name, detail in failures[:10]:
+            lines.append(f"- {tool_name}: {detail}")
+    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
+
+
 def _prediction_market_relevance_guardrail() -> str:
     """Keep broad prediction-market searches from contaminating investment evidence."""
     return (
@@ -111,7 +212,7 @@ def create_news_analyst(llm):
             f"You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(start_date, end_date) for news about the {asset_label} under analysis, get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news, get_macro_indicators(indicator, curr_date, look_back_days) to ground macro commentary in actual data from FRED (e.g. 'cpi', 'core_pce', 'unemployment', 'fed_funds_rate', '10y_treasury', 'yield_curve'), and get_prediction_markets(topic, limit) for live market-implied probabilities of forward-looking events (e.g. 'Fed rate cut', 'recession 2026', geopolitical or sector events). Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + _prediction_market_relevance_guardrail()
-            + " SOURCE-PROVENANCE REQUIREMENTS: Preserve direct URLs, publisher/provider names, and publication dates exactly as returned by news tools. For macro time series, state series/title, unit, observation date, value and source. For prediction-market probabilities, include market URL, observed probability, retrieval/observation time, volume/liquidity context if returned, and label the figure as market-implied rather than fact. If a source returns DATA_UNAVAILABLE or an unavailable/error placeholder, say it could not be checked. If a query returns no matching items, distinguish that from a provider failure and do not claim this proves no event/news occurred. Never invent a source URL, event, probability, date, or macro number. Add a Sources table with direct links for the claims that materially affect the thesis."
+            + " SOURCE-PROVENANCE REQUIREMENTS: Preserve direct URLs, publisher/provider names, and publication dates exactly as returned by news tools. For macro time series, state series/title, unit, observation date, value and source. For prediction-market probabilities, include market URL, observed probability, retrieval/observation time, volume/liquidity context if returned, and label the figure as market-implied rather than fact. If a source returns DATA_UNAVAILABLE or an unavailable/error placeholder, say it could not be checked. If a query returns no matching items, distinguish that from a provider failure and do not claim this proves no event/news occurred. Never invent a source URL, event, probability, date, or macro number. Add a Sources table with direct links for the claims that materially affect the thesis. INLINE LINK REQUIREMENT: A URL in an appended tool-provenance appendix does not substitute for linking the macro or prediction-market claim in the narrative or Sources table. Do not use generic placeholders like 'Report Link', or bare text labels like 'DGS10' / 'Fed Rate Cut Markets' unless the Markdown link target is the exact URL returned by the tool. If the exact URL is unavailable in the writing context, write 'direct link unavailable' instead of a placeholder link."
             + get_language_instruction()
         )
 
@@ -139,7 +240,9 @@ def create_news_analyst(llm):
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
         if report:
-            report = _append_news_tool_evidence(report, state.get("messages", []))
+            tool_messages = state.get("messages", [])
+            report = _append_news_tool_evidence(report, tool_messages)
+            report = _append_macro_prediction_tool_evidence(report, tool_messages)
 
         return {
             "messages": [result],

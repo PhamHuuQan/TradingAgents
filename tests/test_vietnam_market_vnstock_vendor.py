@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from tradingagents.dataflows import config as config_module, router
+from tradingagents.dataflows import config as config_module, date_window, router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
 from tradingagents.dataflows.vendors import vnstock_fundamentals
@@ -59,27 +59,49 @@ def _frames():
 class FakeClient:
     def __init__(self):
         self.income_frame, self.balance_frame, self.cash_flow_frame = _frames()
+        income, balance, cash_flow = _frames()
+        self.kbs_income_frame = FakeFrame(income.rows, source="kbs")
+        self.kbs_balance_frame = FakeFrame(balance.rows, source="kbs")
+        self.kbs_cash_flow_frame = FakeFrame(cash_flow.rows, source="kbs")
+        self.failed_sources = set()
+        self.failed_requests = set()
         self.calls = []
 
+    def _fetch(self, name, period, format, source, vci_frame, kbs_frame):
+        self.calls.append((name, period, format, source))
+        if source in self.failed_sources or (source, name) in self.failed_requests:
+            raise RuntimeError(f"simulated {source.upper()} {name} outage")
+        return vci_frame if source == "vci" else kbs_frame
+
     def income_statement(self, *, period, format, source):
-        self.calls.append(("income_statement", period, format, source))
-        return self.income_frame
+        return self._fetch(
+            "income_statement", period, format, source,
+            self.income_frame, self.kbs_income_frame,
+        )
 
     def balance_sheet(self, *, period, format, source):
-        self.calls.append(("balance_sheet", period, format, source))
-        return self.balance_frame
+        return self._fetch(
+            "balance_sheet", period, format, source,
+            self.balance_frame, self.kbs_balance_frame,
+        )
 
     def cash_flow(self, *, period, format, source):
-        self.calls.append(("cash_flow", period, format, source))
-        return self.cash_flow_frame
+        return self._fetch(
+            "cash_flow", period, format, source,
+            self.cash_flow_frame, self.kbs_cash_flow_frame,
+        )
 
 
 @pytest.fixture
 def fake_vnstock(monkeypatch):
     client = FakeClient()
     monkeypatch.setattr(vnstock_fundamentals, "_fundamental_client", lambda symbol: client)
-    # Current CI host date may be UTC while our synthetic statements are dated in 2025.
+    # Freeze both references: the adapter imports get_current_date directly,
+    # while withhold_undated_statements resolves it through date_window at call time.
+    # Keep the explicit as-of date equal to simulated today so these tests exercise
+    # the source adapters rather than the historical-data safety guard.
     monkeypatch.setattr(vnstock_fundamentals, "get_current_date", lambda: "2026-10-25")
+    monkeypatch.setattr(date_window, "get_current_date", lambda: "2026-10-25")
     return client
 
 
@@ -95,11 +117,80 @@ def test_vnstock_statement_route_returns_validated_long_csv(fake_vnstock):
 
 
 @pytest.mark.unit
+def test_vnstock_statement_falls_back_to_kbs_and_labels_the_actual_source(fake_vnstock):
+    fake_vnstock.failed_sources.add("vci")
+
+    output = vnstock_fundamentals.get_vnstock_balance_sheet(
+        "FPT", "quarterly", "2026-10-25"
+    )
+
+    assert "# Balance Sheet for FPT from Vnstock KBS" in output
+    assert "# Provider source: vnstock-kbs;" in output
+    assert [call[3] for call in fake_vnstock.calls] == ["vci", "kbs"]
+    assert all(call[2] == "long" for call in fake_vnstock.calls)
+
+
+@pytest.mark.unit
+def test_vnstock_kbs_frame_with_wrong_source_metadata_is_rejected(fake_vnstock):
+    fake_vnstock.failed_sources.add("vci")
+    # Simulate the KBS request unexpectedly returning a VCI-tagged frame.
+    fake_vnstock.kbs_balance_frame = FakeFrame(
+        fake_vnstock.kbs_balance_frame.rows, source="vci"
+    )
+
+    with pytest.raises(VendorUnavailableError, match="expected 'kbs'"):
+        vnstock_fundamentals.get_vnstock_balance_sheet(
+            "FPT", "quarterly", "2026-10-25"
+        )
+
+
+@pytest.mark.unit
+def test_vnstock_fundamentals_summary_falls_back_as_a_complete_kbs_set(fake_vnstock):
+    fake_vnstock.failed_sources.add("vci")
+
+    output = vnstock_fundamentals.get_vnstock_fundamentals("FPT", "2026-10-25")
+
+    assert "# Current KBS fundamentals for FPT" in output
+    assert "- Source: vnstock-kbs" in output
+    assert "Source fallback: VCI unavailable; selected KBS." in output
+    assert "TTM net income: not derived from KBS" in output
+    assert "TTM operating cash flow: not derived from KBS" in output
+    assert "Latest total equity: 200,000,000,000 VND" in output
+    assert [call[3] for call in fake_vnstock.calls] == [
+        "vci", "kbs", "kbs", "kbs"
+    ]
+
+
+@pytest.mark.unit
+def test_vnstock_summary_never_mixes_partial_vci_with_kbs_statements(fake_vnstock):
+    # VCI returns the income statement but fails on the balance sheet. The full
+    # three-statement set must be retried with KBS rather than mixing providers.
+    fake_vnstock.failed_requests.add(("vci", "balance_sheet"))
+
+    output = vnstock_fundamentals.get_vnstock_fundamentals("FPT", "2026-10-25")
+
+    assert "# Current KBS fundamentals for FPT" in output
+    assert "- Source: vnstock-kbs" in output
+    assert [call[3] for call in fake_vnstock.calls] == [
+        "vci", "vci", "kbs", "kbs", "kbs"
+    ]
+
+
+@pytest.mark.unit
+def test_vnstock_source_chain_rejects_unknown_provider(monkeypatch):
+    monkeypatch.setenv("TRADINGAGENTS_VNSTOCK_FUNDAMENTALS_SOURCES", "vci,unknown")
+
+    with pytest.raises(vnstock_fundamentals.VendorNotConfiguredError, match="only accepts"):
+        vnstock_fundamentals._configured_sources()
+
+
+@pytest.mark.unit
 def test_vnstock_statement_withholds_historical_request_before_loading_client(monkeypatch):
     client = Mock()
     loader = Mock(return_value=client)
     monkeypatch.setattr(vnstock_fundamentals, "_fundamental_client", loader)
     monkeypatch.setattr(vnstock_fundamentals, "get_current_date", lambda: "2026-10-25")
+    monkeypatch.setattr(date_window, "get_current_date", lambda: "2026-10-25")
 
     output = vnstock_fundamentals.get_vnstock_income_statement(
         "FPT", "quarterly", "2026-10-01"
@@ -148,15 +239,35 @@ def test_vnstock_router_is_explicit_only_in_default_chain(monkeypatch):
 @pytest.mark.parametrize(
     ("metadata", "message"),
     [
-        ({}, "metadata source is None"),
-        ({"source": "vci", "format": "long"}, "metadata ticker"),
-        ({"source": "vci", "symbol": "FPT"}, "metadata format"),
         ({"source": "kbs", "symbol": "FPT", "format": "long"}, "expected 'vci'"),
+        ({"source": "vci", "symbol": "VCB", "format": "long"}, "metadata ticker"),
+        ({"source": "vci", "symbol": "FPT", "format": "wide"}, "metadata format"),
     ],
 )
-def test_vnstock_statement_response_requires_complete_matching_metadata(metadata, message):
+def test_vnstock_rejects_conflicting_response_metadata(metadata, message):
     client = FakeClient()
     client.income_frame.attrs = metadata
 
     with pytest.raises(VendorUnavailableError, match=message):
         vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement")
+
+
+@pytest.mark.unit
+def test_vnstock_accepts_explicit_source_when_provider_omits_optional_attrs():
+    client = FakeClient()
+    # The VCI provider may expose no attrs; the request explicitly selects VCI
+    # and the long-form data contract is independently checked by required columns.
+    client.income_frame.attrs = {}
+    vnstock_fundamentals._validate_frame(client.income_frame, "FPT", "income_statement", "vci")
+
+    # KBS reports source/ticker but may omit format. Existing metadata must match,
+    # while long-form columns establish the returned shape.
+    client.kbs_balance_frame.attrs = {
+        "source": "KBS",
+        "symbol": "FPT",
+        "report_type": "balance_sheet",
+        "period": "quarter",
+    }
+    vnstock_fundamentals._validate_frame(
+        client.kbs_balance_frame, "FPT", "balance_sheet", "kbs"
+    )
