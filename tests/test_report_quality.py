@@ -1053,3 +1053,71 @@ def test_explicit_portfolio_context_allows_position_specific_hold_language():
         item["code"] for item in audit["findings"]
     }
 
+
+def test_tool_provenance_appendix_does_not_substitute_for_inline_macro_and_market_links():
+    state = _sample_state()
+    state["news_report"] = (
+        "FRED reports the 10-year Treasury yield at 5.00% on 2026-10-26. "
+        "Polymarket shows a 96% market-implied probability of no Fed cuts in 2026.\n"
+        "| Source | Topic | Link |\n"
+        "| FRED | Treasury yield | DGS10 |\n"
+        "| Polymarket | Fed cuts | Fed Rate Cut Markets |\n"
+        "| GlobeNewswire | Edge infrastructure | Report Link |\n"
+        "### Source records returned by news tools\n"
+        "A technology headline; publication date: 2026-10-27; URL: https://finance.yahoo.com/technology/example\n"
+        "### Macro and prediction-market records returned by tools\n"
+        "Source URL: https://fred.stlouisfed.org/series/DGS10\n"
+        "Retrieved at (UTC): 2026-10-28T10:55:02Z\n"
+        "Observed at (UTC): 2026-10-28T10:55:02Z\n"
+        "Market URL: https://polymarket.com/event/how-many-fed-rate-cuts-in-2026"
+    )
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "NEWS_PLACEHOLDER_CITATIONS" in codes
+    assert "FRED_SERIES_CITATION_MISSING" in codes
+    assert "PREDICTION_MARKET_URL_MISSING" in codes
+    assert "PREDICTION_MARKET_TIMESTAMP_MISSING" in codes
+
+
+def test_sentiment_report_flags_absolute_silence_wording_inside_analyst_narrative():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Yahoo Finance had no article records in the requested sample. "
+        "StockTwits returned no messages in the window. "
+        "Do sự thiếu hụt hoàn toàn các dữ liệu đầu vào, không thể xác định chủ đề. "
+        "Đây là sự im lặng của mọi nguồn cung cấp thông tin.\n"
+        "### Source URLs and coverage supplied to sentiment analysis\n"
+        "This is not proof of zero discussion everywhere."
+    )
+    audit = build_report_quality_audit(state)
+    assert "SENTIMENT_EMPTY_FEED_OVERSTATEMENT" in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_death_cross_claim_without_a_crossover_date_is_flagged():
+    state = _sample_state()
+    state["market_report"] = (
+        "FPT close 54,000; SMA50 62,412; SMA200 69,059. "
+        "Death Cross đã hình thành từ lâu.\n"
+        "Provider: ssi-fastconnect-v3\n"
+        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\n"
+        "Retrieved at: 2026-10-28T17:55:18+07:00"
+    )
+    audit = build_report_quality_audit(state)
+    assert "TECHNICAL_CROSSOVER_DATE_UNVERIFIED" in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_numeric_stop_loss_order_instruction_is_flagged_without_portfolio_context():
+    state = _sample_state()
+    state.pop("portfolio_context", None)
+    state["risk_debate_state"] = {
+        "bear_history": "Nếu đã nắm giữ, cần đặt ngưỡng cắt lỗ chặt chẽ tại 53.000 để bảo toàn vốn."
+    }
+    audit = build_report_quality_audit(state)
+    assert "UNSUPPORTED_STOP_LOSS_INSTRUCTION" in {
+        item["code"] for item in audit["findings"]
+    }
+
