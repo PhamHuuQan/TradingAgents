@@ -165,7 +165,7 @@ def fetch_stocktwits_messages(
                 message_url = raw_url.strip()
         lines.append(
             f"[{created} · @{user} · {tag}] {body}\n"
-            + (f"  Source URL: {message_url}" if message_url else "  Source URL unavailable from the provider")
+            + (f"  Source URL: {message_url}" if message_url else "  Source URL unavailable from the provider; Message URL unavailable from the provider")
         )
 
     total = bullish + bearish + unlabeled
