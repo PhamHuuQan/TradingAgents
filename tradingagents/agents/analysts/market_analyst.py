@@ -40,16 +40,22 @@ def _append_verified_market_provenance(report: str, messages) -> str:
     else:
         content = str(raw_content)
     content = content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
+    # Provider wrappers may introduce invisible BOM/zero-width characters around sentinels.
+    content = content.replace("\ufeff", "").replace("\u200b", "").strip()
     content_folded = content.casefold().lstrip()
 
     unavailable_pattern = re.compile(
-        r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|EntitlementError)\b"
-        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot",
+        r"\b(?:DATA[\s_-]*UNAVAILABLE|NO[\s_-]*DATA[\s_-]*AVAILABLE|VendorUnavailableError|EntitlementError)\b"
+        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot|"
+        r"market snapshot (?:is )?(?:missing|unavailable|failed)",
         re.IGNORECASE,
     )
+    # Fail closed before parsing metadata: an error payload must never create a
+    # provenance section or replace an existing section with fabricated fields.
     if (
         unavailable_pattern.search(content)
-        or content_folded.startswith(("error:", "failed:", "<error"))
+        or content_folded.startswith(("error:", "failed:", "<error", "{'error'", '{"error"'))
+        or content_folded in {"", "none", "null"}
     ):
         return report
 
