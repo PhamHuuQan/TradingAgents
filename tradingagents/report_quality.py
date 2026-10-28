@@ -139,8 +139,8 @@ _INSIDER_QUALIFIER_RE = re.compile(
     re.IGNORECASE,
 )
 _UNSUPPORTED_PORTFOLIO_ACTION_RE = re.compile(
-    r"\\b(?:maintain|keep|retain)\\s+(?:your\\s+|the\\s+)?(?:current|existing)\\s+(?:holdings|position|allocation|weight|exposure)\\b"
-    r"|(?:duy trì|giữ nguyên|tiếp tục duy trì)\\s+(?:vị thế hiện tại|tỷ trọng hiện tại|cổ phiếu đang nắm giữ)"
+    r"\b(?:maintain|keep|retain)\s+(?:your\s+|the\s+)?(?:current|existing)\s+(?:holdings|position|allocation|weight|exposure)\b"
+    r"|(?:duy trì|giữ nguyên|tiếp tục duy trì)\s+(?:vị thế hiện tại|tỷ trọng hiện tại|cổ phiếu đang nắm giữ)"
     r"|tỷ trọng trung bình trong danh mục chuẩn"
     r"|medium allocation in (?:the )?standard portfolio",
     re.IGNORECASE,
