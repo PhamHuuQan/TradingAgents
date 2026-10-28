@@ -76,7 +76,7 @@ _UNSUPPORTED_FINANCIAL_METRIC_RE = re.compile(
 _UNSUPPORTED_VALUATION_CLAIM_RE = re.compile(
     r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|deep[- ]value)\b"
     r"|(?:định giá thấp|được định giá thấp|đang bị thị trường định giá thấp|định giá hấp dẫn|mức định giá hấp dẫn|"
-    r"giá rẻ|món hời|món quà(?: từ trên trời rơi xuống)?)"
+    r"giá rẻ|mua rẻ|chiết khấu sâu|vùng giá chiết khấu|giá chiết khấu|món hời|món quà(?: từ trên trời rơi xuống)?)"
     r"|priced irrationally low|trading below intrinsic value",
     re.IGNORECASE,
 )
