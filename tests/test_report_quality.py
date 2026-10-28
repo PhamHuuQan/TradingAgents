@@ -515,6 +515,7 @@ def test_source_linked_fpt_summary_is_partial_not_wholly_unavailable_or_unsuppor
     )
     assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+    assert "Do not assert strong/weak cash flow" in build_decision_evidence_guardrails(state)
     # Sourced revenue/PBT growth is not an unsupported claim about financial condition.
     assert "UNSUPPORTED_FINANCIAL_STRENGTH" not in codes
 
