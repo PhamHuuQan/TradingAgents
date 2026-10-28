@@ -41,6 +41,9 @@ on:
       - "tests/test_fundamentals_provenance.py"
       - "tests/test_fundamentals_units.py"
       - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_structured_agents.py"
+      - "tests/test_memory_log.py"
+      - "tests/test_yahoo_rate_limit.py"
       - "tests/test_vietnam_market_vnstock.py"
       - "tests/test_news_lookahead.py"
       - "tests/test_yahoo_snapshot.py"
@@ -143,6 +146,8 @@ jobs:
             tests/test_stocktwits_resilience.py \
             tests/test_report_html.py \
             tests/test_reporting.py
+      - name: Run full repository regression suite
+        run: python -m pytest -q tests/
       - name: Lint changed Python files
         run: |
           python -m ruff check \
