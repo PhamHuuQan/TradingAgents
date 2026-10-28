@@ -1,6 +1,7 @@
 from langchain_core.messages import ToolMessage
 
 from tradingagents.agents.analysts.news_analyst import (
+    _append_macro_prediction_tool_evidence,
     _append_news_tool_evidence,
     _prediction_market_relevance_guardrail,
 )
@@ -67,6 +68,56 @@ def test_empty_news_query_is_distinguished_from_provider_failure():
     assert "Queries with no matching news returned for the requested window" in actual
     assert "Provider or retrieval failures" not in actual
     assert "No article-level records" in actual
+
+
+
+def test_macro_and_prediction_market_tool_evidence_preserves_urls_values_and_times():
+    fred = """## FRED: Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity (DGS10)
+- Source: Federal Reserve Bank of St. Louis, FRED
+- Source URL: https://fred.stlouisfed.org/series/DGS10
+- Data URL: https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10
+- Retrieved at (UTC): 2026-10-28T05:31:00+00:00
+- Units: Percent
+- Observation window: 2026-10-20 to 2026-10-28
+**Latest:** 5.00 (2026-10-26)
+**Change from 2026-10-20 to 2026-10-26:** -0.12 (-2.34%), from 5.12
+"""
+    polymarket = """## Polymarket prediction markets: "Fed rate cuts in 2026"
+- Source: Polymarket public Gamma API
+- API endpoint: https://gamma-api.polymarket.com/public-search
+- Retrieved at (UTC): 2026-10-28T05:31:02+00:00
+- **How many Fed rate cuts in 2026?** — 0 (0 bps) 96% ($54,886,710 volume, resolves 2026-12-31)
+  - Observed at (UTC): 2026-10-28T05:31:02+00:00
+  - Market URL: https://polymarket.com/event/how-many-fed-rate-cuts-in-2026/will-no-fed-rate-cuts-happen-in-2026
+"""
+    messages = [
+        ToolMessage(content=fred, tool_call_id="fred-call", name="get_macro_indicators"),
+        ToolMessage(content=polymarket, tool_call_id="market-call", name="get_prediction_markets"),
+    ]
+
+    actual = _append_macro_prediction_tool_evidence("News analysis text", messages)
+
+    assert "### Macro and prediction-market records returned by tools" in actual
+    assert "https://fred.stlouisfed.org/series/DGS10" in actual
+    assert "5.00 (2026-10-26)" in actual
+    assert "https://polymarket.com/event/how-many-fed-rate-cuts-in-2026/will-no-fed-rate-cuts-happen-in-2026" in actual
+    assert "96%" in actual and "54,886,710 volume" in actual
+    assert "2026-10-28T05:31:02+00:00" in actual
+
+
+def test_auxiliary_evidence_does_not_invent_links_for_unavailable_tools():
+    messages = [
+        ToolMessage(
+            content="DATA_UNAVAILABLE: FRED API key not configured",
+            tool_call_id="fred-fail",
+            name="get_macro_indicators",
+        )
+    ]
+
+    actual = _append_macro_prediction_tool_evidence("News analysis text", messages)
+
+    assert "get_macro_indicators" in actual or "FRED API key not configured" in actual
+    assert "https://fred.stlouisfed.org/series/" not in actual
 
 def test_news_prompt_excludes_prediction_markets_unrelated_to_investment_thesis():
     rule = _prediction_market_relevance_guardrail()

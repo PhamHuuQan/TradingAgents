@@ -1,4 +1,7 @@
-from tradingagents.agents.analysts.sentiment_analyst import _append_sentiment_source_provenance
+from tradingagents.agents.analysts.sentiment_analyst import (
+    _append_sentiment_source_provenance,
+    _build_system_message,
+)
 
 
 def test_sentiment_report_preserves_fetched_article_and_post_links():
@@ -120,3 +123,19 @@ def test_partially_linked_stocktwits_feed_still_flags_posts_without_permalinks()
     assert "Message permalink: https://stocktwits.com/user1/message/123" in actual
     assert "Message URL unavailable from the provider" in actual
 
+
+
+
+def test_sentiment_prompt_forbids_inference_from_empty_feeds():
+    prompt = _build_system_message(
+        ticker="FPT",
+        start_date="2026-10-21",
+        end_date="2026-10-28",
+        news_block="No article records could be extracted.",
+        stocktwits_block="No matching messages in the requested window.",
+        reddit_block="No Reddit posts found.",
+    )
+
+    assert "EMPTY-FEED INFERENCE LIMIT" in prompt
+    assert "Do not infer low retail interest" in prompt
+    assert "smart-money accumulation/distribution" in prompt

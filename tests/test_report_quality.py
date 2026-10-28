@@ -774,6 +774,34 @@ def test_bear_report_does_not_turn_empty_news_social_feeds_into_market_wide_sile
     assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
 
 
+
+
+def test_fpt_report_catches_empty_feed_inference_and_unverified_operating_margin_claims():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Yahoo Finance returned no article records. "
+        "StockTwits provider unavailable due to HTTPError. "
+        "Reddit returned no matching posts; this is not proof of zero discussion everywhere."
+    )
+    state["fundamentals_report"] = (
+        "Revenue 40.023 tỷ VND (+12,4%); PBT 8.770 tỷ VND (+17,0%). "
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "DATA_UNAVAILABLE: balance sheet and cash flow statements unavailable."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Mức độ quan tâm của cộng đồng giao dịch bán lẻ trên StockTwits "
+            "là không đáng kể. Tăng trưởng PBT là minh chứng cho cải thiện biên lợi nhuận hoạt động. "
+            "Dòng tiền thông minh vẫn đang theo dõi sát sao kết quả kinh doanh."
+        )
+    }
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
+
+
 def test_report5_regression_flags_known_claims_and_avoids_known_false_positives():
     state = {
         "trade_date": "2026-10-27",
