@@ -18,6 +18,8 @@ on:
       - "tradingagents/dataflows/vendors/reddit.py"
       - "tradingagents/dataflows/vendors/stocktwits.py"
       - "tradingagents/dataflows/router.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
+      - "tradingagents/dataflows/vietnam_market/vnstock_adapter.py"
       - "tradingagents/agents/tools.py"
       - "tradingagents/graph/trading_graph.py"
       - "tradingagents/report_html.py"
@@ -32,6 +34,8 @@ on:
       - "tests/test_news_provenance.py"
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_vietnam_market_vnstock.py"
       - "tests/test_news_lookahead.py"
       - "tests/test_yahoo_snapshot.py"
       - "tests/test_fred.py"
@@ -57,6 +61,8 @@ on:
       - "tradingagents/dataflows/vendors/reddit.py"
       - "tradingagents/dataflows/vendors/stocktwits.py"
       - "tradingagents/dataflows/router.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
+      - "tradingagents/dataflows/vietnam_market/vnstock_adapter.py"
       - "tradingagents/agents/tools.py"
       - "tradingagents/graph/trading_graph.py"
       - "tradingagents/report_html.py"
@@ -71,6 +77,8 @@ on:
       - "tests/test_news_provenance.py"
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_vietnam_market_vnstock.py"
       - "tests/test_news_lookahead.py"
       - "tests/test_yahoo_snapshot.py"
       - "tests/test_fred.py"
@@ -112,6 +120,8 @@ jobs:
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
+            tests/test_vietnam_market_vnstock.py \
             tests/test_news_lookahead.py \
             tests/test_yahoo_snapshot.py \
             tests/test_fred.py \
@@ -134,6 +144,8 @@ jobs:
             tradingagents/dataflows/vendors/reddit.py \
             tradingagents/dataflows/vendors/stocktwits.py \
             tradingagents/dataflows/router.py \
+            tradingagents/dataflows/vendors/vnstock_fundamentals.py \
+            tradingagents/dataflows/vietnam_market/vnstock_adapter.py \
             tradingagents/agents/tools.py \
             tradingagents/graph/trading_graph.py \
             tradingagents/report_html.py \
@@ -153,6 +165,8 @@ jobs:
             tests/test_news_provenance.py \
             tests/test_fpt_ir.py \
             tests/test_fundamentals_units.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
+            tests/test_vietnam_market_vnstock.py \
             tests/test_news_lookahead.py \
             tests/test_yahoo_snapshot.py \
             tests/test_fred.py \
