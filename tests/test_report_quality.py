@@ -1239,3 +1239,66 @@ def test_exact_market_numbers_without_numeric_snapshot_are_not_reconciled():
     codes = {item["code"] for item in audit["findings"]}
 
     assert "MARKET_CLAIMS_NOT_RECONCILED_TO_SNAPSHOT" in codes
+
+
+
+def _fred_macro_state(narrative):
+    state = _sample_state()
+    state["news_report"] = (
+        narrative
+        + "\n\n### Macro and prediction-market records returned by tools\n\n"
+        + "- **get_macro_indicators — FRED: Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity (DGS10)**\n"
+        + "  - Source URL: https://fred.stlouisfed.org/series/DGS10\n"
+        + "  - Retrieved at (UTC): 2026-10-28T16:00:00+00:00\n"
+        + "  - Units: Percent\n"
+        + "  - Observation window: 2026-10-01 to 2026-10-28\n"
+        + "  - Data vintage as of: 2026-10-28\n"
+        + "  - Latest:** 5.00 (2026-10-26) | **Change from 2026-10-01 to 2026-10-26:** -0.12, from 5.12\n"
+    )
+    return state
+
+
+def test_current_fred_macro_value_is_reconciled_to_matching_series():
+    state = _fred_macro_state("The current 10-year Treasury yield is 5.00%.")
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MACRO_NUMERIC_CLAIM_MISMATCH" not in codes
+    assert "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED" not in codes
+
+
+def test_fred_macro_numeric_mismatch_is_flagged_with_source_value():
+    state = _fred_macro_state("The current 10-year Treasury yield is 5.25%.")
+
+    audit = build_report_quality_audit(state)
+    mismatch = next(
+        item for item in audit["findings"] if item["code"] == "MACRO_NUMERIC_CLAIM_MISMATCH"
+    )
+
+    assert mismatch["severity"] == "HIGH"
+    assert "DGS10: report=5.25, FRED=5 Percent" in mismatch["finding"]
+    assert "observation 2026-10-26" in mismatch["finding"]
+
+
+def test_current_macro_numeric_claim_without_fred_value_is_not_reconciled():
+    state = _sample_state()
+    state["news_report"] = "The current federal funds rate is 3.75%."
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED" in codes
+    assert "MACRO_NUMERIC_CLAIM_MISMATCH" not in codes
+
+
+def test_macro_forecast_is_not_compared_with_current_fred_observation():
+    state = _fred_macro_state(
+        "Market participants expect the 10-year Treasury yield to fall to 4.50%."
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MACRO_NUMERIC_CLAIM_MISMATCH" not in codes
+    assert "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED" not in codes
