@@ -1175,3 +1175,67 @@ def test_source_linked_vietnamese_markdown_table_is_partial_coverage():
     )
     assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
+
+
+
+def _market_evidence_state(ticker, narrative, snapshot_lines):
+    state = _sample_state()
+    state["company_of_interest"] = ticker
+    state["market_report"] = (
+        narrative
+        + "\\n\\n### Market Data Provenance\\n"
+        + f"- Provider: deterministic-fixture\\n"
+        + f"- Source URL: https://example.test/market/{ticker}\\n"
+        + "Retrieved at: 2026-10-28T16:00:00+00:00\\n"
+        + ("\\n### Verified Numeric Evidence\\n" + snapshot_lines if snapshot_lines else "")
+    )
+    state["asset_type"] = "stock"
+    return state
+
+
+@pytest.mark.parametrize("ticker", ["FPT", "AAPL", "VNM"])
+def test_market_numeric_claims_match_verified_snapshot_across_symbols(ticker):
+    state = _market_evidence_state(
+        ticker,
+        f"{ticker} current price 55,400; SMA 50 62,574; RSI 25.43.",
+        "- Verified OHLCV Close: 55400.00\\n"
+        "- Verified indicator close_50_sma: 62574.00\\n"
+        "- Verified indicator rsi: 25.43",
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MARKET_NUMERIC_CLAIM_MISMATCH" not in codes
+    assert "MARKET_CLAIMS_NOT_RECONCILED_TO_SNAPSHOT" not in codes
+
+
+def test_market_numeric_claim_mismatch_is_high_severity_and_names_values():
+    state = _market_evidence_state(
+        "AAPL",
+        "AAPL current price 200.00; SMA 50 195.25; RSI 55.50.",
+        "- Verified OHLCV Close: 200.00\\n"
+        "- Verified indicator close_50_sma: 195.25\\n"
+        "- Verified indicator rsi: 25.50",
+    )
+
+    audit = build_report_quality_audit(state)
+    mismatch = next(
+        item for item in audit["findings"] if item["code"] == "MARKET_NUMERIC_CLAIM_MISMATCH"
+    )
+
+    assert mismatch["severity"] == "HIGH"
+    assert "rsi: report=55.5, verified=25.5" in mismatch["finding"]
+
+
+def test_exact_market_numbers_without_numeric_snapshot_are_not_reconciled():
+    state = _market_evidence_state(
+        "VNM",
+        "VNM current price 63,500; SMA 50 64,000; RSI 28.25.",
+        "",
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MARKET_CLAIMS_NOT_RECONCILED_TO_SNAPSHOT" in codes
