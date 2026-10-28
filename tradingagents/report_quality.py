@@ -734,6 +734,22 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         })
 
     asset_type = str(final_state.get("asset_type") or "stock").strip().casefold()
+    # Tool-provenance blocks may faithfully preserve irrelevant search results that
+    # the analyst explicitly excluded. Relevance checks should assess the narrative,
+    # not flag a source merely because it appears in the raw audit trail.
+    news_for_relevance = re.split(
+        r"(?im)^\\s*(?:source records returned by news tools|macro and prediction-market records returned by tools)",
+        news,
+        maxsplit=1,
+    )[0]
+    exclusion_only_line = re.compile(
+        r"(?i)(?:thị trường dự đoán về )?thể thao.{0,100}(?:được loại trừ|đã loại trừ|không đưa vào phân tích|excluded|not included)"
+        r"|(?:AFC Asian Cup|sports prediction market).{0,100}(?:được loại trừ|đã loại trừ|không đưa vào phân tích|excluded|not included)"
+    )
+    news_for_relevance = "\\n".join(
+        line for line in news_for_relevance.splitlines()
+        if not exclusion_only_line.search(line)
+    )
     sports_market_mention = re.search(
         r"(?is)(?:polymarket|prediction market|thị trường dự báo).{0,260}"
         r"(?:afc asian cup|world cup|champions league|premier league|nba|nfl|mlb|nhl|"
@@ -741,8 +757,8 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         r"|(?:afc asian cup|world cup|champions league|premier league|nba|nfl|mlb|nhl|"
         r"olympics?|grand prix|football|soccer|basketball|tennis|sports event|sự kiện thể thao)"
         r".{0,260}(?:polymarket|prediction market|thị trường dự báo)",
-        news,
-    ) if news.strip() else None
+        news_for_relevance,
+    ) if news_for_relevance.strip() else None
     if sports_market_mention and asset_type not in {"sports", "sports event"}:
         findings.append({
             "severity": "MEDIUM",
