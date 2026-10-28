@@ -6,6 +6,7 @@ on:
     branches:
       - feature/report-evidence-quality-20261027
       - fix/report-provenance-audit-20261028
+      - antigravity/recovered-fpt-evidence-20261028
     paths:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
