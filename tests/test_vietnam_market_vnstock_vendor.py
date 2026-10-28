@@ -106,6 +106,23 @@ def fake_vnstock(monkeypatch):
 
 
 @pytest.mark.unit
+def test_vnstock_current_date_does_not_consult_host_date_helper(fake_vnstock, monkeypatch):
+    """An injected current date must not reach the helper that reads the host's real date."""
+    monkeypatch.setattr(
+        vnstock_fundamentals,
+        "withhold_undated_statements",
+        Mock(side_effect=AssertionError("current-date request must bypass historical withholding")),
+    )
+
+    output = vnstock_fundamentals.get_vnstock_income_statement(
+        "FPT", "quarterly", "2026-10-25"
+    )
+
+    assert "# Income Statement for FPT from Vnstock VCI" in output
+    assert fake_vnstock.calls == [("income_statement", "quarter", "long", "vci")]
+
+
+@pytest.mark.unit
 def test_vnstock_statement_route_returns_validated_long_csv(fake_vnstock):
     output = vnstock_fundamentals.get_vnstock_income_statement(
         "fpt", "quarterly", "2026-10-25"
