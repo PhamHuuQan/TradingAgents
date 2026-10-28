@@ -17,6 +17,7 @@ TOOLS = (
 
 _MARKET_PROVENANCE_HEADING = re.compile(r"(?im)^\s*#{1,6}\s*Market Data Provenance\s*$")
 
+
 def _strip_unverified_market_provenance(report: str) -> str:
     """Remove a model-written provenance section unless a tool snapshot validates it."""
     match = _MARKET_PROVENANCE_HEADING.search(report or "")
@@ -55,12 +56,18 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         )
     else:
         content = str(raw_content)
-    content = content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
+    content = (
+        content.replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\n")
+    )
     content_folded = content.casefold().lstrip()
 
     unavailable_pattern = re.compile(
-        r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|VendorNotConfiguredError|NoMarketDataError|EntitlementError)\b"
-        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot|no usable market data",
+        r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|"
+        r"VendorNotConfiguredError|NoMarketDataError|EntitlementError)\b"
+        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot"
+        r"|no usable market data",
         re.IGNORECASE,
     )
     if unavailable_pattern.search(content) or content_folded.startswith((
@@ -95,7 +102,9 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         elif label in {"Provider", "Source URL", "Retrieved at"}:
             lines.append(f"- {label}: not supplied by provider")
     base = clean_report.rstrip()
-    return (base + "\n" if base else "") + "\n".join(lines).lstrip("\n") + "\n"
+    provenance = "\n".join(lines).strip("\n") + "\n"
+    return f"{base}\n\n{provenance}" if base else provenance
+
 
 def create_market_analyst(llm):
 
