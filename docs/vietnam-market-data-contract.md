@@ -111,8 +111,11 @@ config["data_vendors"]["fundamental_data"] = "vnstock"
 Use `TradingAgentsGraph(..., config=config)`. The package is imported only when
 the Vnstock source is called, and the normal/default vendor chain never auto-selects
 it. The adapter calls Vnstock with `period="quarter"` or `period="year"`,
-`format="long"`, and `source="vci"` or `source="kbs"`; it validates that the response's
-source, ticker, format, and required columns match the request.
+`format="long"`, and `source="vci"` or `source="kbs"`. It rejects any source, ticker,
+or format metadata that conflicts with the request; because the VCI provider may omit
+some attributes, missing metadata is tolerated only when the explicit provider argument
+and required long-format columns establish the request contract. The official Vnstock
+documentation states that explicit source requests do not silently switch providers.
 
 The `get_fundamentals` summary derives TTM parent-company net income and operating
 cash flow only when four contiguous standalone-quarter facts exist. It reports
