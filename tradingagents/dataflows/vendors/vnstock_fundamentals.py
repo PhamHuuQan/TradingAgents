@@ -1,7 +1,8 @@
-"""Optional, current-date-only Vnstock VCI fundamentals vendor.
+"""Optional, current-date-only Vnstock VCI/KBS fundamentals vendor.
 
 The standard Vnstock V5 Fundamental API returns VAS-normalized long-format
-statements. This adapter validates source metadata and blocks historical
+statements. This adapter validates any reported source metadata against the
+explicit request, records which provider was selected, and blocks historical
 as-of dates because fetched statements do not carry their first-publication
 time. It never calls premium ratio() endpoints and never infers missing share
 counts or capex.
