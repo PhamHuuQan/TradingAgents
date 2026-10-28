@@ -60,6 +60,11 @@ on:
     branches:
       - feature/vietnam-market-foundation
       - feature/report-evidence-quality-20261027
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     paths:
       - "tradingagents/report_quality.py"
       - "tradingagents/reporting.py"
