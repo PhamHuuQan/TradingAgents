@@ -114,6 +114,7 @@ on:
       - "tests/test_reporting.py"
       - ".github/workflows/evidence-quality-tests.yml"
       - "notebooks/TradingAgents_Evidence_Quality_Audit.ipynb"
+      - "docs/financial-evidence-audit.md"
   workflow_dispatch:
 
 permissions:
