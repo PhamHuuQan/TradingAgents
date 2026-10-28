@@ -97,26 +97,28 @@ def _fundamental_client(symbol: str) -> Any:
         return Fundamental().equity(symbol)
     except Exception as exc:
         raise VendorUnavailableError(
-            f"Vnstock VCI client initialization failed ({type(exc).__name__}); "
+            f"Vnstock client initialization failed ({type(exc).__name__}); "
             "check installation, network access, and source entitlement."
         ) from exc
 
 
 def _validate_frame(frame: object, symbol: str, report: str, source: str = "vci") -> None:
-    source = source.strip().lower()
-    if source not in _VALID_SOURCES:
-        raise VendorNotConfiguredError(f"Unsupported Vnstock source: {source!r}")
+    expected_source = source.strip().lower()
+    if expected_source not in _VALID_SOURCES:
+        raise VendorNotConfiguredError(f"Unsupported Vnstock source: {expected_source!r}")
     if frame is None or bool(getattr(frame, "empty", False)):
-        raise NoMarketDataError(symbol, symbol, f"Vnstock {source.upper()} returned no {report} rows")
+        raise NoMarketDataError(
+            symbol, symbol, f"Vnstock {expected_source.upper()} returned no {report} rows"
+        )
     attrs = getattr(frame, "attrs", None)
     if not isinstance(attrs, Mapping):
         raise VendorUnavailableError(
             f"Vnstock {report} response lacks provenance metadata; refusing to infer source."
         )
-    source = attrs.get("source")
-    if str(source or "").strip().lower() != source:
+    frame_source = attrs.get("source")
+    if str(frame_source or "").strip().lower() != expected_source:
         raise VendorUnavailableError(
-            f"Vnstock {report} metadata source is {source!r}; expected the explicitly requested source"
+            f"Vnstock {report} metadata source is {frame_source!r}; expected '{expected_source}'"
         )
     frame_symbol = attrs.get("symbol")
     if str(frame_symbol or "").strip().upper() != symbol:
@@ -189,7 +191,7 @@ def _csv_response(frame: object, symbol: str, title: str, period: str, source: s
             f"Could not serialize Vnstock {title} response ({type(exc).__name__})"
         ) from exc
     if not isinstance(csv_text, str) or not csv_text.strip():
-        raise NoMarketDataError(symbol, symbol, f"Vnstock VCI returned empty {title} CSV")
+        raise NoMarketDataError(symbol, symbol, f"Vnstock {source.upper()} returned empty {title} CSV")
     return (
         f"# {title} for {symbol} from Vnstock {source.upper()}\n"
         f"# Provider source: vnstock-{source}; period: {period}; retrieved at: {fetched_at.isoformat()}\n"
@@ -203,7 +205,7 @@ def _csv_response(frame: object, symbol: str, title: str, period: str, source: s
 def get_vnstock_balance_sheet(
     ticker: str, freq: str = "quarterly", as_of_date: str | None = None
 ) -> str:
-    """Return the validated VCI balance sheet as long-format CSV."""
+    """Return the validated VCI/KBS balance sheet as long-format CSV."""
     symbol = _symbol(ticker)
     period = _period(freq)
     withheld = _guard_as_of(as_of_date, symbol, "Balance Sheet")
@@ -217,7 +219,7 @@ def get_vnstock_balance_sheet(
 def get_vnstock_cashflow(
     ticker: str, freq: str = "quarterly", as_of_date: str | None = None
 ) -> str:
-    """Return the validated VCI cash-flow statement as long-format CSV."""
+    """Return the validated VCI/KBS cash-flow statement as long-format CSV."""
     symbol = _symbol(ticker)
     period = _period(freq)
     withheld = _guard_as_of(as_of_date, symbol, "Cash Flow")
@@ -231,7 +233,7 @@ def get_vnstock_cashflow(
 def get_vnstock_income_statement(
     ticker: str, freq: str = "quarterly", as_of_date: str | None = None
 ) -> str:
-    """Return the validated VCI income statement as long-format CSV."""
+    """Return the validated VCI/KBS income statement as long-format CSV."""
     symbol = _symbol(ticker)
     period = _period(freq)
     withheld = _guard_as_of(as_of_date, symbol, "Income Statement")
