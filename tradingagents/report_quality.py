@@ -910,11 +910,11 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
 
     macro_discrepancies, macro_unreconciled = _macro_numeric_discrepancies(news)
     if macro_discrepancies:
+        macro_source_values = _verified_macro_series_values(news)
         examples = "; ".join(
-            f"{series_id}: report={reported:g}, FRED={expected:g} {unit} (observation {observation_date})"
+            f"{series_id}: report={reported:g}, FRED={expected:g} {unit} "
+            f"(observation {macro_source_values.get(series_id, (expected, unit, ''))[2]})"
             for series_id, reported, expected, _token, unit in macro_discrepancies[:5]
-            for _source in [ _verified_macro_series_values(news).get(series_id, (expected, unit, "")) ]
-            for observation_date in [_source[2]]
         )
         findings.append({
             "severity": "HIGH",
