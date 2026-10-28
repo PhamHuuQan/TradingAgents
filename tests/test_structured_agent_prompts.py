@@ -277,3 +277,4 @@ def test_portfolio_manager_discloses_missing_personal_portfolio_context():
 
     assert "Portfolio Context Limitation" in output
     assert "not a personalized mandatory stop-loss or order instruction" in output
+    assert "\n\n**Portfolio Context Limitation**" in output
