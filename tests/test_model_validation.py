@@ -98,3 +98,16 @@ def test_a_retired_model_id_still_runs_without_a_warning(provider, model):
     from tradingagents.llm_clients.validators import validate_model
 
     assert validate_model(provider, model)
+
+
+@pytest.mark.unit
+def test_gemini_36_flash_is_offered_and_deprecated_35_flash_is_legacy_only():
+    from tradingagents.llm_clients.model_catalog import LEGACY_MODELS, MODEL_OPTIONS
+
+    quick_ids = [model for _, model in MODEL_OPTIONS["google"]["quick"]]
+    deep_ids = [model for _, model in MODEL_OPTIONS["google"]["deep"]]
+    assert "gemini-3.6-flash" in quick_ids
+    assert "gemini-3.6-flash" in deep_ids
+    assert "gemini-3.5-flash" in LEGACY_MODELS["google"]
+    assert "gemini-3.5-flash" not in quick_ids + deep_ids
+
