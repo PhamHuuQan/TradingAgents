@@ -944,3 +944,61 @@ def test_vietnamese_mua_re_claim_is_flagged_without_verified_valuation_data():
 
     assert "UNSUPPORTED_VALUATION_CLAIM" in codes
 
+
+def test_report_flags_unsupported_capital_flow_and_numeric_risk_claims():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["market_report"] = (
+        "FPT close 54,000; RSI 21.76; MACD -2077.44.\\n"
+        "Provider: ssi-fastconnect-v3\\n"
+        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\\n"
+        "Retrieved at: 2026-10-28T17:22:36+07:00"
+    )
+    state["fundamentals_report"] = (
+        "FPT 9M2026 earnings summary only. "
+        "Revenue and PBT are source-linked; balance sheet and cash flow are unavailable. "
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0"
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Bear Analyst: The price drop proves large institutional money is exiting. "
+            "Rủi ro cụt tay là 99% chỉ vì giá đang giảm mạnh."
+        )
+    }
+    state["risk_debate_state"] = {"history": "Hold and observe."}
+    state["investment_plan"] = "Recommendation: Hold based on incomplete evidence."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "UNSUPPORTED_CAPITAL_FLOW_INFERENCE" in codes
+    assert "UNSUPPORTED_NUMERIC_RISK_PROBABILITY" in codes
+    guardrails = build_decision_evidence_guardrails(state)
+    assert "CAPITAL-FLOW INFERENCE LIMITATION" in guardrails
+    assert "NUMERIC RISK-PROBABILITY LIMITATION" in guardrails
+
+
+def test_quantified_source_linked_flow_data_can_support_flow_direction_claim():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["market_report"] = "FPT close 54,000; RSI 21.76."
+    state["news_report"] = (
+        "Khối ngoại bán ròng 125,4 tỷ VND theo báo cáo giao dịch HOSE ngày 2026-10-28. "
+        "Source URL: https://example.test/foreign-flow"
+    )
+    state["investment_debate_state"] = {
+        "history": "Khối ngoại bán ròng cho thấy dòng tiền bên ngoài giảm trong phiên này."
+    }
+    state["risk_debate_state"] = {"history": "Observe flow data."}
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "UNSUPPORTED_CAPITAL_FLOW_INFERENCE" not in codes
+
