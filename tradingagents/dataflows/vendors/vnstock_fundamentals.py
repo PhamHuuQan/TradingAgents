@@ -79,8 +79,12 @@ def _guard_as_of(as_of_date: str | None, symbol: str, report: str) -> str | None
             raise ValueError("as_of_date must use YYYY-MM-DD format") from exc
         if parsed.isoformat() != normalized:
             raise ValueError("as_of_date must use YYYY-MM-DD format")
-        if normalized > get_current_date():
+        current_date = get_current_date()
+        if normalized > current_date:
             raise ValueError("Vnstock live statements do not support future as-of dates")
+        if normalized == current_date:
+            # Avoid using withhold_undated_statements, which consults the host's date.today().
+            return None
         return withhold_undated_statements(normalized, symbol, report)
     return None
 
