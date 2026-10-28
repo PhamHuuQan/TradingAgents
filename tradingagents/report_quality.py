@@ -138,6 +138,13 @@ _INSIDER_QUALIFIER_RE = re.compile(
     r"|không chứng minh(?: được)?(?: rằng)? không có",
     re.IGNORECASE,
 )
+_UNSUPPORTED_PORTFOLIO_ACTION_RE = re.compile(
+    r"\\b(?:maintain|keep|retain)\\s+(?:your\\s+|the\\s+)?(?:current|existing)\\s+(?:holdings|position|allocation|weight|exposure)\\b"
+    r"|(?:duy trì|giữ nguyên|tiếp tục duy trì)\\s+(?:vị thế hiện tại|tỷ trọng hiện tại|cổ phiếu đang nắm giữ)"
+    r"|tỷ trọng trung bình trong danh mục chuẩn"
+    r"|medium allocation in (?:the )?standard portfolio",
+    re.IGNORECASE,
+)
 _MISSING_TRADE_LEVEL_RE = re.compile(
     r"(?:\*\*)?(?:entry price|stop[\s-]?loss|price target)(?:\*\*)?\s*[:：]\s*(?:not provided|not specified|n/?a|chưa có|không có)",
     re.IGNORECASE,
@@ -483,7 +490,7 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         )
     if not (isinstance(state.get("portfolio_context"), str) and state["portfolio_context"].strip()):
         guardrails.append(
-            "- PORTFOLIO CONTEXT LIMITATION: current holdings, cost basis, allocation, cash, and personal risk limits were not supplied. Do not assume the user owns the asset or is fully invested. For Hold, do not invent a personalized mandatory stop-loss; any numeric price threshold from the debate must be labelled as a conditional review/invalidation level, not an order instruction."
+            "- PORTFOLIO CONTEXT LIMITATION: current holdings, cost basis, allocation, cash, and personal risk limits were not supplied. Do not assume the user owns the asset or is fully invested. Do not tell the user to maintain or change an existing position, specify a portfolio allocation/weight, or refer to a 'standard portfolio' unless that portfolio is explicitly defined in the supplied context. For Hold, describe the recommendation conditionally (if already held, reassess against stated evidence; if not held, do not imply an existing position). Do not invent a personalized mandatory stop-loss; any numeric price threshold from the debate must be labelled as a conditional review/invalidation level, not an order instruction."
         )
     if fundamentals.strip() and not _urls(fundamentals) and not (
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
@@ -665,6 +672,20 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Downstream analysis infers institutional or 'smart money' inflows/outflows from price/technical signals "
                 "without quantified, source-linked flow evidence. OHLC and momentum indicators do not identify investor class or net capital flow."
+            ),
+        })
+
+    has_portfolio_context = (
+        isinstance(final_state.get("portfolio_context"), str)
+        and bool(final_state["portfolio_context"].strip())
+    )
+    if not has_portfolio_context and _UNSUPPORTED_PORTFOLIO_ACTION_RE.search(downstream):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_PORTFOLIO_CONTEXT_ACTION",
+            "finding": (
+                "The recommendation assumes existing holdings or specifies an allocation/weight although no portfolio context was supplied. "
+                "State Hold conditionally and leave holdings, position size and allocation unspecified until the user's portfolio is known."
             ),
         })
 
