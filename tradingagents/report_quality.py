@@ -232,7 +232,10 @@ _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"|cạn kiệt thanh khoản quan tâm"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
-    r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)",
+    r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)"
+    r"|thiếu hụt hoàn toàn.{0,70}(?:dữ liệu|thông tin|nguồn)"
+    r"|sự im lặng của mọi nguồn.{0,70}(?:thông tin|dữ liệu|cung cấp)"
+    r"|mọi nguồn cung cấp thông tin.{0,70}(?:im lặng|không ghi nhận)",
     re.IGNORECASE,
 )
 _SOCIAL_COVERAGE_LIMITATION_RE = re.compile(
@@ -252,6 +255,25 @@ _NEWS_UNLINKED_SOURCE_CUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
+_NEWS_PLACEHOLDER_CITATION_RE = re.compile(
+    r"(?i)\b(?:report link|placeholder link|source link unavailable|link unavailable)\b"
+)
+_TECHNICAL_CROSSOVER_CLAIM_RE = re.compile(r"(?i)\b(?:death cross|golden cross)\b")
+_TECHNICAL_CROSSOVER_DATE_RE = re.compile(
+    r"(?i)(?:\b(?:death cross|golden cross)\b[^\n]{0,100}"
+    r"(?:\b(?:on|occurred|formed|crossed|happened|xảy ra|hình thành)\b)[^\n]{0,35}"
+    r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})"
+    r"|(?:crossover date|crossing date|ngày giao cắt|thời điểm giao cắt)[^\n]{0,40}"
+    r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4}))"
+)
+_UNSUPPORTED_STOP_LOSS_INSTRUCTION_RE = re.compile(
+    r"(?i)(?:\b(?:đặt|thiết lập|cần đặt|nên đặt|phải đặt|set|place|put)\b)"
+    r"[^\n.!?]{0,50}(?:stop[\s-]?loss|cắt lỗ|ngưỡng cắt lỗ)"
+    r"[^\n.!?]{0,70}\d[\d,.]*"
+    r"|(?:stop[\s-]?loss|cắt lỗ|ngưỡng cắt lỗ)[^\n.!?]{0,40}"
+    r"(?:at|tại|ở)\s*\d[\d,.]*"
+)
 
 _MARKET_SOURCE_LINE_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?(?:source|provider|nguồn(?: dữ liệu)?)\s*[:：]"
@@ -518,6 +540,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     news = _text(final_state.get("news_report"))
     sentiment = _text(final_state.get("sentiment_report"))
     fundamentals = _text(final_state.get("fundamentals_report"))
+    news_narrative = re.split(
+        r"(?im)^\s*#{0,6}\s*(?:source records returned by news tools|macro and prediction-market records returned by tools|unavailable or empty tool responses)\s*$",
+        news,
+        maxsplit=1,
+    )[0]
+    sentiment_narrative = re.split(
+        r"(?im)^\s*#{0,6}\s*source urls and coverage supplied to sentiment analysis\s*$",
+        sentiment,
+        maxsplit=1,
+    )[0]
     fundamentals_has_summary_metrics = _has_source_linked_summary_metrics(fundamentals)
     fundamentals_has_unavailable_sections = bool(
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)
@@ -689,6 +721,36 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
+    if (
+        _TECHNICAL_CROSSOVER_CLAIM_RE.search(market)
+        and not _TECHNICAL_CROSSOVER_DATE_RE.search(market)
+    ):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "TECHNICAL_CROSSOVER_DATE_UNVERIFIED",
+            "finding": (
+                "The market report names a Death Cross/Golden Cross but supplies no dated crossover event. "
+                "SMA50 below SMA200 establishes the current ordering, not when the crossover occurred."
+            ),
+        })
+
+    has_portfolio_context_for_trade = (
+        isinstance(final_state.get("portfolio_context"), str)
+        and bool(final_state["portfolio_context"].strip())
+    )
+    if (
+        not has_portfolio_context_for_trade
+        and _UNSUPPORTED_STOP_LOSS_INSTRUCTION_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_STOP_LOSS_INSTRUCTION",
+            "finding": (
+                "The debate contains an executable stop-loss instruction with a numeric level although no user portfolio context was supplied. "
+                "Rephrase it as a conditional review/invalidation threshold rather than a personalized order instruction."
+            ),
+        })
+
     downstream_insider_claim = (
         _INSIDER_ABSENCE_RE.search(downstream)
         and not _INSIDER_QUALIFIER_RE.search(downstream)
@@ -791,8 +853,23 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _FRED_SOURCE_CLAIM_RE.search(news) and not re.search(
-        r"https?://fred\.stlouisfed\.org/series/", news, re.IGNORECASE
+    if news_narrative.strip():
+        placeholder_without_url = any(
+            _NEWS_PLACEHOLDER_CITATION_RE.search(line) and not _urls(line)
+            for line in news_narrative.splitlines()
+        )
+        if placeholder_without_url:
+            findings.append({
+                "severity": "MEDIUM",
+                "code": "NEWS_PLACEHOLDER_CITATIONS",
+                "finding": (
+                    "The news narrative contains generic placeholder citation text such as 'Report Link' without a target URL. "
+                    "A URL appearing later in the raw tool-evidence appendix does not link that narrative claim to its source."
+                ),
+            })
+
+    if news_narrative.strip() and _FRED_SOURCE_CLAIM_RE.search(news_narrative) and not re.search(
+        r"https?://fred\.stlouisfed\.org/series/", news_narrative, re.IGNORECASE
     ):
         findings.append({
             "severity": "MEDIUM",
@@ -803,8 +880,8 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             ),
         })
 
-    if news.strip() and _POLYMARKET_PROBABILITY_RE.search(news):
-        has_market_url = bool(_POLYMARKET_URL_RE.search(news))
+    if news_narrative.strip() and _POLYMARKET_PROBABILITY_RE.search(news_narrative):
+        has_market_url = bool(_POLYMARKET_URL_RE.search(news_narrative))
         if not has_market_url or _MARKET_URL_MISSING_RE.search(news):
             findings.append({
                 "severity": "MEDIUM",
@@ -814,7 +891,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                     "The generic Gamma API endpoint is not a substitute for the specific market page."
                 ),
             })
-        if not re.search(r"Observed at \(UTC\):|Retrieved at \(UTC\):", news, re.IGNORECASE):
+        if not re.search(r"Observed at \(UTC\):|Retrieved at \(UTC\):", news_narrative, re.IGNORECASE):
             findings.append({
                 "severity": "MEDIUM",
                 "code": "PREDICTION_MARKET_TIMESTAMP_MISSING",
@@ -841,6 +918,16 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
             "finding": (
                 "Sentiment report contains no direct source URLs. Preserve source name, sample size/window, "
                 "and links so readers can distinguish an empty feed from unavailable coverage."
+            ),
+        })
+
+    if _SOCIAL_SILENCE_CLAIM_RE.search(sentiment_narrative):
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "SENTIMENT_EMPTY_FEED_OVERSTATEMENT",
+            "finding": (
+                "The sentiment narrative uses absolute or market-wide silence language despite bounded, provider-specific feeds. "
+                "Describe only what each queried provider returned for the stated window; do not claim every source or the entire market was silent."
             ),
         })
 
