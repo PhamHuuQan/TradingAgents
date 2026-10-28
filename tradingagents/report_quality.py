@@ -104,6 +104,25 @@ _REVERSAL_EVIDENCE_RE = re.compile(
     r"|kiểm định lịch sử|tỷ lệ thành công lịch sử|mẫu gồm \d+",
     re.IGNORECASE,
 )
+_UNSUPPORTED_NUMERIC_RISK_RE = re.compile(
+    r"(?:rủi ro|xác suất|khả năng|nguy cơ|risk|probability|chance)"
+    r"[^\n.!?]{0,70}\b\d{1,3}(?:[.,]\d+)?\s*%"
+    r"|\b\d{1,3}(?:[.,]\d+)?\s*%[^\n.!?]{0,70}"
+    r"(?:rủi ro|xác suất|khả năng|nguy cơ|risk|probability|chance)",
+    re.IGNORECASE,
+)
+_CAPITAL_FLOW_INFERENCE_RE = re.compile(
+    r"(?:dòng tiền\s+(?:lớn|tổ chức|thông minh).{0,65}(?:rút ra|thoát ra|đang rời|tháo chạy|đang gom|thu gom|tích lũy)"
+    r"|(?:institutional|smart money|large capital)\s+(?:flows?\s+)?(?:are\s+)?(?:exiting|flowing out|accumulating|buying up|selling off|withdrawing)"
+    r"|(?:khối ngoại|nhà đầu tư tổ chức).{0,55}(?:rút vốn|bán tháo|gom hàng|thoát hàng|đang bán ròng))",
+    re.IGNORECASE,
+)
+_CAPITAL_FLOW_QUANTIFIED_EVIDENCE_RE = re.compile(
+    r"(?:khối ngoại.{0,50}(?:mua ròng|bán ròng).{0,45}\d[\d,.]*"
+    r"|(?:foreign net (?:buy|sell)|institutional net (?:buy|sell)|net foreign (?:buying|selling))"
+    r".{0,55}\d[\d,.]*)",
+    re.IGNORECASE,
+)
 _INSIDER_QUALIFIER_RE = re.compile(
     r"not proof (?:that )?(?:no|there (?:was|were) no) insider"
     r"|not proof of (?:no|absence of) insider"
@@ -365,6 +384,8 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         "- Prefer a neutral/low-confidence conclusion when a key claim cannot be substantiated; explain which evidence would change the view.",
         "- TRADE-LEVEL CONSISTENCY: keep entry, stop-loss and target in the same currency and price scale. For a buy, the target must be strictly above entry and stop-loss below entry; never label an entry/support price as a profit target.",
         "- REVERSAL PROBABILITY LIMITATION: RSI below 30 or proximity to a Bollinger band does not quantify reversal odds. Do not call a bounce high-probability unless a cited historical test gives its sample, time horizon, and hit rate.",
+        "- CAPITAL-FLOW INFERENCE LIMITATION: OHLC prices, moving averages, RSI, MACD, Bollinger bands, or volume alone do not prove that institutional investors or 'smart money' are exiting, accumulating, or selling net. State that flow direction is unknown unless the supplied evidence contains quantified, source-linked flow data.",
+        "- NUMERIC RISK-PROBABILITY LIMITATION: do not assign a percentage to loss risk, rebound probability, or reversal odds without a cited quantitative method/backtest, defined sample and time horizon. Do not use unsupported claims such as '99% risk' based only on technical indicators.",
     ]
     market = _text(state.get("market_report"))
     if (
@@ -618,6 +639,32 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
                 "The report describes a technical bounce/reversal as highly probable without a cited historical test, "
                 "sample definition, time horizon, or hit rate. RSI oversold conditions and Bollinger proximity alone "
                 "do not establish a quantified probability."
+            ),
+        })
+
+    if (
+        _UNSUPPORTED_NUMERIC_RISK_RE.search(downstream)
+        and not _REVERSAL_EVIDENCE_RE.search(downstream)
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_NUMERIC_RISK_PROBABILITY",
+            "finding": (
+                "Downstream analysis assigns a numeric percentage to risk, loss, or probability without a cited "
+                "quantitative method, defined sample, and time horizon. Remove the percentage or provide a reproducible source."
+            ),
+        })
+
+    if (
+        _CAPITAL_FLOW_INFERENCE_RE.search(downstream)
+        and not _CAPITAL_FLOW_QUANTIFIED_EVIDENCE_RE.search("\n".join((market, news, sentiment, fundamentals)))
+    ):
+        findings.append({
+            "severity": "HIGH",
+            "code": "UNSUPPORTED_CAPITAL_FLOW_INFERENCE",
+            "finding": (
+                "Downstream analysis infers institutional or 'smart money' inflows/outflows from price/technical signals "
+                "without quantified, source-linked flow evidence. OHLC and momentum indicators do not identify investor class or net capital flow."
             ),
         })
 
