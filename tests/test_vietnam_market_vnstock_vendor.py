@@ -59,19 +59,36 @@ def _frames():
 class FakeClient:
     def __init__(self):
         self.income_frame, self.balance_frame, self.cash_flow_frame = _frames()
+        income, balance, cash_flow = _frames()
+        self.kbs_income_frame = FakeFrame(income.rows, source="kbs")
+        self.kbs_balance_frame = FakeFrame(balance.rows, source="kbs")
+        self.kbs_cash_flow_frame = FakeFrame(cash_flow.rows, source="kbs")
+        self.failed_sources = set()
         self.calls = []
 
+    def _fetch(self, name, period, format, source, vci_frame, kbs_frame):
+        self.calls.append((name, period, format, source))
+        if source in self.failed_sources:
+            raise RuntimeError(f"simulated {source.upper()} source outage")
+        return vci_frame if source == "vci" else kbs_frame
+
     def income_statement(self, *, period, format, source):
-        self.calls.append(("income_statement", period, format, source))
-        return self.income_frame
+        return self._fetch(
+            "income_statement", period, format, source,
+            self.income_frame, self.kbs_income_frame,
+        )
 
     def balance_sheet(self, *, period, format, source):
-        self.calls.append(("balance_sheet", period, format, source))
-        return self.balance_frame
+        return self._fetch(
+            "balance_sheet", period, format, source,
+            self.balance_frame, self.kbs_balance_frame,
+        )
 
     def cash_flow(self, *, period, format, source):
-        self.calls.append(("cash_flow", period, format, source))
-        return self.cash_flow_frame
+        return self._fetch(
+            "cash_flow", period, format, source,
+            self.cash_flow_frame, self.kbs_cash_flow_frame,
+        )
 
 
 @pytest.fixture
@@ -92,6 +109,44 @@ def test_vnstock_statement_route_returns_validated_long_csv(fake_vnstock):
     assert "historical first-publication time" in output
     assert "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY" in output
     assert fake_vnstock.calls == [("income_statement", "quarter", "long", "vci")]
+
+
+@pytest.mark.unit
+def test_vnstock_statement_falls_back_to_kbs_and_labels_the_actual_source(fake_vnstock):
+    fake_vnstock.failed_sources.add("vci")
+
+    output = vnstock_fundamentals.get_vnstock_balance_sheet(
+        "FPT", "quarterly", "2026-10-25"
+    )
+
+    assert "# Balance Sheet for FPT from Vnstock KBS" in output
+    assert "# Provider source: vnstock-kbs;" in output
+    assert [call[3] for call in fake_vnstock.calls] == ["vci", "kbs"]
+    assert all(call[2] == "long" for call in fake_vnstock.calls)
+
+
+@pytest.mark.unit
+def test_vnstock_fundamentals_summary_falls_back_as_a_complete_kbs_set(fake_vnstock):
+    fake_vnstock.failed_sources.add("vci")
+
+    output = vnstock_fundamentals.get_vnstock_fundamentals("FPT", "2026-10-25")
+
+    assert "# Current KBS fundamentals for FPT" in output
+    assert "- Source: vnstock-kbs" in output
+    assert "TTM net income: not derived from KBS" in output
+    assert "TTM operating cash flow: not derived from KBS" in output
+    assert "Latest total equity: 200,000,000,000 VND" in output
+    assert [call[3] for call in fake_vnstock.calls] == [
+        "vci", "vci", "vci", "kbs", "kbs", "kbs"
+    ]
+
+
+@pytest.mark.unit
+def test_vnstock_source_chain_rejects_unknown_provider(monkeypatch):
+    monkeypatch.setenv("TRADINGAGENTS_VNSTOCK_FUNDAMENTALS_SOURCES", "vci,unknown")
+
+    with pytest.raises(vnstock_fundamentals.VendorNotConfiguredError, match="only accepts"):
+        vnstock_fundamentals._configured_sources()
 
 
 @pytest.mark.unit
