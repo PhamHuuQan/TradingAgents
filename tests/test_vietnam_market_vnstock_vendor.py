@@ -137,7 +137,7 @@ def test_vnstock_fundamentals_summary_falls_back_as_a_complete_kbs_set(fake_vnst
     assert "TTM operating cash flow: not derived from KBS" in output
     assert "Latest total equity: 200,000,000,000 VND" in output
     assert [call[3] for call in fake_vnstock.calls] == [
-        "vci", "vci", "vci", "kbs", "kbs", "kbs"
+        "vci", "kbs", "kbs", "kbs"
     ]
 
 
