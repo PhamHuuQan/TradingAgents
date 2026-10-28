@@ -61,6 +61,7 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         .replace("\\n", "\n")
         .replace("\\r", "\n")
     )
+    content = content.replace("\ufeff", "").replace("\u200b", "").strip()
     content_folded = content.casefold().lstrip()
 
     unavailable_pattern = re.compile(
