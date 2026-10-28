@@ -14,7 +14,10 @@ _UNAVAILABLE_RE = re.compile(
     r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|EntitlementError|VendorUnavailableError)\b"
     r"|data\s+(?:is\s+)?unavailable|not available|unavailable via (?:the )?api"
     r"|temporarily unavailable|currently unavailable|tạm thời (?:chưa )?khả dụng|không thể trích xuất|không lấy được dữ liệu"
-    r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)",
+    r"|dữ liệu .*?không khả dụng|thiếu dữ liệu (?:tài chính|cơ bản)"
+    r"|(?:revenue|profit before tax|PBT|profit after tax|PAT|EPS|financial statement|financial ratio)"
+    r"\s+(?:details?|values?|metrics?)\s+(?:are|were|is|was)\s+unavailable"
+    r"|values?\s+(?:were|was)\s+not supplied",
     re.IGNORECASE,
 )
 _NO_DATA_RE = re.compile(
@@ -74,7 +77,8 @@ _UNSUPPORTED_FINANCIAL_METRIC_RE = re.compile(
     re.IGNORECASE,
 )
 _UNSUPPORTED_VALUATION_CLAIM_RE = re.compile(
-    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|deep[- ]value)\b"
+    r"\b(?:undervalued|underpriced|mispriced|cheaply valued|bargain[- ]priced|bargain|deep[- ]value)\b"
+    r"|\bgift at this price\b"
     r"|(?:định giá thấp|được định giá thấp|đang bị thị trường định giá thấp|định giá hấp dẫn|mức định giá hấp dẫn|"
     r"giá rẻ|mua rẻ|chiết khấu sâu|vùng giá chiết khấu|giá chiết khấu|món hời|món quà(?: từ trên trời rơi xuống)?)"
     r"|priced irrationally low|trading below intrinsic value",
@@ -390,7 +394,9 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         guardrails.append(
             "- FUNDAMENTALS LIMITATION: usable source-linked earnings metrics and financial statements/ratios "
             "are unavailable in the supplied fundamentals report. Do not invent revenue, PBT, PAT, EPS, "
-            "cash flow, margins, solvency, valuation ratios, or a strong financial position. State the limitation."
+            "cash flow, margins, solvency, valuation ratios, or a strong financial position. "
+            "Do not assert strong/weak cash flow, balance-sheet strength, or liquidity without a source for that exact metric. "
+            "State the limitation."
         )
     if _requires_fundamentals(state) and (
         fundamentals_fully_unavailable or fundamentals_are_partial
