@@ -113,7 +113,7 @@ _UNSUPPORTED_NUMERIC_RISK_RE = re.compile(
 )
 _CAPITAL_FLOW_INFERENCE_RE = re.compile(
     r"(?:dòng tiền\s+(?:lớn|tổ chức|thông minh).{0,65}(?:rút ra|thoát ra|đang rời|tháo chạy|đang gom|thu gom|tích lũy)"
-    r"|(?:institutional|smart money|large capital)\s+(?:flows?\s+)?(?:are\s+)?(?:exiting|flowing out|accumulating|buying up|selling off|withdrawing)"
+    r"|(?:institutional|smart money|large capital|large institutional money|institutional money|institutional capital)\s+(?:flows?\s+)?(?:(?:are|is)\s+)?(?:exiting|flowing out|accumulating|buying up|selling off|withdrawing)"
     r"|(?:khối ngoại|nhà đầu tư tổ chức).{0,55}(?:rút vốn|bán tháo|gom hàng|thoát hàng|đang bán ròng))",
     re.IGNORECASE,
 )
