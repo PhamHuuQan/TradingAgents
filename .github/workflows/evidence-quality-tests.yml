@@ -55,7 +55,8 @@ on:
       - "tests/test_report_html.py"
       - "tests/test_reporting.py"
       - ".github/workflows/evidence-quality-tests.yml"
-      - "notebooks/TradingAgents_FPT_Evidence_Quality_And_Report.ipynb"
+      - "notebooks/TradingAgents_Evidence_Quality_Audit.ipynb"
+      - "docs/financial-evidence-audit.md"
   pull_request:
     branches:
       - feature/vietnam-market-foundation
@@ -112,7 +113,7 @@ on:
       - "tests/test_report_html.py"
       - "tests/test_reporting.py"
       - ".github/workflows/evidence-quality-tests.yml"
-      - "notebooks/TradingAgents_FPT_Evidence_Quality_And_Report.ipynb"
+      - "notebooks/TradingAgents_Evidence_Quality_Audit.ipynb"
   workflow_dispatch:
 
 permissions:
