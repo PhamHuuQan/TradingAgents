@@ -240,6 +240,13 @@ def _run_details(final_state: dict, settings: dict | None) -> list[tuple[str, st
                 _group(_CATEGORY.get(k, k), _chain(v)) for k, v in vendors.items()
             )))
         details.append(("Version", escape(f"TradingAgents {s('version', '?')}")))
+        code_branch = s("code_branch")
+        code_commit = s("code_commit")
+        if code_branch or code_commit:
+            details.append(("Code revision", _fields([
+                code_branch or "unknown",
+                code_commit or "unknown",
+            ])))
     if final_state.get("memory_note"):
         details.append(("Memory log", escape(final_state["memory_note"])))
     return details

@@ -1,3 +1,5 @@
+from tradingagents.report_quality import build_decision_evidence_guardrails
+
 from tradingagents.agents.context import (
     get_instrument_context_from_state,
     get_language_instruction,
@@ -27,6 +29,7 @@ def create_bull_researcher(llm):
             if asset_type == "stock"
             else "Asset fundamentals report (may be unavailable for crypto)"
         )
+        evidence_guardrails = build_decision_evidence_guardrails(state)
 
         prompt = f"""You are a Bull Analyst advocating for investing in the {target_label}. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively.
 
@@ -43,6 +46,7 @@ Market research report: {market_research_report}
 Social media sentiment report: {sentiment_report}
 Latest world affairs news: {news_report}
 {fundamentals_label}: {fundamentals_report}
+{evidence_guardrails}
 Conversation history of the debate: {history}
 Last bear argument: {current_response}
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position.

@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from tradingagents.agents.rating import run_rating
+from tradingagents.report_quality import build_report_quality_audit, render_report_quality_markdown
 
 
 def analyst_names(keys) -> list[str]:
@@ -35,6 +36,13 @@ def _header(ticker: str, final_state: dict, settings: dict | None) -> str:
             models = (f"deep {deep_provider} {s('deep_think_llm', '?')}, "
                       f"quick {quick_provider} {s('quick_think_llm', '?')}")
         lines.append(f"- TradingAgents {s('version', '?')}: {models}")
+        code_branch = s("code_branch")
+        code_commit = s("code_commit")
+        if code_branch or code_commit:
+            lines.append(
+                f"- Code revision: `{code_branch or 'unknown'}` @ "
+                f"`{code_commit or 'unknown'}`"
+            )
         lines.append(f"- Analysts: {', '.join(analyst_names(s('analysts')))}; "
                      f"research debate rounds {s('max_debate_rounds', '?')}, "
                      f"risk debate rounds {s('max_risk_discuss_rounds', '?')}")
@@ -100,6 +108,19 @@ def write_report_tree(final_state: dict, ticker: str, save_path, settings: dict 
     save_path = Path(save_path)
     save_path.mkdir(parents=True, exist_ok=True)
     parts = _report_parts(final_state)
+
+    # Preserve the original agent reports and append a deterministic audit that
+    # makes known source/data limitations visible in both Markdown and HTML.
+    quality_text = render_report_quality_markdown(build_report_quality_audit(final_state))
+    quality_dir = save_path / "6_quality"
+    quality_dir.mkdir(exist_ok=True)
+    (quality_dir / "report_quality.md").write_text(quality_text, encoding="utf-8")
+    parts.append((
+        "VI. Data Quality & Evidence Audit",
+        "6_quality",
+        [("Automated Evidence Audit", "report_quality.md", quality_text)],
+    ))
+
     sections = []
     for heading, folder, written in parts:
         (save_path / folder).mkdir(exist_ok=True)

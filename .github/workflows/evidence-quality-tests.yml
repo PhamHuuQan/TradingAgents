@@ -1,0 +1,219 @@
+# Evidence-quality regression workflow; source changes must be tested on this branch.
+name: Evidence quality and FPT IR regression tests
+
+on:
+  push:
+    branches:
+      - feature/report-evidence-quality-20261027
+      - fix/report-provenance-audit-20261028
+      - antigravity/recovered-fpt-evidence-20261028
+    paths:
+      - "tradingagents/report_quality.py"
+      - "tradingagents/reporting.py"
+      - "tradingagents/dataflows/vendors/fpt_ir.py"
+      - "tradingagents/dataflows/vendors/yahoo/fundamentals.py"
+      - "tradingagents/dataflows/vendors/yahoo/news.py"
+      - "tradingagents/dataflows/vendors/yahoo/snapshot.py"
+      - "tradingagents/dataflows/vendors/fred.py"
+      - "tradingagents/dataflows/vendors/polymarket.py"
+      - "tradingagents/dataflows/vendors/reddit.py"
+      - "tradingagents/dataflows/vendors/stocktwits.py"
+      - "tradingagents/dataflows/router.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
+      - "tradingagents/dataflows/vietnam_market/vnstock_adapter.py"
+      - "tradingagents/agents/tools.py"
+      - "tradingagents/graph/trading_graph.py"
+      - "tradingagents/report_html.py"
+      - "tradingagents/agents/analysts/**"
+      - "tradingagents/agents/structured.py"
+      - "tradingagents/llm_clients/model_catalog.py"
+      - "tradingagents/agents/researchers/**"
+      - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/risk_mgmt/**"
+      - "tradingagents/agents/trader/**"
+      - "tests/test_report_quality.py"
+      - "tests/test_model_validation.py"
+      - "tests/test_structured_agent_prompts.py"
+      - "tests/test_market_provenance.py"
+      - "tests/test_sentiment_provenance.py"
+      - "tests/test_vietnam_market_ssi_vendor.py"
+      - "tests/test_news_provenance.py"
+      - "tests/test_fpt_ir.py"
+      - "tests/test_fundamentals_provenance.py"
+      - "tests/test_fundamentals_units.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_structured_agents.py"
+      - "tests/test_memory_log.py"
+      - "tests/test_yahoo_rate_limit.py"
+      - "tests/test_vietnam_market_vnstock.py"
+      - "tests/test_news_lookahead.py"
+      - "tests/test_yahoo_snapshot.py"
+      - "tests/test_fred.py"
+      - "tests/test_polymarket.py"
+      - "tests/test_reddit_fallback.py"
+      - "tests/test_stocktwits_resilience.py"
+      - "tests/test_report_html.py"
+      - "tests/test_reporting.py"
+      - ".github/workflows/evidence-quality-tests.yml"
+      - "notebooks/TradingAgents_Evidence_Quality_Audit.ipynb"
+      - "docs/financial-evidence-audit.md"
+  pull_request:
+    branches:
+      - feature/vietnam-market-foundation
+      - feature/report-evidence-quality-20261027
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - "tradingagents/report_quality.py"
+      - "tradingagents/reporting.py"
+      - "tradingagents/dataflows/vendors/fpt_ir.py"
+      - "tradingagents/dataflows/vendors/yahoo/fundamentals.py"
+      - "tradingagents/dataflows/vendors/yahoo/news.py"
+      - "tradingagents/dataflows/vendors/yahoo/snapshot.py"
+      - "tradingagents/dataflows/vendors/fred.py"
+      - "tradingagents/dataflows/vendors/polymarket.py"
+      - "tradingagents/dataflows/vendors/reddit.py"
+      - "tradingagents/dataflows/vendors/stocktwits.py"
+      - "tradingagents/dataflows/router.py"
+      - "tradingagents/dataflows/vendors/vnstock_fundamentals.py"
+      - "tradingagents/dataflows/vietnam_market/vnstock_adapter.py"
+      - "tradingagents/agents/tools.py"
+      - "tradingagents/graph/trading_graph.py"
+      - "tradingagents/report_html.py"
+      - "tradingagents/agents/analysts/**"
+      - "tradingagents/agents/researchers/**"
+      - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/risk_mgmt/**"
+      - "tradingagents/agents/trader/**"
+      - "tests/test_report_quality.py"
+      - "tests/test_yahoo_rate_limit.py"
+      - "tests/test_memory_log.py"
+      - "tests/test_structured_agents.py"
+      - "tests/test_vietnam_market_ssi.py"
+      - "tests/test_model_validation.py"
+      - "tests/test_structured_agent_prompts.py"
+      - "tests/test_market_provenance.py"
+      - "tests/test_sentiment_provenance.py"
+      - "tests/test_vietnam_market_ssi_vendor.py"
+      - "tests/test_news_provenance.py"
+      - "tests/test_fpt_ir.py"
+      - "tests/test_fundamentals_provenance.py"
+      - "tests/test_fundamentals_units.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
+      - "tests/test_vietnam_market_vnstock.py"
+      - "tests/test_news_lookahead.py"
+      - "tests/test_yahoo_snapshot.py"
+      - "tests/test_fred.py"
+      - "tests/test_polymarket.py"
+      - "tests/test_reddit_fallback.py"
+      - "tests/test_stocktwits_resilience.py"
+      - "tests/test_report_html.py"
+      - "tests/test_reporting.py"
+      - ".github/workflows/evidence-quality-tests.yml"
+      - "notebooks/TradingAgents_Evidence_Quality_Audit.ipynb"
+      - "docs/financial-evidence-audit.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project and development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Run evidence/provenance/report regressions
+        run: |
+          python -m pytest -q \
+            tests/test_report_quality.py \
+            tests/test_structured_agents.py \
+            tests/test_memory_log.py \
+            tests/test_yahoo_rate_limit.py \
+            tests/test_model_validation.py \
+            tests/test_structured_agent_prompts.py \
+            tests/test_market_provenance.py \
+            tests/test_sentiment_provenance.py \
+            tests/test_vietnam_market_ssi_vendor.py \
+            tests/test_vietnam_market_ssi.py \
+            tests/test_news_provenance.py \
+            tests/test_fpt_ir.py \
+            tests/test_fundamentals_provenance.py \
+            tests/test_fundamentals_units.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
+            tests/test_vietnam_market_vnstock.py \
+            tests/test_news_lookahead.py \
+            tests/test_yahoo_snapshot.py \
+            tests/test_fred.py \
+            tests/test_polymarket.py \
+            tests/test_reddit_fallback.py \
+            tests/test_stocktwits_resilience.py \
+            tests/test_report_html.py \
+            tests/test_reporting.py
+      - name: Run full repository regression suite
+        run: python -m pytest -q tests/
+      - name: Lint changed Python files
+        run: |
+          python -m ruff check \
+            tradingagents/report_quality.py \
+            tradingagents/reporting.py \
+            tradingagents/dataflows/vendors/fpt_ir.py \
+            tradingagents/dataflows/vendors/yahoo/fundamentals.py \
+            tradingagents/dataflows/vendors/yahoo/news.py \
+            tradingagents/dataflows/vendors/yahoo/snapshot.py \
+            tradingagents/dataflows/vendors/fred.py \
+            tradingagents/dataflows/vendors/polymarket.py \
+            tradingagents/dataflows/vendors/reddit.py \
+            tradingagents/dataflows/vendors/stocktwits.py \
+            tradingagents/dataflows/router.py \
+            tradingagents/dataflows/vendors/vnstock_fundamentals.py \
+            tradingagents/dataflows/vietnam_market/vnstock_adapter.py \
+            tradingagents/agents/tools.py \
+            tradingagents/graph/trading_graph.py \
+            tradingagents/report_html.py \
+            tradingagents/agents/structured.py \
+            tradingagents/llm_clients/model_catalog.py \
+            tradingagents/agents/analysts/market_analyst.py \
+            tradingagents/agents/analysts/fundamentals_analyst.py \
+            tradingagents/agents/analysts/news_analyst.py \
+            tradingagents/agents/analysts/sentiment_analyst.py \
+            tradingagents/agents/researchers/bull_researcher.py \
+            tradingagents/agents/researchers/bear_researcher.py \
+            tradingagents/agents/managers/research_manager.py \
+            tradingagents/agents/managers/portfolio_manager.py \
+            tradingagents/agents/risk_mgmt/aggressive_debator.py \
+            tradingagents/agents/risk_mgmt/conservative_debator.py \
+            tradingagents/agents/risk_mgmt/neutral_debator.py \
+            tradingagents/agents/trader/trader.py \
+            tests/test_report_quality.py \
+            tests/test_structured_agent_prompts.py \
+            tests/test_market_provenance.py \
+            tests/test_sentiment_provenance.py \
+            tests/test_vietnam_market_ssi_vendor.py \
+            tests/test_news_provenance.py \
+            tests/test_fpt_ir.py \
+            tests/test_fundamentals_provenance.py \
+            tests/test_fundamentals_units.py \
+            tests/test_vietnam_market_vnstock_vendor.py \
+            tests/test_vietnam_market_vnstock.py \
+            tests/test_news_lookahead.py \
+            tests/test_yahoo_snapshot.py \
+            tests/test_fred.py \
+            tests/test_polymarket.py \
+            tests/test_reddit_fallback.py \
+            tests/test_stocktwits_resilience.py \
+            tests/test_report_html.py \
+            tests/test_reporting.py

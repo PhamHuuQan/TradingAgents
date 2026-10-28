@@ -186,7 +186,7 @@ def build_default_config() -> dict:
             "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance, ssi/vnstock (same selected OHLCV source)
             # Statements come from SEC EDGAR as filed (US filers), then Yahoo; the
         # overview and insider tools, which SEC EDGAR does not serve, from Yahoo.
-            "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance, vnstock (explicit/current-date only)
+            "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance, vnstock (current-date only), fpt_ir (FPT-only/current-date only)
             "news_data": "yfinance",             # Options: alpha_vantage, yfinance
             "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
             "prediction_markets": "polymarket",  # Options: polymarket (keyless)

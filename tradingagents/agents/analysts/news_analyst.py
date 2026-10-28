@@ -1,3 +1,6 @@
+import re
+
+from langchain_core.messages import ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.analysts.turn import take_turn
@@ -18,6 +21,85 @@ TOOLS = (
 )
 
 
+
+
+def _append_news_tool_evidence(report: str, messages) -> str:
+    """Append source dates/URLs present in the exact news-tool results."""
+    if not report.strip():
+        return report
+    heading = "### Source records returned by news tools"
+    if heading in report:
+        report = report.split(heading, 1)[0].rstrip()
+
+    records = []
+    unavailable_blocks = []
+    no_match_blocks = []
+    for message in messages or ():
+        if not isinstance(message, ToolMessage):
+            continue
+        tool_name = str(getattr(message, "name", "") or "")
+        content = str(getattr(message, "content", "") or "")
+        if tool_name not in {"get_news", "get_global_news"} and not re.search(
+            r"(?m)^###\s+.+\nPublication date:", content
+        ):
+            continue
+        folded_content = content.casefold()
+        if any(token in folded_content for token in ("data_unavailable", "unavailable:", "vendorunavailableerror", "failed", "timed out", "timeout")):
+            unavailable_blocks.append((tool_name or "news tool", content[:260].replace("\n", " ")))
+        elif "no news found" in folded_content or "no global news found" in folded_content:
+            no_match_blocks.append((tool_name or "news tool", content[:260].replace("\n", " ")))
+        for chunk in re.split(r"(?m)(?=^###\s+)", content):
+            title_match = re.search(r"(?m)^###\s+(.+?)(?:\s+\(source:\s*(.+?)\))?\s*$", chunk)
+            if not title_match:
+                continue
+            title = title_match.group(1).strip()
+            publisher = (title_match.group(2) or "publisher not labelled").strip()
+            date_match = re.search(r"(?im)^\s*Publication date:\s*(.+?)\s*$", chunk)
+            url_match = re.search(r"(?im)^\s*Link:\s*(https?://\S+)\s*$", chunk)
+            publication_date = date_match.group(1).strip() if date_match else "unavailable from provider"
+            url = url_match.group(1).strip().rstrip(".,;:!?)]}") if url_match else None
+            if url and not url.startswith("https://"):
+                url = None
+            key = (title, publisher, publication_date, url)
+            if key not in records:
+                records.append(key)
+
+    if not records and not unavailable_blocks and not no_match_blocks:
+        return report
+
+    lines = ["", heading, "", "- The following records were copied from the news tools' returned blocks; their presence does not independently validate the article or claim.", ""]
+    if records:
+        for title, publisher, pub_date, url in records[:20]:
+            suffix = f"; URL: {url}" if url else "; Source URL unavailable from the provider"
+            lines.append(f"- {title} — {publisher}; publication date: {pub_date}{suffix}")
+        if len(records) > 20:
+            lines.append(f"- {len(records) - 20} additional tool-returned news records omitted from this index.")
+    else:
+        lines.append("- No article-level records with publisher/date/URL were available in the supplied tool results.")
+    if no_match_blocks:
+        lines.append("")
+        lines.append("**Queries with no matching news returned for the requested window**")
+        for tool_name, detail in list(dict.fromkeys(no_match_blocks))[:5]:
+            lines.append(f"- {tool_name}: {detail}")
+    if unavailable_blocks:
+        lines.append("")
+        lines.append("**Provider or retrieval failures**")
+        for tool_name, detail in list(dict.fromkeys(unavailable_blocks))[:5]:
+            lines.append(f"- {tool_name}: {detail}")
+    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
+
+
+def _prediction_market_relevance_guardrail() -> str:
+    """Keep broad prediction-market searches from contaminating investment evidence."""
+    return (
+        " PREDICTION-MARKET RELEVANCE: Only report a market when its question is materially relevant "
+        "to the asset, its sector, or a macro driver with a clear transmission channel. "
+        "Exclude unrelated sports, entertainment, or other markets returned by broad searches. "
+        "If only irrelevant markets are returned, state that no relevant market was found; "
+        "do not include those markets in the investment thesis or key-events table."
+    )
+
+
 def create_news_analyst(llm):
     def news_analyst_node(state):
         current_date = state["trade_date"]
@@ -28,6 +110,8 @@ def create_news_analyst(llm):
         system_message = (
             f"You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(start_date, end_date) for news about the {asset_label} under analysis, get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news, get_macro_indicators(indicator, curr_date, look_back_days) to ground macro commentary in actual data from FRED (e.g. 'cpi', 'core_pce', 'unemployment', 'fed_funds_rate', '10y_treasury', 'yield_curve'), and get_prediction_markets(topic, limit) for live market-implied probabilities of forward-looking events (e.g. 'Fed rate cut', 'recession 2026', geopolitical or sector events). Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            + _prediction_market_relevance_guardrail()
+            + " SOURCE-PROVENANCE REQUIREMENTS: Preserve direct URLs, publisher/provider names, and publication dates exactly as returned by news tools. For macro time series, state series/title, unit, observation date, value and source. For prediction-market probabilities, include market URL, observed probability, retrieval/observation time, volume/liquidity context if returned, and label the figure as market-implied rather than fact. If a source returns DATA_UNAVAILABLE or an unavailable/error placeholder, say it could not be checked. If a query returns no matching items, distinguish that from a provider failure and do not claim this proves no event/news occurred. Never invent a source URL, event, probability, date, or macro number. Add a Sources table with direct links for the claims that materially affect the thesis."
             + get_language_instruction()
         )
 
@@ -54,6 +138,8 @@ def create_news_analyst(llm):
         prompt = prompt.partial(instrument_context=instrument_context)
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        if report:
+            report = _append_news_tool_evidence(report, state.get("messages", []))
 
         return {
             "messages": [result],

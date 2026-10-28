@@ -1,3 +1,6 @@
+import re
+
+from langchain_core.messages import ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.analysts.turn import take_turn
@@ -10,6 +13,86 @@ TOOLS = (
     get_indicators,
     get_verified_market_snapshot,
 )
+
+
+def _append_verified_market_provenance(report: str, messages) -> str:
+    """Append metadata only from the latest successful verified snapshot result."""
+    if not report.strip():
+        return report
+
+    matching_messages = [
+        message for message in (messages or ())
+        if isinstance(message, ToolMessage)
+        and getattr(message, "name", None) == "get_verified_market_snapshot"
+    ]
+    if not matching_messages:
+        return report
+
+    # Use the latest call result. If a later call failed, an earlier successful
+    # snapshot must not be reused as though it were current.
+    message = matching_messages[-1]
+    raw_content = getattr(message, "content", "")
+    if isinstance(raw_content, list):
+        content = "\n".join(
+            str(item.get("text", "")) if isinstance(item, dict) else str(item)
+            for item in raw_content
+        )
+    else:
+        content = str(raw_content)
+    content = content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
+    # Provider wrappers may introduce invisible BOM/zero-width characters around sentinels.
+    content = content.replace("\ufeff", "").replace("\u200b", "").strip()
+    content_folded = content.casefold().lstrip()
+
+    unavailable_pattern = re.compile(
+        r"\b(?:DATA[\s_-]*UNAVAILABLE|NO[\s_-]*DATA[\s_-]*AVAILABLE|VendorUnavailableError|EntitlementError)\b"
+        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot|"
+        r"market snapshot (?:is )?(?:missing|unavailable|failed)",
+        re.IGNORECASE,
+    )
+    # Fail closed before parsing metadata: an error payload must never create a
+    # provenance section or replace an existing section with fabricated fields.
+    if (
+        unavailable_pattern.search(content)
+        or content_folded.startswith(("error:", "failed:", "<error", "{'error'", '{"error"'))
+        or content_folded in {"", "none", "null"}
+    ):
+        return report
+
+    verified_heading_pattern = re.compile(
+        r"(?im)^\s*#{1,6}\s*Verified(?: SSI)? market data snapshot\b"
+    )
+    has_verified_heading = bool(verified_heading_pattern.search(content))
+    has_snapshot_metadata = all(
+        re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+        for pattern in (
+            r"^\s*[-*]?\s*Requested as-of date\s*:",
+            r"^\s*[-*]?\s*Latest returned trading row\s*:",
+            r"^\s*[-*]?\s*Source\s*:",
+        )
+    )
+    if not (has_verified_heading or has_snapshot_metadata):
+        return report
+
+    existing_heading = "### Market Data Provenance"
+    if existing_heading in report:
+        report = report.split(existing_heading, 1)[0].rstrip()
+
+    fields = (
+        ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
+        ("Source URL", r"(?im)^\s*(?:[-*]\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\s*[:：]\s*(.+)$"),
+        ("Retrieved at", r"(?im)^\s*(?:[-*]\s*)?Retrieved at(?: \(UTC\))?\s*[:：]\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested as-of date\s*[:：]\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest returned trading row\s*[:：]\s*(.+)$"),
+    )
+    lines = ["", "### Market Data Provenance", ""]
+    for label, pattern in fields:
+        match = re.search(pattern, content)
+        if match:
+            lines.append(f"- {label}: {match.group(1).strip()}")
+        elif label in {"Provider", "Source URL", "Retrieved at"}:
+            lines.append(f"- {label}: not supplied by provider")
+    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 def create_market_analyst(llm):
@@ -47,6 +130,8 @@ Volume-Based Indicators:
 
 Before writing the final report, call get_verified_market_snapshot for this ticker and the current date, and treat it as the source of truth for any exact OHLCV, price-level, or indicator-value claim. If another tool's output conflicts with the verified snapshot, flag the discrepancy rather than inventing a reconciled number. Do not claim historical validation, support/resistance bounces, or exact percentage moves unless they are directly supported by tool output with concrete dates and prices.
 
+MANDATORY PROVENANCE: Include a clearly labelled "Market Data Provenance" section at the end. Copy the provider/source, exact "Source URL", "Retrieved at" timestamp, requested as-of date, and latest returned trading-row date from get_verified_market_snapshot. Do not silently drop those metadata lines. If the snapshot lacks a field, explicitly write "not supplied by provider"; never invent one or substitute a general home page for a data endpoint.
+
 Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + get_language_instruction()
@@ -75,6 +160,8 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
         prompt = prompt.partial(instrument_context=instrument_context)
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        if report:
+            report = _append_verified_market_provenance(report, state.get("messages", []))
 
         return {
             "messages": [result],

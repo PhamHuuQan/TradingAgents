@@ -109,6 +109,7 @@ class FredConfigTests(unittest.TestCase):
 
 
 @pytest.mark.unit
+@mock.patch.dict("os.environ", {"FRED_API_KEY": "test-fred-key"})
 class FredFormattingTests(unittest.TestCase):
     def test_report_has_header_latest_change_and_table(self):
         with mock.patch.object(fred, "_request", side_effect=_request_stub()):
@@ -116,6 +117,11 @@ class FredFormattingTests(unittest.TestCase):
         self.assertIn("## FRED: Unemployment Rate (UNRATE)", out)
         self.assertIn("Units: %", out)
         self.assertIn("Frequency: Monthly (SA)", out)
+        self.assertIn("Source URL: https://fred.stlouisfed.org/series/UNRATE", out)
+        self.assertIn("not endorsed or certified by the Federal Reserve Bank of St. Louis", out)
+        self.assertIn("Retrieved at (UTC):", out)
+        self.assertIn("Data vintage as of:", out)
+        self.assertIn("Observation window: 2024-09-30 to 2025-09-30", out)
         self.assertIn("**Latest:** 4.4 (2025-09-01)", out)
         # The change names the observations it spans, not the lookback window,
         # so a 3-month move on a monthly series cannot read as year on year.
@@ -213,6 +219,36 @@ class FredFormattingTests(unittest.TestCase):
             self.assertEqual(captured[path]["realtime_end"], "2026-08-31", path)
         # the observation window still tracks as_of_date, not the clamped vintage
         self.assertEqual(captured["series/observations"]["observation_end"], "2026-09-01")
+
+
+    def test_keyless_live_csv_fallback_is_source_linked_and_warns_about_vintage(self):
+        response = mock.Mock()
+        response.text = (
+            "observation_date,UNRATE\n"
+            "2026-08-01,4.3\n"
+            "2026-09-01,4.4\n"
+        )
+        with mock.patch.dict("os.environ", {}, clear=True), \
+                mock.patch.object(fred, "_fred_today", return_value="2026-10-27"), \
+                mock.patch.object(fred, "get_scrubbed", return_value=response) as fetch:
+            out = fred.get_macro_data("unemployment", "2026-10-27", 365)
+
+        self.assertIn("## FRED: Unemployment Rate (UNRATE)", out)
+        self.assertIn("https://fred.stlouisfed.org/series/UNRATE", out)
+        self.assertIn("not endorsed or certified by the Federal Reserve Bank of St. Louis", out)
+        self.assertIn("fredgraph.csv?id=UNRATE", out)
+        self.assertIn("latest values served at retrieval time", out)
+        self.assertIn("never historical backtests", out)
+        self.assertIn("**Latest:** 4.4 (2026-09-01)", out)
+        fetch.assert_called_once()
+
+    def test_keyless_csv_fallback_refuses_historical_date_to_prevent_lookahead(self):
+        with mock.patch.dict("os.environ", {}, clear=True), \
+                mock.patch.object(fred, "_fred_today", return_value="2026-10-27"), \
+                mock.patch.object(fred, "get_scrubbed") as fetch, \
+                self.assertRaises(fred.FredNotConfiguredError):
+            fred.get_macro_data("unemployment", "2026-10-26", 365)
+        fetch.assert_not_called()
 
 
 @pytest.mark.unit

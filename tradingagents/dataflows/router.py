@@ -17,6 +17,7 @@ from tradingagents.dataflows.vendors.alpha_vantage import (
     get_news as get_alpha_vantage_news,
     get_stock as get_alpha_vantage_stock,
 )
+from tradingagents.dataflows.vendors.fpt_ir import get_fpt_ir_fundamentals
 from tradingagents.dataflows.vendors.fred import get_macro_data as get_fred_macro_data
 from tradingagents.dataflows.vendors.polymarket import (
     get_prediction_markets as get_polymarket_prediction_markets,
@@ -109,7 +110,9 @@ OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 
 # SSI must be explicitly selected. Its historical responses carry fetch-time
 # availability only, so it must not enter the implicit "default" vendor chain.
-EXPLICIT_ONLY_VENDORS = frozenset({"ssi", "vnstock"})
+# SSI/Vnstock require explicit selection; the FPT IR adapter is issuer-specific
+# and only provides a current 9M performance summary, not a universal data feed.
+EXPLICIT_ONLY_VENDORS = frozenset({"ssi", "vnstock", "fpt_ir"})
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
@@ -132,6 +135,7 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
         "vnstock": get_vnstock_fundamentals,
+        "fpt_ir": get_fpt_ir_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,

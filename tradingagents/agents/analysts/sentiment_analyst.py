@@ -17,7 +17,9 @@ supports it and free text otherwise, so the band, score and confidence header
 reads the same across providers.
 """
 
+import re
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -118,6 +120,15 @@ def create_sentiment_analyst(llm):
             render_sentiment_report,
             "Sentiment Analyst",
         )
+        report_text = _append_sentiment_source_provenance(
+            report_text,
+            ticker=ticker,
+            start_date=start_date,
+            end_date=end_date,
+            news_block=news_block,
+            stocktwits_block=stocktwits_block,
+            reddit_block=reddit_block,
+        )
 
         return {
             "messages": [AIMessage(content=report_text)],
@@ -125,6 +136,192 @@ def create_sentiment_analyst(llm):
         }
 
     return sentiment_analyst_node
+
+
+
+
+_ALLOWED_SENTIMENT_SOURCE_HOSTS = {
+    "finance.yahoo.com",
+    "news.yahoo.com",
+    "api.stocktwits.com",
+    "stocktwits.com",
+    "www.stocktwits.com",
+    "reddit.com",
+    "www.reddit.com",
+    "old.reddit.com",
+}
+
+
+def _sentiment_source_url(value: str) -> str | None:
+    """Keep only HTTPS URLs from providers used by this sentiment node."""
+    candidate = (value or "").strip().rstrip(".,;:!?)]}")
+    try:
+        parsed = urlparse(candidate)
+    except ValueError:
+        return None
+    if parsed.scheme != "https" or (parsed.hostname or "").casefold() not in _ALLOWED_SENTIMENT_SOURCE_HOSTS:
+        return None
+    return candidate
+
+
+def _append_sentiment_source_provenance(
+    report_text: str,
+    *,
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    news_block: str,
+    stocktwits_block: str,
+    reddit_block: str,
+) -> str:
+    """Append deterministic citations/coverage for source blocks actually given to the model."""
+    if not report_text.strip():
+        return report_text
+
+    # Some provider wrappers serialize multiline tool output with literal \\n sequences.
+    # Normalize that representation before parsing individual rows, URLs and missing-link markers.
+    news_block = (news_block or "").replace("\\n", "\n")
+    stocktwits_block = (stocktwits_block or "").replace("\\n", "\n")
+    reddit_block = (reddit_block or "").replace("\\n", "\n")
+
+    existing_heading = "### Source URLs and coverage supplied to sentiment analysis"
+    lines = [
+        "",
+        "### Source URLs and coverage supplied to sentiment analysis",
+        "",
+        f"- Ticker: {ticker}",
+        f"- Analysis window: {start_date} through {end_date}",
+        "- This index preserves links returned by the source fetchers. It does not independently verify the claims or treat an empty feed as proof of no discussion.",
+        "",
+    ]
+    url_count = 0
+
+    # Replace a model-written source section, if any, with deterministic entries
+    # from the exact tool blocks rather than duplicating or trusting an incomplete index.
+    if existing_heading in report_text:
+        report_text = report_text.split(existing_heading, 1)[0].rstrip()
+
+    # Keep article title, publisher, publication date and URL together so readers
+    # can assess each news item without relying on model-generated citations.
+    article_chunks = re.split(r"(?m)(?=^###\s+)", news_block or "")
+    article_rows = []
+    for chunk in article_chunks:
+        header = re.search(r"(?m)^###\s+(.+?)(?:\s+\(source:\s*(.+?)\))?\s*$", chunk)
+        if not header:
+            continue
+        title = header.group(1).strip()
+        publisher = (header.group(2) or "publisher not labelled").strip()
+        date_match = re.search(r"(?im)^\s*Publication date:\s*(.+?)\s*$", chunk)
+        link_match = re.search(r"(?im)^\s*Link:\s*(https?://\S+)\s*$", chunk)
+        publication_date = date_match.group(1).strip() if date_match else "unavailable from provider"
+        url = _sentiment_source_url(link_match.group(1)) if link_match else None
+        if url:
+            article_rows.append((title, publisher, publication_date, url))
+        elif title:
+            article_rows.append((title, publisher, publication_date, None))
+
+    lines.append("**Yahoo Finance news items supplied to the sentiment analyst**")
+    if not article_rows:
+        lines.append("- No article records could be extracted from the fetched news block; this is not proof that no news exists.")
+    else:
+        for title, publisher, pub_date, url in article_rows[:10]:
+            if url:
+                lines.append(f"- {title} — {publisher}; publication date: {pub_date}; URL: {url}")
+                url_count += 1
+            else:
+                lines.append(f"- {title} — {publisher}; publication date: {pub_date}; direct article URL was not supplied.")
+        if len(article_rows) > 10:
+            lines.append(f"- {len(article_rows) - 10} additional fetched article records omitted from this index.")
+    lines.append("")
+
+    # Separate the StockTwits provider endpoint from individual message permalinks.
+    st_lines = (stocktwits_block or "").splitlines()
+    st_endpoint = None
+    for row in st_lines:
+        match = re.match(r"(?i)^\s*Source URL:\s*(https?://\S+)\s*$", row)
+        if match:
+            candidate = _sentiment_source_url(match.group(1))
+            if candidate and urlparse(candidate).hostname == "api.stocktwits.com":
+                st_endpoint = candidate
+                break
+    st_posts = []
+    for row in st_lines:
+        match = re.match(r"(?i)^\s*Source URL:\s*(https?://\S+)\s*$", row)
+        if not match:
+            continue
+        candidate = _sentiment_source_url(match.group(1))
+        if candidate and urlparse(candidate).hostname in {"stocktwits.com", "www.stocktwits.com"}:
+            st_posts.append(candidate)
+    lines.append("**StockTwits**")
+    if st_endpoint:
+        lines.append(f"- Provider endpoint: {st_endpoint}")
+        url_count += 1
+    st_folded = (stocktwits_block or "").casefold()
+    st_no_messages = "no stocktwits messages" in st_folded
+    st_screened_all = "none of the" in st_folded and "messages is about" in st_folded
+    # Provider rows may be indented; recognize them before deciding that no message was supplied.
+    st_has_message_rows = bool(
+        re.search(r"(?m)^\s*(?:[-*]\s*)?\[\s*\d{4}[-/]\d{2}[-/]\d{2}\b", stocktwits_block or "")
+    )
+    # Count explicit missing-link markers separately from found permalinks so
+    # partially linked feeds do not hide other fetched messages without URLs.
+    st_missing_permalink_count = len(re.findall(
+        r"(?i)(?:source|message|post)\s+(?:url|permalink)\s+unavailable from the provider",
+        stocktwits_block or "",
+    ))
+    st_has_missing_permalink = st_missing_permalink_count > 0
+    if st_posts:
+        for url in dict.fromkeys(st_posts[:10]):
+            lines.append(f"- Message permalink: {url}")
+            url_count += 1
+        if len(set(st_posts)) > 10:
+            lines.append(f"- {len(set(st_posts)) - 10} additional message permalinks omitted from this index.")
+
+    if st_has_missing_permalink or (st_has_message_rows and not st_posts):
+        lines.append(
+            "- Message URL unavailable from the provider for one or more fetched StockTwits messages; "
+            "the stream endpoint is not an individual message permalink."
+        )
+    elif st_no_messages:
+        lines.append("- The fetched block reports no matching messages in the stated window; this is feed output, not proof of zero discussion everywhere.")
+    elif st_screened_all:
+        lines.append("- The screening step retained no on-topic StockTwits messages; no individual post is asserted as evidence.")
+    elif any(token in st_folded for token in ("unavailable", "error", "failed")):
+        lines.append("- The provider block marks the feed unavailable; no conclusion about underlying market discussion is justified.")
+    elif not st_posts:
+        lines.append("- No individual message permalink was supplied in the fetched block; do not present a specific post as verified.")
+    lines.append("")
+
+    rd_urls = []
+    for match in re.finditer(r"(?im)^\s*Source URL:\s*(https?://\S+)\s*$", reddit_block or ""):
+        candidate = _sentiment_source_url(match.group(1))
+        if candidate and (urlparse(candidate).hostname or "").casefold() in {"reddit.com", "www.reddit.com", "old.reddit.com"}:
+            rd_urls.append(candidate)
+    lines.append("**Reddit**")
+    reddit_folded = (reddit_block or "").casefold()
+    rd_has_post_rows = bool(re.search(r"(?m)^\s*\[\d{4}-\d{2}-\d{2}\]", reddit_block or ""))
+    rd_has_missing_permalink = "source url unavailable from the provider" in reddit_folded
+    if rd_urls:
+        for url in dict.fromkeys(rd_urls[:10]):
+            lines.append(f"- Post permalink: {url}")
+            url_count += 1
+        if len(set(rd_urls)) > 10:
+            lines.append(f"- {len(set(rd_urls)) - 10} additional post permalinks omitted from this index.")
+    elif "no reddit posts found" in reddit_folded or "<no posts found mentioning" in reddit_folded:
+        lines.append("- The fetched search block reports no matching posts in the stated window; this is not proof of zero discussion everywhere.")
+    elif rd_has_post_rows or rd_has_missing_permalink:
+        lines.append(
+            "- Message URL unavailable from the provider for one or more fetched Reddit items; "
+            "post permalink unavailable from the provider."
+        )
+    elif "unavailable" in reddit_folded or "fetch failed" in reddit_folded:
+        lines.append("- The Reddit source block marks the fetch unavailable; it must not be described as confirmed silence.")
+    else:
+        lines.append("- No individual Reddit post permalink was supplied in the fetched block.")
+    lines.append("")
+    lines.append(f"- Direct source URLs preserved in this index: {url_count}")
+
+    return report_text.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 def _build_system_message(
@@ -186,6 +383,10 @@ Community discussion, without vote or comment counts. Subreddit character matter
 7. **Identify catalysts and risks** that emerge across sources — news of upcoming earnings, product launches, competitive threats, macro headlines, etc.
 
 8. **Past sentiment is not predictive.** Frame your conclusions as signal for the trader to weigh alongside fundamentals and technicals, not as a price call.
+
+9. **Preserve provenance.** Include direct URLs for the Yahoo Finance articles and source/post URLs when present in the source blocks. State the date window and actual sample count for each source where available. An empty source, provider error, and verified absence are different states. Never invent a link, post, headline, event, or sample count; if a source block lacks provenance, label it unverified and reduce confidence.
+
+10. **Do not infer market-wide social silence or investor attention from data gaps.** A provider outage means the data is unavailable; a successful zero-result query means only that no matching posts were returned by that source in that time window. Do not describe the channels together as "completely silent" when any source failed, and do not infer low retail interest, weak liquidity, or a likely price move from missing or zero-result social data alone.
 
 ## Output fields
 

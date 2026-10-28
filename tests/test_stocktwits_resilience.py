@@ -78,12 +78,19 @@ class TestStockTwitsCryptoSymbols:
         assert "/symbol/BTC.X.json" in seen["url"]
 
 
-def _stream(*bodies):
-    payload = {"messages": [
-        {"body": b, "created_at": "2026-01-09T15:00:00Z", "user": {"username": "u"},
-         "entities": {"sentiment": {"basic": "Bullish"}}}
-        for b in bodies
-    ]}
+def _stream(*bodies, urls=None):
+    messages = []
+    for index, body in enumerate(bodies):
+        message = {
+            "body": body,
+            "created_at": "2026-01-09T15:00:00Z",
+            "user": {"username": "u"},
+            "entities": {"sentiment": {"basic": "Bullish"}},
+        }
+        if urls and index < len(urls) and urls[index]:
+            message["url"] = urls[index]
+        messages.append(message)
+    payload = {"messages": messages}
 
     class _Resp:
         def __enter__(self):
@@ -106,7 +113,8 @@ class TestStockTwitsScreening:
     def test_screened_out_messages_leave_the_block_and_its_counts(self):
         with patch.object(stocktwits, "urlopen", return_value=_stream("SPAM", "long NVDA")):
             out = stocktwits.fetch_stocktwits_messages("NVDA", screen=_drop_spam)
-        assert out.startswith("Screened: note")
+        assert out.startswith("Source: StockTwits public symbol stream")
+        assert "Screened: note" in out
         assert "long NVDA" in out and "SPAM" not in out
         assert "Total: 1 most-recent" in out
 
@@ -114,6 +122,25 @@ class TestStockTwitsScreening:
         with patch.object(stocktwits, "urlopen", return_value=_stream("SPAM")):
             out = stocktwits.fetch_stocktwits_messages("NVDA", screen=_drop_spam)
         assert "none of the 1 StockTwits messages is about $NVDA" in out
+
+
+@pytest.mark.unit
+def test_stocktwits_message_permalink_and_fetch_provenance_are_preserved():
+    permalink = "https://stocktwits.com/user/message/123456"
+    with patch.object(stocktwits, "urlopen", return_value=_stream("Long NVDA", urls=[permalink])):
+        out = stocktwits.fetch_stocktwits_messages("NVDA")
+    assert "Source: StockTwits public symbol stream" in out
+    assert "Source URL: https://api.stocktwits.com/api/2/streams/symbol/NVDA.json" in out
+    assert "Retrieved at (UTC):" in out
+    assert f"Source URL: {permalink}" in out
+
+
+@pytest.mark.unit
+def test_missing_stocktwits_message_url_is_explicit_not_invented():
+    with patch.object(stocktwits, "urlopen", return_value=_stream("Long NVDA")):
+        out = stocktwits.fetch_stocktwits_messages("NVDA")
+    assert "Source URL unavailable from the provider" in out
+    assert "https://stocktwits.com/user/message/" not in out
 
 
 @pytest.mark.unit

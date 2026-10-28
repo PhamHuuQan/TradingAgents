@@ -256,10 +256,11 @@ class TradingAgentsGraph:
         """What produces this graph's runs, for the saved report and state log.
 
         An allowlist: endpoints (a backend_url can carry credentials), keys and
-        local paths are never recorded.
+        local paths are never recorded. Optional code revision metadata is safe
+        to include and helps reproduce/debug reports generated from a checkout.
         """
         cfg = self.config
-        return {
+        settings = {
             "version": tradingagents.__version__,
             "llm_provider": cfg.get("llm_provider"),
             "deep_think_provider": tier_provider(cfg, "deep") if cfg.get("llm_provider") else None,
@@ -273,6 +274,13 @@ class TradingAgentsGraph:
             "data_vendors": dict(cfg.get("data_vendors") or {}),
             "tool_vendors": dict(cfg.get("tool_vendors") or {}),
         }
+        # These values are explicit revision labels only, never endpoints, keys,
+        # user paths, or other execution environment details.
+        if cfg.get("code_branch"):
+            settings["code_branch"] = str(cfg["code_branch"])[:160]
+        if cfg.get("code_commit"):
+            settings["code_commit"] = str(cfg["code_commit"])[:40]
+        return settings
 
     def save_reports(self, final_state, ticker, save_path=None, html=True) -> Path:
         """Write the report tree for a completed run, like the CLI does.

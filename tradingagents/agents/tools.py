@@ -4,6 +4,7 @@ Each dated tool takes the run's ``trade_date`` from graph state (``InjectedState
 and never serves data past it, whatever date the model asks for.
 """
 
+import re
 from typing import Annotated
 
 from langchain_core.tools import tool
@@ -319,28 +320,71 @@ def get_macro_indicators(
     return route_to_vendor("get_macro_indicators", indicator, as_of(curr_date, trade_date), look_back_days)
 
 
+# Sports and entertainment markets often dominate generic search results but are
+# not evidence for an ordinary equity/macro thesis unless the query explicitly ties
+# that event to the instrument under analysis.
+_SPORTS_ENTERTAINMENT_TOPIC_RE = re.compile(
+    r"\b(?:afc|asian cup|world cup|champions league|premier league|"
+    r"nba|nfl|mlb|nhl|ufc|olympics?|grand prix|formula 1|"
+    r"football|soccer|basketball|baseball|hockey|tennis|golf|"
+    r"sports?|match winner|group [a-h] winner|team to win)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_unrelated_sports_market_topic(topic: str, ticker: str, asset_type: str) -> bool:
+    """Conservatively block unlinked sports/entertainment odds from investment research."""
+    if not _SPORTS_ENTERTAINMENT_TOPIC_RE.search(topic or ""):
+        return False
+    topic_tokens = {
+        token for token in re.findall(r"[a-z0-9]+", (topic or "").casefold())
+        if len(token) > 1
+    }
+    ticker_tokens = {
+        token for token in re.findall(r"[a-z0-9]+", (ticker or "").casefold())
+        if len(token) > 1
+    }
+    # Explicitly tying the query to the ticker is the minimum relevance evidence.
+    if ticker_tokens and ticker_tokens.intersection(topic_tokens):
+        return False
+    normalized_type = (asset_type or "stock").strip().casefold()
+    if normalized_type in {"sports", "sports event"}:
+        return False
+    return True
+
+
 @tool
 def get_prediction_markets(
     topic: Annotated[
         str,
-        "Event topic/keyword, e.g. 'Fed rate cut', 'recession 2026', "
-        "'US election', or a sector/company event.",
+        "A financially relevant event topic, e.g. 'Fed rate cut', 'recession 2026', "
+        "'Vietnam technology export policy', or a sector/company event directly tied to the instrument. "
+        "Do not query unrelated sports/entertainment outcomes.",
     ],
     limit: Annotated[int | None, "Max markets to return; omit for a default of 6"] = None,
+    ticker: Annotated[str, InjectedState("company_of_interest")] = "",
+    asset_type: Annotated[str, InjectedState("asset_type")] = "stock",
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
     """
-    Retrieve live, market-implied probabilities for forward-looking events from
-    prediction markets (Polymarket): Fed decisions, recession, elections,
-    geopolitics, crypto. Returns the most-traded open markets matching the
-    topic, each with its implied probability, traded volume, resolution date,
-    and recent move. Uses the configured prediction_markets vendor.
+    Retrieve live, market-implied probabilities for forward-looking financial,
+    policy, macroeconomic, geopolitical, crypto, or sector events from Polymarket.
+    Unrelated sports and entertainment outcomes are filtered before querying.
+    Uses the configured prediction_markets vendor.
 
     Args:
-        topic (str): Event keyword(s) to search
+        topic (str): Event keyword(s) with a clear link to the instrument or its macro drivers
         limit (int): Max markets to return; omit for a default of 6
 
     Returns:
         str: A formatted markdown report of matching prediction markets
     """
+    if _is_unrelated_sports_market_topic(topic, ticker, asset_type):
+        instrument = ticker or "the analyzed instrument"
+        return (
+            f"Prediction-market query filtered: {topic!r} is a sports/entertainment topic "
+            f"with no explicit link to {instrument}. No external market query was sent. "
+            "Exclude this topic from the investment thesis and source table; choose a "
+            "relevant macro, policy, sector, or company event instead."
+        )
     return route_to_vendor("get_prediction_markets", topic, limit, trade_date or None)

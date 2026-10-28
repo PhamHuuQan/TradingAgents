@@ -7,6 +7,7 @@
 
 from unittest import mock
 
+import pandas as pd
 import pytest
 
 from tradingagents.dataflows import date_window
@@ -30,6 +31,30 @@ def test_percent_fields_carry_their_unit_and_fractions_are_unchanged():
     assert "Debt to Equity: 78.445% (0.78x)" in out
     assert "Profit Margin: 0.27619" in out
     assert "Return on Equity: 1.4875101" in out
+
+
+@pytest.mark.unit
+def test_yahoo_fundamentals_include_source_url_and_retrieval_time():
+    out = _fundamentals({"longName": "Apple Inc.", "marketCap": 1000})
+
+    assert "Source: Yahoo Finance (yfinance Ticker.info)" in out
+    assert "Retrieved at:" in out
+    assert "Source URL: https://finance.yahoo.com/quote/AAPL/financials/" in out
+    assert "not use it as point-in-time data" in out
+
+
+@pytest.mark.unit
+def test_empty_insider_result_is_qualified_and_linked(monkeypatch):
+    monkeypatch.setattr(date_window, "get_current_date", lambda: TODAY)
+    monkeypatch.setattr(fundamentals, "yf_retry", lambda fn: pd.DataFrame())
+    monkeypatch.setattr(fundamentals, "vendor_reachable", lambda _url: True)
+
+    out = fundamentals.get_insider_transactions("AAPL", TODAY)
+
+    assert "No insider transaction records were returned" in out
+    assert "not proof that no insider activity occurred" in out
+    assert "Retrieved at:" in out
+    assert "https://finance.yahoo.com/quote/AAPL/insider-transactions/" in out
 
 
 @pytest.mark.unit
