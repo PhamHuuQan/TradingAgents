@@ -148,6 +148,7 @@ def test_vnstock_fundamentals_summary_falls_back_as_a_complete_kbs_set(fake_vnst
 
     assert "# Current KBS fundamentals for FPT" in output
     assert "- Source: vnstock-kbs" in output
+    assert "Source fallback: VCI unavailable; selected KBS." in output
     assert "TTM net income: not derived from KBS" in output
     assert "TTM operating cash flow: not derived from KBS" in output
     assert "Latest total equity: 200,000,000,000 VND" in output
