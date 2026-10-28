@@ -753,6 +753,27 @@ def test_market_wide_social_silence_is_not_inferred_from_unavailable_and_empty_f
 
 
 
+def test_bear_report_does_not_turn_empty_news_social_feeds_into_market_wide_silence():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Yahoo Finance returned no matching FPT articles in the stated window. "
+        "StockTwits provider unavailable due to HTTPError. "
+        "Reddit returned no matching posts in the requested window; "
+        "this is not proof of zero discussion everywhere."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Dữ liệu phân tích tâm lý cho thấy sự trống rỗng hoàn toàn trên các kênh tin tức "
+            "và diễn đàn (Yahoo Finance, StockTwits, Reddit đều không có thảo luận). "
+            "Trong đầu tư, sự thờ ơ của đám đông thường là điềm báo cho việc thiếu động lực tăng giá."
+        )
+    }
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+
+
 def test_report5_regression_flags_known_claims_and_avoids_known_false_positives():
     state = {
         "trade_date": "2026-10-27",

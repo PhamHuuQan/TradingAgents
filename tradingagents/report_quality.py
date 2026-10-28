@@ -195,6 +195,7 @@ _SOCIAL_POST_URL_MISSING_RE = re.compile(
 _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"hoàn toàn không có (?:dữ liệu|thảo luận).{0,100}(?:stocktwits|reddit|mạng xã hội|nhà đầu tư)?"
     r"|vắng bóng hoàn toàn.{0,100}(?:thảo luận|cộng đồng|nhà đầu tư)"
+    r"|trống rỗng hoàn toàn.{0,100}(?:kênh tin tức|diễn đàn|thảo luận|cộng đồng|nhà đầu tư)"
     r"|cạn kiệt thanh khoản quan tâm"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
