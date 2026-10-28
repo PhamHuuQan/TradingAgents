@@ -1002,3 +1002,19 @@ def test_quantified_source_linked_flow_data_can_support_flow_direction_claim():
     codes = {item["code"] for item in audit["findings"]}
     assert "UNSUPPORTED_CAPITAL_FLOW_INFERENCE" not in codes
 
+
+def test_explicitly_excluded_sports_result_in_raw_tool_log_is_not_flagged_as_used_evidence():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["news_report"] = (
+        "Báo cáo tin tức FPT.\\n"
+        "Thị trường dự đoán về thể thao (AFC Asian Cup) được loại trừ theo tiêu chuẩn liên quan đến tài chính.\\n"
+        "Macro and prediction-market records returned by tools\\n"
+        "Will Vietnam win Group E at the 2027 AFC Asian Cup? Yes 6%. "
+        "Market URL: https://polymarket.com/event/afc-asian-cup-2027-group-e-winner"
+    )
+    audit = build_report_quality_audit(state)
+    assert "PREDICTION_MARKET_RELEVANCE_UNVERIFIED" not in {
+        item["code"] for item in audit["findings"]
+    }
+
