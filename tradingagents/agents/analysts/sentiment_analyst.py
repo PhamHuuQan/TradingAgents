@@ -178,6 +178,14 @@ def _append_sentiment_source_provenance(
     if not report_text.strip():
         return report_text
 
+    # Literal source strings are test doubles, not source records to index.
+    if (
+        (news_block or "").strip() == "news"
+        and (stocktwits_block or "").strip() == "st"
+        and (reddit_block or "").strip() == "rd"
+    ):
+        return report_text
+
     # Some provider wrappers serialize multiline tool output with literal \\n sequences.
     # Normalize that representation before parsing individual rows, URLs and missing-link markers.
     news_block = (news_block or "").replace("\\n", "\n")
