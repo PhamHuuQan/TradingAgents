@@ -126,6 +126,20 @@ def test_vnstock_statement_falls_back_to_kbs_and_labels_the_actual_source(fake_v
 
 
 @pytest.mark.unit
+def test_vnstock_kbs_frame_with_wrong_source_metadata_is_rejected(fake_vnstock):
+    fake_vnstock.failed_sources.add("vci")
+    # Simulate the KBS request unexpectedly returning a VCI-tagged frame.
+    fake_vnstock.kbs_balance_frame = FakeFrame(
+        fake_vnstock.kbs_balance_frame.rows, source="vci"
+    )
+
+    with pytest.raises(VendorUnavailableError, match="expected 'kbs'"):
+        vnstock_fundamentals.get_vnstock_balance_sheet(
+            "FPT", "quarterly", "2026-10-25"
+        )
+
+
+@pytest.mark.unit
 def test_vnstock_fundamentals_summary_falls_back_as_a_complete_kbs_set(fake_vnstock):
     fake_vnstock.failed_sources.add("vci")
 
