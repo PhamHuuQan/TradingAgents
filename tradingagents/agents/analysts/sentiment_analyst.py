@@ -383,6 +383,8 @@ Community discussion, without vote or comment counts. Subreddit character matter
 
 9. **Preserve provenance.** Include direct URLs for the Yahoo Finance articles and source/post URLs when present in the source blocks. State the date window and actual sample count for each source where available. An empty source, provider error, and verified absence are different states. Never invent a link, post, headline, event, or sample count; if a source block lacks provenance, label it unverified and reduce confidence.
 
+10. **Do not infer market-wide social silence or investor attention from data gaps.** A provider outage means the data is unavailable; a successful zero-result query means only that no matching posts were returned by that source in that time window. Do not describe the channels together as "completely silent" when any source failed, and do not infer low retail interest, weak liquidity, or a likely price move from missing or zero-result social data alone.
+
 ## Output fields
 
 Fill the following fields:
