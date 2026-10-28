@@ -191,9 +191,12 @@ _SOCIAL_POST_URL_MISSING_RE = re.compile(
 _SOCIAL_SILENCE_CLAIM_RE = re.compile(
     r"hoàn toàn không có (?:dữ liệu|thảo luận).{0,100}(?:stocktwits|reddit|mạng xã hội|nhà đầu tư)?"
     r"|vắng bóng hoàn toàn.{0,100}(?:thảo luận|cộng đồng|nhà đầu tư)"
+    r"|hoàn toàn im ắng.{0,140}(?:không thể truy cập|stocktwits|reddit|mạng xã hội|nhà đầu tư)?"
+    r"|mức độ quan tâm.{0,100}(?:rất thấp|thấp|không đáng kể)"
     r"|cạn kiệt thanh khoản quan tâm"
     r"|complete absence of (?:social|retail) discussion"
     r"|there (?:is|was) no social (?:discussion|activity) (?:at all|anywhere)"
+    r"|social sources? (?:are|were) completely silent"
     r"|lack of social discussion.{0,80}(?:shows|demonstrates|indicates)",
     re.IGNORECASE,
 )
@@ -743,7 +746,7 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
         })
 
     if (
-        _SOCIAL_SILENCE_CLAIM_RE.search(downstream)
+        _SOCIAL_SILENCE_CLAIM_RE.search("\n".join((sentiment, downstream)))
         and sentiment.strip()
         and _SOCIAL_COVERAGE_LIMITATION_RE.search(sentiment)
     ):
