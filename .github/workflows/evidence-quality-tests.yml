@@ -28,6 +28,7 @@ on:
       - "tests/test_market_provenance.py"
       - "tests/test_sentiment_provenance.py"
       - "tests/test_vietnam_market_ssi_vendor.py"
+      - "tests/test_vietnam_market_vnstock_vendor.py"
       - "tests/test_news_provenance.py"
       - "tests/test_fpt_ir.py"
       - "tests/test_fundamentals_units.py"
