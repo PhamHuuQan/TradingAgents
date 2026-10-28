@@ -132,6 +132,12 @@ _TRADE_LEVEL_FIELD_RE = re.compile(
 )
 
 
+
+_MARKET_REFERENCE_PRICE_RE = re.compile(
+    r"(?i)(?:giá\\s+(?:hiện tại|đóng cửa|gần nhất)|(?:closing|current|last)\\s+price|\\bclose\\b)"
+    r"[^\\n]{0,45}?(\\d[\\d,.]*\\d|\\d)"
+)
+
 def _parse_trade_price_token(value: str) -> float | None:
     """Parse common English/Vietnamese price formatting for internal consistency checks."""
     token = re.sub(r"[^0-9.,]", "", value or "")
@@ -792,16 +798,39 @@ def build_report_quality_audit(final_state: dict[str, Any]) -> dict[str, Any]:
     target_level = parsed_levels.get("target")
     trader_action_for_levels = _TRADER_ACTION_RE.search(_text(final_state.get("trader_investment_plan")))
 
+    unit_mismatch_reasons: list[str] = []
     if entry_level is not None and stop_level is not None:
         if min(entry_level, stop_level) > 0 and max(entry_level, stop_level) / min(entry_level, stop_level) >= 20:
-            findings.append({
-                "severity": "HIGH",
-                "code": "TRADE_LEVEL_UNIT_MISMATCH",
-                "finding": (
-                    "Entry and stop-loss values parse to price levels more than 20x apart. This often indicates inconsistent "
-                    "thousands/decimal notation or units; normalize all VND prices before using the plan."
-                ),
-            })
+            unit_mismatch_reasons.append(
+                "Entry and stop-loss values parse to price levels more than 20x apart"
+            )
+
+    # Compare execution levels with the reference market price too. This catches
+    # reports such as a 55.400 VND price paired with a 51.5 stop-loss, where the
+    # formatting likely mixes thousands and decimal notation even if Entry is blank.
+    market_reference_price = None
+    for price_match in _MARKET_REFERENCE_PRICE_RE.finditer(market):
+        market_reference_price = _parse_trade_price_token(price_match.group(1))
+        if market_reference_price is not None and market_reference_price > 0:
+            break
+    if market_reference_price is not None:
+        for label, level in parsed_levels.items():
+            if level > 0 and max(market_reference_price, level) / min(market_reference_price, level) >= 100:
+                unit_mismatch_reasons.append(
+                    f"the reported market price and {label} level differ by at least 100x"
+                )
+                break
+
+    if unit_mismatch_reasons:
+        findings.append({
+            "severity": "HIGH",
+            "code": "TRADE_LEVEL_UNIT_MISMATCH",
+            "finding": (
+                "; ".join(unit_mismatch_reasons)
+                + ". This often indicates inconsistent thousands/decimal notation or units; "
+                "normalize all stock prices before using the plan."
+            ),
+        })
 
     if (
         trader_action_for_levels
