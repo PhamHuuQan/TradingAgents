@@ -3,7 +3,7 @@
 ## Status
 
 This slice provides validated OHLCV and fundamental-fact contracts, optional read-only SSI
-current-date market routing, optional Vnstock VCI statement normalization/export, offline
+current-date market routing, optional Vnstock VCI/KBS statement normalization/export, offline
 technical indicators, valuation metrics, a cash-only backtest simulator, and performance
 statistics. Existing Yahoo Finance defaults remain unchanged; SSI is explicitly opt-in.
 The integration does not place orders and does not recover historical first-availability times.
@@ -15,11 +15,14 @@ FundamentalFact stores a reported metric for one explicit period, unit, source, 
 available_at timestamp. latest_fundamental_facts_as_of selects revisions known by a
 cutoff and keeps sources separate. Neither contract by itself decides source semantics or corporate-action treatment.
 
-## Optional Vnstock VCI quarterly fundamentals
+## Optional Vnstock VCI → KBS quarterly fundamentals
 
 The optional Vnstock fetch command retrieves quarterly income, balance-sheet and
-cash-flow tables through the read-only VCI source, normalizes only three explicitly
-mapped VAS fields, and writes them to the same normalized facts CSV contract:
+cash-flow tables through the read-only VCI source first, then retries KBS when VCI
+fails. It normalizes only three explicitly mapped common VAS fields and writes them
+to the same normalized facts CSV contract. The three statements in a fundamentals
+summary must come from one provider; the adapter never silently combines VCI and KBS
+rows in a single statement set:
 
 - Parent-company net profit attributable to shareholders, mapped to net_income.
 - Total equity (BS_EQUITY), mapped to total_equity.
@@ -32,6 +35,14 @@ shares, capital expenditure, or publication times, so EPS, P/E and free-cash-flo
 coverage may remain unavailable until those mappings are verified. available_at
 is the local fetch completion time, not the first date a historical filing was
 publicly available; do not use these exports as historical point-in-time inputs.
+
+VCI is attempted first and KBS is the fallback by default. Set
+`TRADINGAGENTS_VNSTOCK_FUNDAMENTALS_SOURCES=kbs` to pin the statement adapters to KBS,
+or `vci,kbs` to explicitly retain the default order. Each response carries the source
+that actually returned the data. KBS TTM flow totals are deliberately not derived until
+standalone-quarter versus cumulative-flow semantics have been verified for the selected
+KBS methods. Raw KBS statements and balance-sheet observations can still be displayed
+with source and retrieval metadata.
 
 Vnstock is installed from its own package index rather than the standard PyPI
 index. Its official documentation describes a personal-use licence and says
@@ -95,8 +106,9 @@ config["data_vendors"]["fundamental_data"] = "vnstock"
 
 Use `TradingAgentsGraph(..., config=config)`. The package is imported only when
 the Vnstock source is called, and the normal/default vendor chain never auto-selects
-it. The adapter calls VCI with `period="quarter"` or `period="year"`,
-`format="long"`, and validates available source/ticker/format metadata.
+it. The adapter calls Vnstock with `period="quarter"` or `period="year"`,
+`format="long"`, and `source="vci"` or `source="kbs"`; it validates that the response's
+source, ticker, format, and required columns match the request.
 
 The `get_fundamentals` summary derives TTM parent-company net income and operating
 cash flow only when four contiguous standalone-quarter facts exist. It reports
