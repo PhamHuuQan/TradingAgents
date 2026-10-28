@@ -838,6 +838,11 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
     audit = build_report_quality_audit(state)
     codes = {item["code"] for item in audit["findings"]}
 
+    assert audit["source_statuses"]["Market report"] == "AVAILABLE — SOURCE-LINKED MARKET DATA"
+    assert audit["source_statuses"]["Sentiment report"] == (
+        "PARTIAL COVERAGE — SOURCE-LINKED SENTIMENT; SECONDARY FEED UNAVAILABLE"
+    )
+    assert audit["source_statuses"]["News report"] == "AVAILABLE — SOURCE-LINKED NEWS"
     assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
     assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
