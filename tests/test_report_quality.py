@@ -1133,3 +1133,45 @@ def test_unsupported_high_probability_of_support_break_is_flagged_without_backte
     }
     assert "DIRECTIONAL PROBABILITY LIMITATION" in build_decision_evidence_guardrails(state)
 
+
+
+def test_report5_sentiment_does_not_turn_provider_outage_into_low_investor_attention():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "StockTwits: source unavailable due to HTTPError. "
+        "Reddit: no matching posts were returned in the requested window; "
+        "this is not proof of zero discussion everywhere. "
+        "Các nguồn mạng xã hội (StockTwits, Reddit) hoàn toàn im ắng hoặc không thể truy cập. "
+        "Sự thiếu vắng dữ liệu từ các kênh bán lẻ cho thấy mức độ quan tâm của cộng đồng "
+        "nhà đầu tư cá nhân trên các nền tảng này là rất thấp hoặc không đáng kể."
+    )
+    state["investment_debate_state"] = {"history": "Hold pending better evidence."}
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+
+
+def test_source_linked_vietnamese_markdown_table_is_partial_coverage():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "| Chỉ tiêu | Giá trị | Tăng trưởng YoY |\n"
+        "|---|---:|---:|\n"
+        "| Doanh thu | 40.023 tỷ VND | +12,4% |\n"
+        "| Lợi nhuận trước thuế (PBT) | 8.770 tỷ VND | +17,0% |\n"
+        "| Lợi nhuận sau thuế (PAT) | 7.778 tỷ VND | +13,3% |\n"
+        "| EPS | 4.142 VND/cổ phiếu | +12,8% |\n"
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0\n"
+        "Bảng cân đối kế toán không khả dụng (EntitlementError); "
+        "báo cáo lưu chuyển tiền tệ không khả dụng."
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert audit["source_statuses"]["Fundamentals report"] == (
+        "PARTIAL — SOURCE-LINKED SUMMARY METRICS; FULL STATEMENTS UNAVAILABLE"
+    )
+    assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
+    assert "FUNDAMENTALS_UNAVAILABLE" not in codes
