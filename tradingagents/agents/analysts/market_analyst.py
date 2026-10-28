@@ -15,7 +15,7 @@ TOOLS = (
 )
 
 
-_MARKET_PROVENANCE_HEADING = re.compile(r"(?im)^\\s*#{1,6}\\s*Market Data Provenance\\s*$")
+_MARKET_PROVENANCE_HEADING = re.compile(r"(?im)^\s*#{1,6}\s*Market Data Provenance\s*$")
 
 def _strip_unverified_market_provenance(report: str) -> str:
     """Remove a model-written provenance section unless a tool snapshot validates it."""
@@ -49,17 +49,17 @@ def _append_verified_market_provenance(report: str, messages) -> str:
     message = matching_messages[-1]
     raw_content = getattr(message, "content", "")
     if isinstance(raw_content, list):
-        content = "\\n".join(
+        content = "\n".join(
             str(item.get("text", "")) if isinstance(item, dict) else str(item)
             for item in raw_content
         )
     else:
         content = str(raw_content)
-    content = content.replace("\\\\r\\\\n", "\\n").replace("\\\\n", "\\n").replace("\\\\r", "\\n")
+    content = content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
     content_folded = content.casefold().lstrip()
 
     unavailable_pattern = re.compile(
-        r"\\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|VendorNotConfiguredError|NoMarketDataError|EntitlementError)\\b"
+        r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|VendorNotConfiguredError|NoMarketDataError|EntitlementError)\b"
         r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot|no usable market data",
         re.IGNORECASE,
     )
@@ -69,23 +69,23 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         return clean_report
 
     verified_heading = bool(re.search(
-        r"(?im)^\\s*#{1,6}\\s*Verified(?: SSI)? market data snapshot\\b", content
+        r"(?im)^\s*#{1,6}\s*Verified(?: SSI)? market data snapshot\b", content
     ))
     required_fields = (
-        r"(?im)^\\s*[-*]?\\s*Requested as-of date\\s*:\\s*\\S+",
-        r"(?im)^\\s*[-*]?\\s*Latest returned trading row\\s*:\\s*\\S+",
-        r"(?im)^\\s*[-*]?\\s*Source\\s*:\\s*\\S+",
+        r"(?im)^\s*[-*]?\s*Requested as-of date\s*:\s*\S+",
+        r"(?im)^\s*[-*]?\s*Latest returned trading row\s*:\s*\S+",
+        r"(?im)^\s*[-*]?\s*Source\s*:\s*\S+",
     )
     has_required_metadata = all(re.search(pattern, content) for pattern in required_fields)
     if not (verified_heading and has_required_metadata):
         return clean_report
 
     fields = (
-        ("Provider", r"(?im)^\\s*(?:[-*]\\s*)?Source\\s*[:：]\\s*(.+)$"),
-        ("Source URL", r"(?im)^\\s*(?:[-*]\\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\\s*[:：]\\s*(.+)$"),
-        ("Retrieved at", r"(?im)^\\s*(?:[-*]\\s*)?Retrieved at(?: \\(UTC\\))?\\s*[:：]\\s*(.+)$"),
-        ("Requested as-of date", r"(?im)^\\s*(?:[-*]\\s*)?Requested as-of date\\s*[:：]\\s*(.+)$"),
-        ("Latest returned trading row", r"(?im)^\\s*(?:[-*]\\s*)?Latest returned trading row\\s*[:：]\\s*(.+)$"),
+        ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
+        ("Source URL", r"(?im)^\s*(?:[-*]\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\s*[:：]\s*(.+)$"),
+        ("Retrieved at", r"(?im)^\s*(?:[-*]\s*)?Retrieved at(?: \(UTC\))?\s*[:：]\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested as-of date\s*[:：]\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest returned trading row\s*[:：]\s*(.+)$"),
     )
     lines = ["", "### Market Data Provenance", ""]
     for label, pattern in fields:
@@ -95,7 +95,7 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         elif label in {"Provider", "Source URL", "Retrieved at"}:
             lines.append(f"- {label}: not supplied by provider")
     base = clean_report.rstrip()
-    return (base + "\\n" if base else "") + "\\n".join(lines).lstrip("\\n") + "\\n"
+    return (base + "\n" if base else "") + "\n".join(lines).lstrip("\n") + "\n"
 
 def create_market_analyst(llm):
 
