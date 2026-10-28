@@ -110,26 +110,27 @@ def _validate_frame(frame: object, symbol: str, report: str, source: str = "vci"
         raise NoMarketDataError(
             symbol, symbol, f"Vnstock {expected_source.upper()} returned no {report} rows"
         )
+    # Vnstock's VCI provider does not consistently attach attrs; KBS attaches
+    # source/symbol but may omit format. Explicit source= never auto-switches
+    # providers, so missing metadata is acceptable when the request is explicit
+    # and the returned schema is long-form. Any metadata that IS present must match.
     attrs = getattr(frame, "attrs", None)
-    if not isinstance(attrs, Mapping):
-        raise VendorUnavailableError(
-            f"Vnstock {report} response lacks provenance metadata; refusing to infer source."
-        )
-    frame_source = attrs.get("source")
-    if str(frame_source or "").strip().lower() != expected_source:
-        raise VendorUnavailableError(
-            f"Vnstock {report} metadata source is {frame_source!r}; expected '{expected_source}'"
-        )
-    frame_symbol = attrs.get("symbol")
-    if str(frame_symbol or "").strip().upper() != symbol:
-        raise VendorUnavailableError(
-            f"Vnstock {report} metadata ticker is {frame_symbol!r}; expected {symbol!r}"
-        )
-    frame_format = attrs.get("format")
-    if str(frame_format or "").strip().lower() != "long":
-        raise VendorUnavailableError(
-            f"Vnstock {report} metadata format is {frame_format!r}; expected 'long'"
-        )
+    if isinstance(attrs, Mapping):
+        frame_source = attrs.get("source")
+        if frame_source not in (None, "") and str(frame_source).strip().lower() != expected_source:
+            raise VendorUnavailableError(
+                f"Vnstock {report} metadata source is {frame_source!r}; expected '{expected_source}'"
+            )
+        frame_symbol = attrs.get("symbol")
+        if frame_symbol not in (None, "") and str(frame_symbol).strip().upper() != symbol:
+            raise VendorUnavailableError(
+                f"Vnstock {report} metadata ticker is {frame_symbol!r}; expected {symbol!r}"
+            )
+        frame_format = attrs.get("format")
+        if frame_format not in (None, "") and str(frame_format).strip().lower() != "long":
+            raise VendorUnavailableError(
+                f"Vnstock {report} metadata format is {frame_format!r}; expected 'long'"
+            )
 
     columns = {str(name) for name in getattr(frame, "columns", ())}
     if not _REQUIRED_COLUMNS.issubset(columns):
@@ -192,10 +193,21 @@ def _csv_response(frame: object, symbol: str, title: str, period: str, source: s
         ) from exc
     if not isinstance(csv_text, str) or not csv_text.strip():
         raise NoMarketDataError(symbol, symbol, f"Vnstock {source.upper()} returned empty {title} CSV")
+    attrs = getattr(frame, "attrs", None)
+    observed_source = attrs.get("source") if isinstance(attrs, Mapping) else None
+    if observed_source not in (None, "") and str(observed_source).strip().lower() == source:
+        source_evidence = "confirmed by response metadata"
+    else:
+        source_evidence = (
+            "determined by the explicit source argument; this provider response "
+            "does not expose a source attribute"
+        )
     return (
         f"# {title} for {symbol} from Vnstock {source.upper()}\n"
-        f"# Provider source: vnstock-{source}; period: {period}; retrieved at: {fetched_at.isoformat()}\n"
+        f"# Provider source: vnstock-{source}; source evidence: {source_evidence}\n"
+        f"# Period: {period}; retrieved at: {fetched_at.isoformat()}\n"
         "# Source documentation: https://vnstocks.com/docs/vnstock/co-ban-fundamental\n"
+        "# Vnstock explicit source requests do not silently switch to another provider.\n"
         "# Availability is fetch-time only; this response has no historical first-publication time.\n"
         "# Use only for current-date analysis, not historical point-in-time backtests.\n\n"
         + csv_text
