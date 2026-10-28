@@ -18,7 +18,7 @@ import pytest
 import tradingagents.agents.analysts.sentiment_analyst as sentiment
 from tradingagents.agents.managers.portfolio_manager import create_portfolio_manager
 from tradingagents.agents.managers.research_manager import create_research_manager
-from tradingagents.agents.structured import NO_EXTERNAL_TOOLS
+from tradingagents.agents.structured import NO_EXTERNAL_TOOLS, invoke_structured_or_freetext
 from tradingagents.agents.trader.trader import create_trader
 
 
@@ -278,3 +278,31 @@ def test_portfolio_manager_discloses_missing_personal_portfolio_context():
     assert "Portfolio Context Limitation" in output
     assert "not a personalized mandatory stop-loss or order instruction" in output
     assert "\n\n**Portfolio Context Limitation**" in output
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "failure_message",
+    [
+        "Daily quota/rate limit was reached for every configured Gemini model; no more requests will be sent.",
+        "Gemini fallback exhausted for this graph step; last_model=gemini-3.8-flash, status=429. No additional model requests were sent.",
+    ],
+)
+def test_structured_quota_exhaustion_does_not_retry_as_free_text(failure_message):
+    structured = MagicMock()
+    structured.invoke.side_effect = RuntimeError(failure_message)
+    plain = MagicMock()
+    plain.invoke.return_value.content = "should not be requested"
+
+    with pytest.raises(RuntimeError, match="quota|exhausted"):
+        invoke_structured_or_freetext(
+            structured,
+            plain,
+            "same prompt",
+            lambda value: str(value),
+            "Trader",
+        )
+
+    assert structured.invoke.call_count == 1
+    plain.invoke.assert_not_called()
+
