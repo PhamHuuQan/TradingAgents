@@ -352,6 +352,13 @@ def get_vnstock_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
         "| Metric | Period | Value | Unit |",
         "|---|---|---:|---|",
     ]
+    if errors:
+        failed_sources = ", ".join(source.upper() for source, _ in errors)
+        lines.insert(
+            4,
+            f"- Source fallback: {failed_sources} unavailable; selected {selected_source.upper()}."
+        )
+
     for fact in sorted(facts, key=lambda item: (item.metric, item.period_end, item.period_start)):
         lines.append(
             f"| {fact.metric} | {fact.period_start}..{fact.period_end} | "
