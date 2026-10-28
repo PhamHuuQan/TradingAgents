@@ -79,9 +79,10 @@ def _append_verified_market_provenance(report: str, messages) -> str:
     verified_heading = bool(re.search(
         r"(?im)^\s*#{1,6}\s*Verified(?: SSI)? market data snapshot\b", content
     ))
+    # Different verified providers use equivalent labels for the same date fields.
     required_fields = (
-        r"(?im)^\s*[-*]?\s*Requested as-of date\s*:\s*\S+",
-        r"(?im)^\s*[-*]?\s*Latest returned trading row\s*:\s*\S+",
+        r"(?im)^\s*[-*]?\s*Requested (?:as-of|analysis) date\s*:\s*\S+",
+        r"(?im)^\s*[-*]?\s*Latest (?:returned trading row|trading row used)\s*:\s*\S+",
         r"(?im)^\s*[-*]?\s*Source\s*:\s*\S+",
     )
     has_required_metadata = all(re.search(pattern, content) for pattern in required_fields)
@@ -92,8 +93,8 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
         ("Source URL", r"(?im)^\s*(?:[-*]\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\s*[:：]\s*(.+)$"),
         ("Retrieved at", r"(?im)^\s*(?:[-*]\s*)?Retrieved at(?: \(UTC\))?\s*[:：]\s*(.+)$"),
-        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested as-of date\s*[:：]\s*(.+)$"),
-        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest returned trading row\s*[:：]\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested (?:as-of|analysis) date\s*[:：]\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest (?:returned trading row|trading row used)\s*[:：]\s*(.+)$"),
     )
     lines = ["", "### Market Data Provenance", ""]
     for label, pattern in fields:
@@ -104,6 +105,48 @@ def _append_verified_market_provenance(report: str, messages) -> str:
             lines.append(f"- {label}: not supplied by provider")
     base = clean_report.rstrip()
     provenance = "\n".join(lines).strip("\n") + "\n"
+
+    # Copy numeric evidence from the validated tool response verbatim, rather
+    # than leaving the audit with only a source URL and timestamp. This appendix
+    # is parsed by report_quality.py to compare exact numbers in the narrative.
+    numeric_rows = []
+    section = None
+    for raw_line in content.splitlines():
+        heading = raw_line.strip().casefold()
+        if heading.startswith("### latest verified ohlcv row"):
+            section = "ohlcv"
+            continue
+        if heading.startswith("### verified technical indicators"):
+            section = "indicators"
+            continue
+        if heading.startswith("### "):
+            section = None
+        if section is None:
+            continue
+        match = re.match(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$", raw_line.strip())
+        if not match:
+            continue
+        label, value = match.group(1).strip(), match.group(2).strip()
+        if not label or set(label) <= {"-", ":", " "} or not value:
+            continue
+        if value.casefold() == "n/a" or value.casefold().startswith("n/a "):
+            continue
+        if not re.fullmatch(r"-?\d[\d,.]*", value):
+            continue
+        if section == "ohlcv":
+            if label.casefold() in {"open", "high", "low", "close", "volume"}:
+                numeric_rows.append(f"- Verified OHLCV {label.title()}: {value}")
+        else:
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", label):
+                numeric_rows.append(f"- Verified indicator {label.lower()}: {value}")
+
+    if numeric_rows:
+        numeric_evidence = (
+            "\n### Verified Numeric Evidence\n\n"
+            + "\n".join(numeric_rows)
+            + "\n"
+        )
+        return f"{base}\n\n{provenance}{numeric_evidence}" if base else f"{provenance}{numeric_evidence}"
     return f"{base}\n\n{provenance}" if base else provenance
 
 
