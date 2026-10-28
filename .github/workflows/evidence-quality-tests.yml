@@ -26,6 +26,7 @@ on:
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/risk_mgmt/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
       - "tests/test_structured_agent_prompts.py"
@@ -72,6 +73,7 @@ on:
       - "tradingagents/agents/analysts/**"
       - "tradingagents/agents/researchers/**"
       - "tradingagents/agents/managers/**"
+      - "tradingagents/agents/risk_mgmt/**"
       - "tradingagents/agents/trader/**"
       - "tests/test_report_quality.py"
       - "tests/test_structured_agent_prompts.py"
@@ -164,6 +166,9 @@ jobs:
             tradingagents/agents/researchers/bear_researcher.py \
             tradingagents/agents/managers/research_manager.py \
             tradingagents/agents/managers/portfolio_manager.py \
+            tradingagents/agents/risk_mgmt/aggressive_debator.py \
+            tradingagents/agents/risk_mgmt/conservative_debator.py \
+            tradingagents/agents/risk_mgmt/neutral_debator.py \
             tradingagents/agents/trader/trader.py \
             tests/test_report_quality.py \
             tests/test_structured_agent_prompts.py \

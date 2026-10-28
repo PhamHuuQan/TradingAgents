@@ -454,9 +454,9 @@ def build_decision_evidence_guardrails(state: dict[str, Any]) -> str:
         )
     if sentiment.strip() and _SOCIAL_COVERAGE_LIMITATION_RE.search(sentiment):
         guardrails.append(
-            "- SOCIAL COVERAGE LIMITATION: distinguish an unavailable provider from a successful empty search result. "
-            "Do not generalize either into market-wide silence, lack of investor attention, or low stock liquidity; "
-            "state the exact provider and date window instead."
+            "- SOCIAL COVERAGE LIMITATION: distinguish provider failure, a successful empty query, and a record without an individual permalink. "
+            "An empty Yahoo Finance/StockTwits/Reddit result only describes that provider and requested window. Do not infer low retail interest, lack of institutional information or catalysts, market-wide silence, low liquidity, smart-money accumulation/distribution, or any price direction from it. "
+            "State the exact provider, date window, and sample/coverage limitation; require separate evidence for any broader claim."
         )
     if fundamentals.strip() and not _urls(fundamentals) and not (
         _UNAVAILABLE_RE.search(fundamentals) or _NO_DATA_RE.search(fundamentals)

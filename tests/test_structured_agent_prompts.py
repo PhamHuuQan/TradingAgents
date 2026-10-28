@@ -170,3 +170,49 @@ def test_the_sentiment_prompt_names_the_subreddits_searched(monkeypatch):
     text = _prompt_text(captured["prompt"])
     assert "r/Bitcoin, r/CryptoCurrency, r/CryptoMarkets" in text
     assert "wallstreetbets" not in text
+
+
+
+@pytest.mark.unit
+def test_risk_debaters_receive_social_coverage_guardrail():
+    from copy import deepcopy
+    from tradingagents.agents.risk_mgmt.aggressive_debator import create_aggressive_debator
+    from tradingagents.agents.risk_mgmt.conservative_debator import create_conservative_debator
+    from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
+
+    source_limited_state = {
+        "company_of_interest": "FPT",
+        "asset_type": "stock",
+        "market_report": "FPT market report",
+        "sentiment_report": (
+            "StockTwits provider unavailable due to HTTPError. "
+            "Reddit returned no matching posts in the requested window; "
+            "this is not proof of zero discussion everywhere."
+        ),
+        "news_report": "News report not available.",
+        "fundamentals_report": "DATA_UNAVAILABLE: balance sheet and cash flow.",
+        "trader_investment_plan": "Action: Hold",
+        "risk_debate_state": {
+            "history": "",
+            "aggressive_history": "",
+            "conservative_history": "",
+            "neutral_history": "",
+            "current_aggressive_response": "",
+            "current_conservative_response": "",
+            "current_neutral_response": "",
+            "count": 0,
+        },
+    }
+
+    for factory in (
+        create_aggressive_debator,
+        create_conservative_debator,
+        create_neutral_debator,
+    ):
+        llm = MagicMock()
+        llm.invoke.return_value.content = "Risk argument."
+        factory(llm)(deepcopy(source_limited_state))
+        prompt = llm.invoke.call_args.args[0]
+        assert "SOCIAL COVERAGE LIMITATION" in prompt
+        assert "Do not infer low retail interest" in prompt
+        assert "smart-money accumulation/distribution" in prompt
