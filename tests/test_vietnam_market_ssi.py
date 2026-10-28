@@ -256,20 +256,31 @@ def test_rest_auth_and_ohlc_use_documented_api_without_client_id(monkeypatch):
     assert session.closed is True
 
 
-def test_rest_auth_failure_reports_status_without_response_body(monkeypatch):
+def test_rest_auth_failure_reports_sanitized_ssi_code_and_message(monkeypatch):
     monkeypatch.setenv("SSI_API_KEY", "test-api-key")
     monkeypatch.setenv("SSI_API_SECRET", "test-api-secret")
 
     class FailedSession(FakeHTTPSession):
         def post(self, url, **kwargs):
             self.posts.append((url, kwargs))
-            return FakeHTTPResponse(403, {"msg": "secret should never appear"})
+            return FakeHTTPResponse(
+                401,
+                {
+                    "code": "AUTH_INVALID_CREDENTIALS",
+                    "msg": "Rejected credential test-api-secret",
+                    "privateField": "do not expose arbitrary response fields",
+                },
+            )
 
     session = FailedSession()
     monkeypatch.setattr(ssi_module.requests, "Session", lambda: session)
 
-    with pytest.raises(RuntimeError, match="HTTP 403") as exc_info:
+    with pytest.raises(RuntimeError, match="HTTP 401") as exc_info:
         with authenticated_ssi_provider_from_env():
             pass
-    assert "secret should never appear" not in str(exc_info.value)
+    error_text = str(exc_info.value)
+    assert "SSI code=AUTH_INVALID_CREDENTIALS" in error_text
+    assert "SSI message='Rejected credential [REDACTED]'" in error_text
+    assert "test-api-secret" not in error_text
+    assert "privateField" not in error_text
     assert session.closed is True
