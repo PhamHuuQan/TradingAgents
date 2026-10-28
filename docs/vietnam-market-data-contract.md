@@ -63,7 +63,11 @@ python -m tradingagents.dataflows.vietnam_market.fetch_vnstock_facts --symbol FP
 ~~~
 
 Use --overwrite only when you explicitly intend to replace an existing file.
-No broker credentials or trading permissions are required for this path.
+This read-only path does not require broker trading credentials or trading permissions.
+Vnstock's current automated-run rules may require a personal `VNSTOCK_API_KEY`; if
+the SDK requests it, store it in an environment variable or Colab Secrets, never in
+source code, a notebook output, or a commit. This key is separate from SSI credentials
+and does not enable the bot to place orders.
 
 ### Select Vnstock/SSI sources without editing Python code
 
@@ -91,7 +95,7 @@ unset preserves existing Yahoo Finance / SEC EDGAR defaults.
 
 ## Optional Vnstock source inside the TradingAgents graph
 
-Vnstock VCI can be selected explicitly for all four fundamentals tools without
+Vnstock fundamentals can be selected explicitly for all four fundamentals tools; each statement call tries VCI then KBS by default without
 changing the default US-market sources. Install Vnstock from its official package
 index (see the installation instructions above), then pass a copied config to the
 graph:
