@@ -204,7 +204,7 @@ _MISSING_NEWS_DATE_RE = re.compile(
     r"publication date:\s*unavailable|no publication date|undated (?:source|article)",
     re.IGNORECASE,
 )
-_FRED_SOURCE_CLAIM_RE = re.compile(r"\bFRED\s*:|FRED series|Federal Reserve Economic Data", re.IGNORECASE)
+_FRED_SOURCE_CLAIM_RE = re.compile(r"\bFRED\b|Federal Reserve Economic Data", re.IGNORECASE)
 _POLYMARKET_PROBABILITY_RE = re.compile(
     r"(?:Polymarket|prediction[- ]market|market[- ]implied)[\s\S]{0,120}\b\d+(?:\.\d+)?\s*%"
     r"|\b\d+(?:\.\d+)?\s*%[\s\S]{0,100}(?:Polymarket|prediction[- ]market|market[- ]implied)",
