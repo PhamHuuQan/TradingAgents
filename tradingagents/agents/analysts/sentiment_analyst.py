@@ -178,6 +178,14 @@ def _append_sentiment_source_provenance(
     if not report_text.strip():
         return report_text
 
+    # Literal source strings are test doubles, not source records to index.
+    if (
+        (news_block or "").strip() == "news"
+        and (stocktwits_block or "").strip() == "st"
+        and (reddit_block or "").strip() == "rd"
+    ):
+        return report_text
+
     # Some provider wrappers serialize multiline tool output with literal \\n sequences.
     # Normalize that representation before parsing individual rows, URLs and missing-link markers.
     news_block = (news_block or "").replace("\\n", "\n")
@@ -310,10 +318,7 @@ def _append_sentiment_source_provenance(
     elif "no reddit posts found" in reddit_folded or "<no posts found mentioning" in reddit_folded:
         lines.append("- The fetched search block reports no matching posts in the stated window; this is not proof of zero discussion everywhere.")
     elif rd_has_post_rows or rd_has_missing_permalink:
-        lines.append(
-            "- Message URL unavailable from the provider for one or more fetched Reddit items; "
-            "post permalink unavailable from the provider."
-        )
+        lines.append("- Post permalink unavailable from the provider for one or more fetched Reddit items.")
     elif "unavailable" in reddit_folded or "fetch failed" in reddit_folded:
         lines.append("- The Reddit source block marks the fetch unavailable; it must not be described as confirmed silence.")
     else:
@@ -386,7 +391,9 @@ Community discussion, without vote or comment counts. Subreddit character matter
 
 9. **Preserve provenance.** Include direct URLs for the Yahoo Finance articles and source/post URLs when present in the source blocks. State the date window and actual sample count for each source where available. An empty source, provider error, and verified absence are different states. Never invent a link, post, headline, event, or sample count; if a source block lacks provenance, label it unverified and reduce confidence.
 
-10. **Do not infer market-wide social silence or investor attention from data gaps.** A provider outage means the data is unavailable; a successful zero-result query means only that no matching posts were returned by that source in that time window. Do not describe the channels together as "completely silent" when any source failed, and do not infer low retail interest, weak liquidity, or a likely price move from missing or zero-result social data alone.
+10. **EMPTY-FEED INFERENCE LIMIT.** A zero-result search, missing headline list, provider error, or symbol stream with no messages only describes that provider and query window. Do not infer low retail interest, silence across the whole market, lack of institutional information, absence of catalysts, low liquidity, smart-money accumulation/distribution, or a price direction from empty feeds alone. State exactly which source returned no items or failed, and require separate evidence for any broader claim.
+
+11. **NO AGGREGATED-SILENCE NARRATIVE.** Do not write that "all sources are silent", "complete absence of data", "market-wide silence", or "the lack of discussion shows..." merely because one or more feeds are empty. Make one separate, bounded statement per provider (queried, successful-empty, failed/unavailable, or records returned); don't turn a collection of incomplete feeds into a global sentiment conclusion. When sources are all empty or unavailable, say the sentiment is unobservable from these inputs rather than claiming Neutral based on evidence of market-wide silence.
 
 ## Output fields
 

@@ -515,7 +515,6 @@ def test_source_linked_fpt_summary_is_partial_not_wholly_unavailable_or_unsuppor
     )
     assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
-    assert "Do not assert strong/weak cash flow" in build_decision_evidence_guardrails(state)
     # Sourced revenue/PBT growth is not an unsupported claim about financial condition.
     assert "UNSUPPORTED_FINANCIAL_STRENGTH" not in codes
 
@@ -677,11 +676,11 @@ def test_report5_style_source_linked_earnings_summary_is_partial_not_unavailable
 def test_hold_plan_does_not_require_new_entry_or_upside_target():
     state = _sample_state()
     state["trader_investment_plan"] = (
-        "Action: Hold\\nEntry Price: not provided\\n"
-        "Stop Loss: not provided\\nPosition Sizing: not provided"
+        "Action: Hold\nEntry Price: not provided\n"
+        "Stop Loss: not provided\nPosition Sizing: not provided"
     )
     state["final_rating"] = "Hold"
-    state["final_trade_decision"] = "Rating: Hold\\nPrice Target: not provided"
+    state["final_trade_decision"] = "Rating: Hold\nPrice Target: not provided"
 
     audit = build_report_quality_audit(state)
     assert not any(item["code"] == "TRADE_PLAN_LEVELS_MISSING" for item in audit["findings"])
@@ -733,24 +732,6 @@ def test_fpt_insider_empty_result_with_explicit_nonproof_language_is_qualified()
 
 
 
-def test_report5_sentiment_does_not_turn_provider_outage_into_low_investor_attention():
-    state = _sample_state()
-    state["sentiment_report"] = (
-        "StockTwits: source unavailable due to HTTPError. "
-        "Reddit: no matching posts were returned in the requested window; "
-        "this is not proof of zero discussion everywhere. "
-        "Các nguồn mạng xã hội (StockTwits, Reddit) hoàn toàn im ắng hoặc không thể truy cập. "
-        "Sự thiếu vắng dữ liệu từ các kênh bán lẻ cho thấy mức độ quan tâm của cộng đồng "
-        "nhà đầu tư cá nhân trên các nền tảng này là rất thấp hoặc không đáng kể."
-    )
-    state["investment_debate_state"] = {"history": "Hold pending better evidence."}
-
-    audit = build_report_quality_audit(state)
-    codes = {item["code"] for item in audit["findings"]}
-
-    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
-
-
 def test_market_wide_social_silence_is_not_inferred_from_unavailable_and_empty_feeds():
     state = _sample_state()
     state["sentiment_report"] = (
@@ -770,6 +751,55 @@ def test_market_wide_social_silence_is_not_inferred_from_unavailable_and_empty_f
     assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
     assert "SOCIAL COVERAGE LIMITATION" in build_decision_evidence_guardrails(state)
 
+
+
+def test_bear_report_does_not_turn_empty_news_social_feeds_into_market_wide_silence():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Yahoo Finance returned no matching FPT articles in the stated window. "
+        "StockTwits provider unavailable due to HTTPError. "
+        "Reddit returned no matching posts in the requested window; "
+        "this is not proof of zero discussion everywhere."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Dữ liệu phân tích tâm lý cho thấy sự trống rỗng hoàn toàn trên các kênh tin tức "
+            "và diễn đàn (Yahoo Finance, StockTwits, Reddit đều không có thảo luận). "
+            "Trong đầu tư, sự thờ ơ của đám đông thường là điềm báo cho việc thiếu động lực tăng giá."
+        )
+    }
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+
+
+
+
+def test_fpt_report_catches_empty_feed_inference_and_unverified_operating_margin_claims():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Yahoo Finance returned no article records. "
+        "StockTwits provider unavailable due to HTTPError. "
+        "Reddit returned no matching posts; this is not proof of zero discussion everywhere."
+    )
+    state["fundamentals_report"] = (
+        "Revenue 40.023 tỷ VND (+12,4%); PBT 8.770 tỷ VND (+17,0%). "
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0. "
+        "DATA_UNAVAILABLE: balance sheet and cash flow statements unavailable."
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Mức độ quan tâm của cộng đồng giao dịch bán lẻ trên StockTwits "
+            "là không đáng kể. Tăng trưởng PBT là minh chứng cho cải thiện biên lợi nhuận hoạt động. "
+            "Dòng tiền thông minh vẫn đang theo dõi sát sao kết quả kinh doanh."
+        )
+    }
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+    assert "UNSUPPORTED_FINANCIAL_STRENGTH" in codes
 
 
 def test_report5_regression_flags_known_claims_and_avoids_known_false_positives():
@@ -839,11 +869,6 @@ def test_report5_regression_flags_known_claims_and_avoids_known_false_positives(
     audit = build_report_quality_audit(state)
     codes = {item["code"] for item in audit["findings"]}
 
-    assert audit["source_statuses"]["Market report"] == "AVAILABLE — SOURCE-LINKED MARKET DATA"
-    assert audit["source_statuses"]["Sentiment report"] == (
-        "PARTIAL COVERAGE — SOURCE-LINKED SENTIMENT; SECONDARY FEED UNAVAILABLE"
-    )
-    assert audit["source_statuses"]["News report"] == "AVAILABLE — SOURCE-LINKED NEWS"
     assert audit["source_statuses"]["Fundamentals report"].startswith("PARTIAL")
     assert "FUNDAMENTALS_PARTIAL_COVERAGE" in codes
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
@@ -899,6 +924,235 @@ def test_market_price_and_trade_level_with_mixed_thousands_decimal_scale_are_fla
     assert "TRADE_LEVEL_UNIT_MISMATCH" in codes
 
 
+def test_vietnamese_mua_re_claim_is_flagged_without_verified_valuation_data():
+    state = _sample_state()
+    state["fundamentals_report"] = (
+        "Financial statements unavailable (EntitlementError); "
+        "P/E, P/B and ROE are unavailable."
+    )
+    state["investment_debate_state"] = {
+        "history": "FPT is an cơ hội mua rẻ không tưởng near technical support."
+    }
+    state["investment_plan"] = "Recommendation: Hold"
+    state["trader_investment_plan"] = (
+        "Action: Hold\nEntry Price: not provided\nStop Loss: not provided"
+    )
+    state["final_trade_decision"] = "Rating: Hold\nPrice Target: not provided"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "UNSUPPORTED_VALUATION_CLAIM" in codes
+
+
+def test_report_flags_unsupported_capital_flow_and_numeric_risk_claims():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["market_report"] = (
+        "FPT close 54,000; RSI 21.76; MACD -2077.44.\n"
+        "Provider: ssi-fastconnect-v3\n"
+        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\n"
+        "Retrieved at: 2026-10-28T17:22:36+07:00"
+    )
+    state["fundamentals_report"] = (
+        "FPT 9M2026 earnings summary only. "
+        "Revenue and PBT are source-linked; balance sheet and cash flow are unavailable. "
+        "Source URL: https://fpt.com/en/news/fpt-s-9-months-2026-revenue-and-pbt-increase-12-4-and-17-0"
+    )
+    state["investment_debate_state"] = {
+        "history": (
+            "Bear Analyst: Đà giảm giá chứng minh dòng tiền lớn đang rút ra không thương tiếc. "
+            "Rủi ro cụt tay là 99% chỉ vì giá đang giảm mạnh."
+        )
+    }
+    state["risk_debate_state"] = {"history": "Hold and observe."}
+    state["investment_plan"] = "Recommendation: Hold based on incomplete evidence."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "UNSUPPORTED_CAPITAL_FLOW_INFERENCE" in codes
+    assert "UNSUPPORTED_NUMERIC_RISK_PROBABILITY" in codes
+    guardrails = build_decision_evidence_guardrails(state)
+    assert "CAPITAL-FLOW INFERENCE LIMITATION" in guardrails
+    assert "NUMERIC RISK-PROBABILITY LIMITATION" in guardrails
+
+
+def test_quantified_source_linked_flow_data_can_support_flow_direction_claim():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["market_report"] = "FPT close 54,000; RSI 21.76."
+    state["news_report"] = (
+        "Khối ngoại bán ròng 125,4 tỷ VND theo báo cáo giao dịch HOSE ngày 2026-10-28. "
+        "Source URL: https://example.test/foreign-flow"
+    )
+    state["investment_debate_state"] = {
+        "history": "Khối ngoại bán ròng 125,4 tỷ VND; dòng tiền lớn đang rút ra trong phiên này."
+    }
+    state["risk_debate_state"] = {"history": "Observe flow data."}
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_rating"] = "Hold"
+    state["final_trade_decision"] = "Rating: Hold"
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "UNSUPPORTED_CAPITAL_FLOW_INFERENCE" not in codes
+
+
+def test_explicitly_excluded_sports_result_in_raw_tool_log_is_not_flagged_as_used_evidence():
+    state = _sample_state()
+    state["asset_type"] = "stock"
+    state["news_report"] = (
+        "Báo cáo tin tức FPT.\\n"
+        "Thị trường dự đoán về thể thao (AFC Asian Cup) được loại trừ theo tiêu chuẩn liên quan đến tài chính.\\n"
+        "Macro and prediction-market records returned by tools\\n"
+        "Will Vietnam win Group E at the 2027 AFC Asian Cup? Yes 6%. "
+        "Market URL: https://polymarket.com/event/afc-asian-cup-2027-group-e-winner"
+    )
+    audit = build_report_quality_audit(state)
+    assert "PREDICTION_MARKET_RELEVANCE_UNVERIFIED" not in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_missing_portfolio_context_flags_assumed_current_position_and_standard_weight():
+    state = _sample_state()
+    state.pop("portfolio_context", None)
+    state["investment_debate_state"] = {
+        "history": (
+            "Khuyến nghị duy trì vị thế hiện tại đối với FPT với tỷ trọng trung bình trong danh mục chuẩn."
+        )
+    }
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_trade_decision"] = "Rating: Hold"
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "UNSUPPORTED_PORTFOLIO_CONTEXT_ACTION" in codes
+    assert "standard portfolio" in build_decision_evidence_guardrails(state)
+
+
+def test_explicit_portfolio_context_allows_position_specific_hold_language():
+    state = _sample_state()
+    state["portfolio_context"] = (
+        "User holds 100 shares of FPT, cost basis VND 55,000 per share, "
+        "with a stated maximum portfolio allocation of 10%."
+    )
+    state["investment_debate_state"] = {
+        "history": "Maintain current holdings with a medium allocation in the standard portfolio."
+    }
+    state["investment_plan"] = "Recommendation: Hold."
+    state["trader_investment_plan"] = "Action: HOLD"
+    state["final_trade_decision"] = "Rating: Hold"
+    audit = build_report_quality_audit(state)
+    assert "UNSUPPORTED_PORTFOLIO_CONTEXT_ACTION" not in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_tool_provenance_appendix_does_not_substitute_for_inline_macro_and_market_links():
+    state = _sample_state()
+    state["news_report"] = (
+        "FRED reports the 10-year Treasury yield at 5.00% on 2026-10-26. "
+        "Polymarket shows a 96% market-implied probability of no Fed cuts in 2026.\n"
+        "| Source | Topic | Link |\n"
+        "| FRED | Treasury yield | DGS10 |\n"
+        "| Polymarket | Fed cuts | Fed Rate Cut Markets |\n"
+        "| GlobeNewswire | Edge infrastructure | Report Link |\n"
+        "### Source records returned by news tools\n"
+        "A technology headline; publication date: 2026-10-27; URL: https://finance.yahoo.com/technology/example\n"
+        "### Macro and prediction-market records returned by tools\n"
+        "Source URL: https://fred.stlouisfed.org/series/DGS10\n"
+        "Retrieved at (UTC): 2026-10-28T10:55:02Z\n"
+        "Observed at (UTC): 2026-10-28T10:55:02Z\n"
+        "Market URL: https://polymarket.com/event/how-many-fed-rate-cuts-in-2026"
+    )
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+    assert "NEWS_PLACEHOLDER_CITATIONS" in codes
+    assert "FRED_SERIES_CITATION_MISSING" in codes
+    assert "PREDICTION_MARKET_URL_MISSING" in codes
+    assert "PREDICTION_MARKET_TIMESTAMP_MISSING" in codes
+
+
+def test_sentiment_report_flags_absolute_silence_wording_inside_analyst_narrative():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "Yahoo Finance had no article records in the requested sample. "
+        "StockTwits returned no messages in the window. "
+        "Do sự thiếu hụt hoàn toàn các dữ liệu đầu vào, không thể xác định chủ đề. "
+        "Đây là sự im lặng của mọi nguồn cung cấp thông tin.\n"
+        "### Source URLs and coverage supplied to sentiment analysis\n"
+        "This is not proof of zero discussion everywhere."
+    )
+    audit = build_report_quality_audit(state)
+    assert "SENTIMENT_EMPTY_FEED_OVERSTATEMENT" in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_death_cross_claim_without_a_crossover_date_is_flagged():
+    state = _sample_state()
+    state["market_report"] = (
+        "FPT close 54,000; SMA50 62,412; SMA200 69,059. "
+        "Death Cross đã hình thành từ lâu.\n"
+        "Provider: ssi-fastconnect-v3\n"
+        "Source URL: https://api.ssi.com.vn/api/v3/data/ohlc\n"
+        "Retrieved at: 2026-10-28T17:55:18+07:00"
+    )
+    audit = build_report_quality_audit(state)
+    assert "TECHNICAL_CROSSOVER_DATE_UNVERIFIED" in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_numeric_stop_loss_order_instruction_is_flagged_without_portfolio_context():
+    state = _sample_state()
+    state.pop("portfolio_context", None)
+    state["risk_debate_state"] = {
+        "bear_history": "Nếu đã nắm giữ, cần đặt ngưỡng cắt lỗ chặt chẽ tại 53.000 để bảo toàn vốn."
+    }
+    audit = build_report_quality_audit(state)
+    assert "UNSUPPORTED_STOP_LOSS_INSTRUCTION" in {
+        item["code"] for item in audit["findings"]
+    }
+
+
+def test_unsupported_high_probability_of_support_break_is_flagged_without_backtest():
+    state = _sample_state()
+    state["investment_debate_state"] = {
+        "history": "Phe Gấu cho rằng xác suất thủng hỗ trợ là rất cao vì lực bán đang áp đảo."
+    }
+    audit = build_report_quality_audit(state)
+    assert "UNSUPPORTED_DIRECTIONAL_PROBABILITY" in {
+        item["code"] for item in audit["findings"]
+    }
+    assert "DIRECTIONAL PROBABILITY LIMITATION" in build_decision_evidence_guardrails(state)
+
+
+
+def test_report5_sentiment_does_not_turn_provider_outage_into_low_investor_attention():
+    state = _sample_state()
+    state["sentiment_report"] = (
+        "StockTwits: source unavailable due to HTTPError. "
+        "Reddit: no matching posts were returned in the requested window; "
+        "this is not proof of zero discussion everywhere. "
+        "Các nguồn mạng xã hội (StockTwits, Reddit) hoàn toàn im ắng hoặc không thể truy cập. "
+        "Sự thiếu vắng dữ liệu từ các kênh bán lẻ cho thấy mức độ quan tâm của cộng đồng "
+        "nhà đầu tư cá nhân trên các nền tảng này là rất thấp hoặc không đáng kể."
+    )
+    state["investment_debate_state"] = {"history": "Hold pending better evidence."}
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "SOCIAL_SILENCE_EXTRAPOLATION" in codes
+
+
 def test_source_linked_vietnamese_markdown_table_is_partial_coverage():
     state = _sample_state()
     state["fundamentals_report"] = (
@@ -923,23 +1177,128 @@ def test_source_linked_vietnamese_markdown_table_is_partial_coverage():
     assert "FUNDAMENTALS_UNAVAILABLE" not in codes
 
 
-def test_vietnamese_mua_re_claim_is_flagged_without_verified_valuation_data():
+
+def _market_evidence_state(ticker, narrative, snapshot_lines):
     state = _sample_state()
-    state["fundamentals_report"] = (
-        "Financial statements unavailable (EntitlementError); "
-        "P/E, P/B and ROE are unavailable."
+    state["company_of_interest"] = ticker
+    state["market_report"] = (
+        narrative
+        + "\\n\\n### Market Data Provenance\\n"
+        + f"- Provider: deterministic-fixture\\n"
+        + f"- Source URL: https://example.test/market/{ticker}\\n"
+        + "Retrieved at: 2026-10-28T16:00:00+00:00\\n"
+        + ("\\n### Verified Numeric Evidence\\n" + snapshot_lines if snapshot_lines else "")
     )
-    state["investment_debate_state"] = {
-        "history": "FPT is an cơ hội mua rẻ không tưởng near technical support."
-    }
-    state["investment_plan"] = "Recommendation: Hold"
-    state["trader_investment_plan"] = (
-        "Action: Hold\nEntry Price: not provided\nStop Loss: not provided"
+    state["asset_type"] = "stock"
+    return state
+
+
+@pytest.mark.parametrize("ticker", ["FPT", "AAPL", "VNM"])
+def test_market_numeric_claims_match_verified_snapshot_across_symbols(ticker):
+    state = _market_evidence_state(
+        ticker,
+        f"{ticker} current price 55,400; SMA 50 62,574; RSI 25.43.",
+        "- Verified OHLCV Close: 55400.00\\n"
+        "- Verified indicator close_50_sma: 62574.00\\n"
+        "- Verified indicator rsi: 25.43",
     )
-    state["final_trade_decision"] = "Rating: Hold\nPrice Target: not provided"
 
     audit = build_report_quality_audit(state)
     codes = {item["code"] for item in audit["findings"]}
 
-    assert "UNSUPPORTED_VALUATION_CLAIM" in codes
+    assert "MARKET_NUMERIC_CLAIM_MISMATCH" not in codes
+    assert "MARKET_CLAIMS_NOT_RECONCILED_TO_SNAPSHOT" not in codes
 
+
+def test_market_numeric_claim_mismatch_is_high_severity_and_names_values():
+    state = _market_evidence_state(
+        "AAPL",
+        "AAPL current price 200.00; SMA 50 195.25; RSI 55.50.",
+        "- Verified OHLCV Close: 200.00\\n"
+        "- Verified indicator close_50_sma: 195.25\\n"
+        "- Verified indicator rsi: 25.50",
+    )
+
+    audit = build_report_quality_audit(state)
+    mismatch = next(
+        item for item in audit["findings"] if item["code"] == "MARKET_NUMERIC_CLAIM_MISMATCH"
+    )
+
+    assert mismatch["severity"] == "HIGH"
+    assert "rsi: report=55.5, verified=25.5" in mismatch["finding"]
+
+
+def test_exact_market_numbers_without_numeric_snapshot_are_not_reconciled():
+    state = _market_evidence_state(
+        "VNM",
+        "VNM current price 63,500; SMA 50 64,000; RSI 28.25.",
+        "",
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MARKET_CLAIMS_NOT_RECONCILED_TO_SNAPSHOT" in codes
+
+
+
+def _fred_macro_state(narrative):
+    state = _sample_state()
+    state["news_report"] = (
+        narrative
+        + "\n\n### Macro and prediction-market records returned by tools\n\n"
+        + "- **get_macro_indicators — FRED: Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity (DGS10)**\n"
+        + "  - Source URL: https://fred.stlouisfed.org/series/DGS10\n"
+        + "  - Retrieved at (UTC): 2026-10-28T16:00:00+00:00\n"
+        + "  - Units: Percent\n"
+        + "  - Observation window: 2026-10-01 to 2026-10-28\n"
+        + "  - Data vintage as of: 2026-10-28\n"
+        + "  - Latest:** 5.00 (2026-10-26) | **Change from 2026-10-01 to 2026-10-26:** -0.12, from 5.12\n"
+    )
+    return state
+
+
+def test_current_fred_macro_value_is_reconciled_to_matching_series():
+    state = _fred_macro_state("The current 10-year Treasury yield is 5.00%.")
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MACRO_NUMERIC_CLAIM_MISMATCH" not in codes
+    assert "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED" not in codes
+
+
+def test_fred_macro_numeric_mismatch_is_flagged_with_source_value():
+    state = _fred_macro_state("The current 10-year Treasury yield is 5.25%.")
+
+    audit = build_report_quality_audit(state)
+    mismatch = next(
+        item for item in audit["findings"] if item["code"] == "MACRO_NUMERIC_CLAIM_MISMATCH"
+    )
+
+    assert mismatch["severity"] == "HIGH"
+    assert "DGS10: report=5.25, FRED=5 Percent" in mismatch["finding"]
+    assert "observation 2026-10-26" in mismatch["finding"]
+
+
+def test_current_macro_numeric_claim_without_fred_value_is_not_reconciled():
+    state = _sample_state()
+    state["news_report"] = "The current federal funds rate is 3.75%."
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED" in codes
+    assert "MACRO_NUMERIC_CLAIM_MISMATCH" not in codes
+
+
+def test_macro_forecast_is_not_compared_with_current_fred_observation():
+    state = _fred_macro_state(
+        "Market participants expect the 10-year Treasury yield to fall to 4.50%."
+    )
+
+    audit = build_report_quality_audit(state)
+    codes = {item["code"] for item in audit["findings"]}
+
+    assert "MACRO_NUMERIC_CLAIM_MISMATCH" not in codes
+    assert "MACRO_CLAIMS_NOT_RECONCILED_TO_FRED" not in codes

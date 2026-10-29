@@ -15,10 +15,27 @@ TOOLS = (
 )
 
 
+_MARKET_PROVENANCE_HEADING = re.compile(r"(?im)^\s*#{1,6}\s*Market Data Provenance\s*$")
+
+
+def _strip_unverified_market_provenance(report: str) -> str:
+    """Remove a model-written provenance section unless a tool snapshot validates it."""
+    match = _MARKET_PROVENANCE_HEADING.search(report or "")
+    if not match:
+        return report
+    # The prompt asks for this section at the end. Never keep its claims after a
+    # missing, failed, or malformed snapshot, because they may be model-generated.
+    return report[:match.start()].rstrip()
+
+
 def _append_verified_market_provenance(report: str, messages) -> str:
-    """Append metadata only from the latest successful verified snapshot result."""
+    """Append provenance only from a complete, successful verified snapshot tool result."""
     if not report.strip():
         return report
+
+    # First remove any provenance written by the model. It is replaced only after
+    # a tool result has supplied the minimum evidence required below.
+    clean_report = _strip_unverified_market_provenance(report)
 
     matching_messages = [
         message for message in (messages or ())
@@ -26,10 +43,10 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         and getattr(message, "name", None) == "get_verified_market_snapshot"
     ]
     if not matching_messages:
-        return report
+        return clean_report
 
-    # Use the latest call result. If a later call failed, an earlier successful
-    # snapshot must not be reused as though it were current.
+    # The latest invocation is authoritative. Do not reuse an older success if
+    # a later snapshot call failed.
     message = matching_messages[-1]
     raw_content = getattr(message, "content", "")
     if isinstance(raw_content, list):
@@ -39,51 +56,45 @@ def _append_verified_market_provenance(report: str, messages) -> str:
         )
     else:
         content = str(raw_content)
-    content = content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
-    # Provider wrappers may introduce invisible BOM/zero-width characters around sentinels.
+    content = (
+        content.replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\n")
+    )
     content = content.replace("\ufeff", "").replace("\u200b", "").strip()
     content_folded = content.casefold().lstrip()
 
     unavailable_pattern = re.compile(
-        r"\b(?:DATA[\s_-]*UNAVAILABLE|NO[\s_-]*DATA[\s_-]*AVAILABLE|VendorUnavailableError|EntitlementError)\b"
-        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot|"
-        r"market snapshot (?:is )?(?:missing|unavailable|failed)",
+        r"\b(?:DATA_UNAVAILABLE|NO_DATA_AVAILABLE|VendorUnavailableError|"
+        r"VendorNotConfiguredError|NoMarketDataError|EntitlementError)\b"
+        r"|no market snapshot|snapshot unavailable|could not retrieve.*snapshot"
+        r"|no usable market data",
         re.IGNORECASE,
     )
-    # Fail closed before parsing metadata: an error payload must never create a
-    # provenance section or replace an existing section with fabricated fields.
-    if (
-        unavailable_pattern.search(content)
-        or content_folded.startswith(("error:", "failed:", "<error", "{'error'", '{"error"'))
-        or content_folded in {"", "none", "null"}
-    ):
-        return report
+    if unavailable_pattern.search(content) or content_folded.startswith((
+        "error:", "failed:", "<error",
+    )):
+        return clean_report
 
-    verified_heading_pattern = re.compile(
-        r"(?im)^\s*#{1,6}\s*Verified(?: SSI)? market data snapshot\b"
+    verified_heading = bool(re.search(
+        r"(?im)^\s*#{1,6}\s*Verified(?: SSI)? market data snapshot\b", content
+    ))
+    # Different verified providers use equivalent labels for the same date fields.
+    required_fields = (
+        r"(?im)^\s*[-*]?\s*Requested (?:as-of|analysis) date\s*:\s*\S+",
+        r"(?im)^\s*[-*]?\s*Latest (?:returned trading row|trading row used)\s*:\s*\S+",
+        r"(?im)^\s*[-*]?\s*Source\s*:\s*\S+",
     )
-    has_verified_heading = bool(verified_heading_pattern.search(content))
-    has_snapshot_metadata = all(
-        re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
-        for pattern in (
-            r"^\s*[-*]?\s*Requested as-of date\s*:",
-            r"^\s*[-*]?\s*Latest returned trading row\s*:",
-            r"^\s*[-*]?\s*Source\s*:",
-        )
-    )
-    if not (has_verified_heading or has_snapshot_metadata):
-        return report
-
-    existing_heading = "### Market Data Provenance"
-    if existing_heading in report:
-        report = report.split(existing_heading, 1)[0].rstrip()
+    has_required_metadata = all(re.search(pattern, content) for pattern in required_fields)
+    if not (verified_heading and has_required_metadata):
+        return clean_report
 
     fields = (
         ("Provider", r"(?im)^\s*(?:[-*]\s*)?Source\s*[:：]\s*(.+)$"),
         ("Source URL", r"(?im)^\s*(?:[-*]\s*)?(?:Source URL|Data URL|URL nguồn|Link nguồn)\s*[:：]\s*(.+)$"),
         ("Retrieved at", r"(?im)^\s*(?:[-*]\s*)?Retrieved at(?: \(UTC\))?\s*[:：]\s*(.+)$"),
-        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested as-of date\s*[:：]\s*(.+)$"),
-        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest returned trading row\s*[:：]\s*(.+)$"),
+        ("Requested as-of date", r"(?im)^\s*(?:[-*]\s*)?Requested (?:as-of|analysis) date\s*[:：]\s*(.+)$"),
+        ("Latest returned trading row", r"(?im)^\s*(?:[-*]\s*)?Latest (?:returned trading row|trading row used)\s*[:：]\s*(.+)$"),
     )
     lines = ["", "### Market Data Provenance", ""]
     for label, pattern in fields:
@@ -92,7 +103,51 @@ def _append_verified_market_provenance(report: str, messages) -> str:
             lines.append(f"- {label}: {match.group(1).strip()}")
         elif label in {"Provider", "Source URL", "Retrieved at"}:
             lines.append(f"- {label}: not supplied by provider")
-    return report.rstrip() + "\n" + "\n".join(lines) + "\n"
+    base = clean_report.rstrip()
+    provenance = "\n".join(lines).strip("\n") + "\n"
+
+    # Copy numeric evidence from the validated tool response verbatim, rather
+    # than leaving the audit with only a source URL and timestamp. This appendix
+    # is parsed by report_quality.py to compare exact numbers in the narrative.
+    numeric_rows = []
+    section = None
+    for raw_line in content.splitlines():
+        heading = raw_line.strip().casefold()
+        if heading.startswith("### latest verified ohlcv row"):
+            section = "ohlcv"
+            continue
+        if heading.startswith("### verified technical indicators"):
+            section = "indicators"
+            continue
+        if heading.startswith("### "):
+            section = None
+        if section is None:
+            continue
+        match = re.match(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$", raw_line.strip())
+        if not match:
+            continue
+        label, value = match.group(1).strip(), match.group(2).strip()
+        if not label or set(label) <= {"-", ":", " "} or not value:
+            continue
+        if value.casefold() == "n/a" or value.casefold().startswith("n/a "):
+            continue
+        if not re.fullmatch(r"-?\d[\d,.]*", value):
+            continue
+        if section == "ohlcv":
+            if label.casefold() in {"open", "high", "low", "close", "volume"}:
+                numeric_rows.append(f"- Verified OHLCV {label.title()}: {value}")
+        else:
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", label):
+                numeric_rows.append(f"- Verified indicator {label.lower()}: {value}")
+
+    if numeric_rows:
+        numeric_evidence = (
+            "\n### Verified Numeric Evidence\n\n"
+            + "\n".join(numeric_rows)
+            + "\n"
+        )
+        return f"{base}\n\n{provenance}{numeric_evidence}" if base else f"{provenance}{numeric_evidence}"
+    return f"{base}\n\n{provenance}" if base else provenance
 
 
 def create_market_analyst(llm):

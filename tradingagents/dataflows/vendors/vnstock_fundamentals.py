@@ -1,13 +1,16 @@
-"""Optional, current-date-only Vnstock VCI fundamentals vendor.
+"""Optional, current-date-only Vnstock VCI/KBS fundamentals vendor.
 
 The standard Vnstock V5 Fundamental API returns VAS-normalized long-format
-statements. This adapter validates source metadata and blocks historical
+statements. This adapter validates any reported source metadata against the
+explicit request, records which provider was selected, and blocks historical
 as-of dates because fetched statements do not carry their first-publication
 time. It never calls premium ratio() endpoints and never infers missing share
 counts or capex.
 """
 from __future__ import annotations
 
+import logging
+import os
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -28,8 +31,26 @@ from tradingagents.dataflows.vietnam_market.vnstock_adapter import (
     normalize_vnstock_vci_statements,
 )
 
-_SOURCE = "vnstock-vci"
 _REQUIRED_COLUMNS = {"period", "id", "unit", "value"}
+_VALID_SOURCES = {"vci", "kbs"}
+_DEFAULT_SOURCES = ("vci", "kbs")
+_SOURCES_ENV = "TRADINGAGENTS_VNSTOCK_FUNDAMENTALS_SOURCES"
+logger = logging.getLogger(__name__)
+
+
+def _configured_sources() -> tuple[str, ...]:
+    """Return the explicitly ordered, validated Vnstock statement source chain."""
+    raw = os.getenv(_SOURCES_ENV, ",".join(_DEFAULT_SOURCES)).strip()
+    sources = tuple(dict.fromkeys(part.strip().lower() for part in raw.split(",") if part.strip()))
+    if not sources:
+        sources = _DEFAULT_SOURCES
+    invalid = [source for source in sources if source not in _VALID_SOURCES]
+    if invalid:
+        raise VendorNotConfiguredError(
+            f"{_SOURCES_ENV} only accepts comma-separated vci and/or kbs; "
+            f"received: {', '.join(invalid)}"
+        )
+    return sources
 
 
 def _symbol(value: str) -> str:
@@ -62,8 +83,7 @@ def _guard_as_of(as_of_date: str | None, symbol: str, report: str) -> str | None
         if normalized > current_date:
             raise ValueError("Vnstock live statements do not support future as-of dates")
         if normalized == current_date:
-            # Do not hand a current-date request to a helper that reads date.today()
-            # directly; that would make injected clocks/tests depend on the host timezone.
+            # Avoid using withhold_undated_statements, which consults the host's date.today().
             return None
         return withhold_undated_statements(normalized, symbol, report)
     return None
@@ -82,34 +102,40 @@ def _fundamental_client(symbol: str) -> Any:
         return Fundamental().equity(symbol)
     except Exception as exc:
         raise VendorUnavailableError(
-            f"Vnstock VCI client initialization failed ({type(exc).__name__}); "
+            f"Vnstock client initialization failed ({type(exc).__name__}); "
             "check installation, network access, and source entitlement."
         ) from exc
 
 
-def _validate_frame(frame: object, symbol: str, report: str) -> None:
+def _validate_frame(frame: object, symbol: str, report: str, source: str = "vci") -> None:
+    expected_source = source.strip().lower()
+    if expected_source not in _VALID_SOURCES:
+        raise VendorNotConfiguredError(f"Unsupported Vnstock source: {expected_source!r}")
     if frame is None or bool(getattr(frame, "empty", False)):
-        raise NoMarketDataError(symbol, symbol, f"Vnstock VCI returned no {report} rows")
+        raise NoMarketDataError(
+            symbol, symbol, f"Vnstock {expected_source.upper()} returned no {report} rows"
+        )
+    # Vnstock's VCI provider does not consistently attach attrs; KBS attaches
+    # source/symbol but may omit format. Explicit source= never auto-switches
+    # providers, so missing metadata is acceptable when the request is explicit
+    # and the returned schema is long-form. Any metadata that IS present must match.
     attrs = getattr(frame, "attrs", None)
-    if not isinstance(attrs, Mapping):
-        raise VendorUnavailableError(
-            f"Vnstock {report} response lacks provenance metadata; refusing to infer source."
-        )
-    source = attrs.get("source")
-    if str(source or "").strip().lower() != "vci":
-        raise VendorUnavailableError(
-            f"Vnstock {report} metadata source is {source!r}; expected 'vci'"
-        )
-    frame_symbol = attrs.get("symbol")
-    if str(frame_symbol or "").strip().upper() != symbol:
-        raise VendorUnavailableError(
-            f"Vnstock {report} metadata ticker is {frame_symbol!r}; expected {symbol!r}"
-        )
-    frame_format = attrs.get("format")
-    if str(frame_format or "").strip().lower() != "long":
-        raise VendorUnavailableError(
-            f"Vnstock {report} metadata format is {frame_format!r}; expected 'long'"
-        )
+    if isinstance(attrs, Mapping):
+        frame_source = attrs.get("source")
+        if frame_source not in (None, "") and str(frame_source).strip().lower() != expected_source:
+            raise VendorUnavailableError(
+                f"Vnstock {report} metadata source is {frame_source!r}; expected '{expected_source}'"
+            )
+        frame_symbol = attrs.get("symbol")
+        if frame_symbol not in (None, "") and str(frame_symbol).strip().upper() != symbol:
+            raise VendorUnavailableError(
+                f"Vnstock {report} metadata ticker is {frame_symbol!r}; expected {symbol!r}"
+            )
+        frame_format = attrs.get("format")
+        if frame_format not in (None, "") and str(frame_format).strip().lower() != "long":
+            raise VendorUnavailableError(
+                f"Vnstock {report} metadata format is {frame_format!r}; expected 'long'"
+            )
 
     columns = {str(name) for name in getattr(frame, "columns", ())}
     if not _REQUIRED_COLUMNS.issubset(columns):
@@ -123,24 +149,46 @@ def _validate_frame(frame: object, symbol: str, report: str) -> None:
         )
 
 
-def _fetch_frame(client: Any, name: str, symbol: str, period: str) -> object:
+def _fetch_frame(client: Any, name: str, symbol: str, period: str, source: str = "vci") -> object:
+    source = source.strip().lower()
+    if source not in _VALID_SOURCES:
+        raise VendorNotConfiguredError(f"Unsupported Vnstock source: {source!r}")
     getter = getattr(client, name, None)
     if not callable(getter):
         raise VendorUnavailableError(f"Installed Vnstock client does not support {name}()")
     try:
-        frame = getter(period=period, format="long", source="vci")
+        frame = getter(period=period, format="long", source=source)
     except (NoMarketDataError, VendorNotConfiguredError, VendorUnavailableError):
         raise
     except Exception as exc:
         raise VendorUnavailableError(
-            f"Vnstock VCI {name} request failed ({type(exc).__name__}); "
-            "check source availability and package compatibility."
+            f"Vnstock {source.upper()} {name} request failed ({type(exc).__name__}); "
+            "check source availability, API-key status, and package compatibility."
         ) from exc
-    _validate_frame(frame, symbol, name)
+    _validate_frame(frame, symbol, name, source)
     return frame
 
 
-def _csv_response(frame: object, symbol: str, title: str, period: str) -> str:
+def _fetch_frame_with_fallback(
+    client: Any, name: str, symbol: str, period: str
+) -> tuple[object, str]:
+    """Try configured sources in order and return the frame plus its real source."""
+    errors: list[tuple[str, Exception]] = []
+    for source in _configured_sources():
+        try:
+            return _fetch_frame(client, name, symbol, period, source), source
+        except (NoMarketDataError, VendorNotConfiguredError, VendorUnavailableError) as exc:
+            logger.warning("Vnstock %s unavailable for %s/%s: %s", source, symbol, name, exc)
+            errors.append((source, exc))
+    details = "; ".join(f"{source}: {error}" for source, error in errors)
+    if any(not isinstance(error, NoMarketDataError) for _, error in errors):
+        raise VendorUnavailableError(
+            f"All configured Vnstock sources failed for {name} ({details})"
+        )
+    raise NoMarketDataError(symbol, symbol, f"Vnstock sources returned no {name} rows ({details})")
+
+
+def _csv_response(frame: object, symbol: str, title: str, period: str, source: str) -> str:
     fetched_at = datetime.now(UTC)
     try:
         csv_text = frame.to_csv(index=False)
@@ -149,10 +197,21 @@ def _csv_response(frame: object, symbol: str, title: str, period: str) -> str:
             f"Could not serialize Vnstock {title} response ({type(exc).__name__})"
         ) from exc
     if not isinstance(csv_text, str) or not csv_text.strip():
-        raise NoMarketDataError(symbol, symbol, f"Vnstock VCI returned empty {title} CSV")
+        raise NoMarketDataError(symbol, symbol, f"Vnstock {source.upper()} returned empty {title} CSV")
+    attrs = getattr(frame, "attrs", None)
+    observed_source = attrs.get("source") if isinstance(attrs, Mapping) else None
+    if observed_source not in (None, "") and str(observed_source).strip().lower() == source:
+        source_evidence = "confirmed by response metadata"
+    else:
+        source_evidence = (
+            "determined by the explicit source argument; this provider response "
+            "does not expose a source attribute"
+        )
     return (
-        f"# {title} for {symbol} from Vnstock VCI\n"
+        f"# {title} for {symbol} from Vnstock {source.upper()}\n"
+        f"# Provider source: vnstock-{source}; source evidence: {source_evidence}\n"
         f"# Period: {period}; retrieved at: {fetched_at.isoformat()}\n"
+        "# Vnstock explicit source requests do not silently switch to another provider.\n"
         "# Availability is fetch-time only; this response has no historical first-publication time.\n"
         "# Use only for current-date analysis, not historical point-in-time backtests.\n\n"
         + csv_text
@@ -162,43 +221,43 @@ def _csv_response(frame: object, symbol: str, title: str, period: str) -> str:
 def get_vnstock_balance_sheet(
     ticker: str, freq: str = "quarterly", as_of_date: str | None = None
 ) -> str:
-    """Return the validated VCI balance sheet as long-format CSV."""
+    """Return the validated VCI/KBS balance sheet as long-format CSV."""
     symbol = _symbol(ticker)
     period = _period(freq)
     withheld = _guard_as_of(as_of_date, symbol, "Balance Sheet")
     if withheld:
         return withheld
     client = _fundamental_client(symbol)
-    frame = _fetch_frame(client, "balance_sheet", symbol, period)
-    return _csv_response(frame, symbol, "Balance Sheet", period)
+    frame, source = _fetch_frame_with_fallback(client, "balance_sheet", symbol, period)
+    return _csv_response(frame, symbol, "Balance Sheet", period, source)
 
 
 def get_vnstock_cashflow(
     ticker: str, freq: str = "quarterly", as_of_date: str | None = None
 ) -> str:
-    """Return the validated VCI cash-flow statement as long-format CSV."""
+    """Return the validated VCI/KBS cash-flow statement as long-format CSV."""
     symbol = _symbol(ticker)
     period = _period(freq)
     withheld = _guard_as_of(as_of_date, symbol, "Cash Flow")
     if withheld:
         return withheld
     client = _fundamental_client(symbol)
-    frame = _fetch_frame(client, "cash_flow", symbol, period)
-    return _csv_response(frame, symbol, "Cash Flow", period)
+    frame, source = _fetch_frame_with_fallback(client, "cash_flow", symbol, period)
+    return _csv_response(frame, symbol, "Cash Flow", period, source)
 
 
 def get_vnstock_income_statement(
     ticker: str, freq: str = "quarterly", as_of_date: str | None = None
 ) -> str:
-    """Return the validated VCI income statement as long-format CSV."""
+    """Return the validated VCI/KBS income statement as long-format CSV."""
     symbol = _symbol(ticker)
     period = _period(freq)
     withheld = _guard_as_of(as_of_date, symbol, "Income Statement")
     if withheld:
         return withheld
     client = _fundamental_client(symbol)
-    frame = _fetch_frame(client, "income_statement", symbol, period)
-    return _csv_response(frame, symbol, "Income Statement", period)
+    frame, source = _fetch_frame_with_fallback(client, "income_statement", symbol, period)
+    return _csv_response(frame, symbol, "Income Statement", period, source)
 
 
 def _ttm_sum(
@@ -228,47 +287,83 @@ def _ttm_sum(
 
 
 def get_vnstock_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
-    """Summarize explicitly mapped VCI facts; do not call premium ratio endpoints."""
+    """Summarize validated VCI/KBS facts without silently mixing source data."""
     symbol = _symbol(ticker)
     withheld = _guard_as_of(as_of_date, symbol, "Fundamentals")
     if withheld:
         return withheld
 
     client = _fundamental_client(symbol)
-    income = _fetch_frame(client, "income_statement", symbol, "quarter")
-    balance = _fetch_frame(client, "balance_sheet", symbol, "quarter")
-    cash_flow = _fetch_frame(client, "cash_flow", symbol, "quarter")
     fetched_at = datetime.now(UTC)
-    try:
-        facts = normalize_vnstock_vci_statements(
-            symbol, income, balance, cash_flow, fetched_at
+    errors: list[tuple[str, Exception]] = []
+    facts: list[FundamentalFact] | None = None
+    selected_source: str | None = None
+
+    # Keep the entire three-statement summary on one provider. If any VCI report
+    # fails, discard that partial set and retry all three from KBS.
+    for source in _configured_sources():
+        try:
+            income = _fetch_frame(client, "income_statement", symbol, "quarter", source)
+            balance = _fetch_frame(client, "balance_sheet", symbol, "quarter", source)
+            cash_flow = _fetch_frame(client, "cash_flow", symbol, "quarter", source)
+            facts = normalize_vnstock_vci_statements(
+                symbol, income, balance, cash_flow, fetched_at, source=source
+            )
+            selected_source = source
+            break
+        except (
+            NoMarketDataError,
+            VendorNotConfiguredError,
+            VendorUnavailableError,
+            VnstockNormalizationError,
+        ) as exc:
+            logger.warning("Vnstock %s statement set unavailable for %s: %s", source, symbol, exc)
+            errors.append((source, exc))
+
+    if facts is None or selected_source is None:
+        details = "; ".join(f"{source}: {error}" for source, error in errors)
+        if any(not isinstance(error, NoMarketDataError) for _, error in errors):
+            raise VendorUnavailableError(
+                f"All configured Vnstock sources failed to provide a validated three-statement set ({details})"
+            )
+        raise NoMarketDataError(
+            symbol, symbol, f"Vnstock sources returned no complete three-statement set ({details})"
         )
-    except VnstockNormalizationError as exc:
-        raise VendorUnavailableError(
-            f"Vnstock VCI data could not be normalized safely: {exc}"
-        ) from exc
 
     latest_equity = max(
         (fact for fact in facts if fact.metric == "total_equity"),
         key=lambda fact: fact.period_end,
         default=None,
     )
-    net_income_ttm = _ttm_sum(facts, "net_income")
-    operating_cash_flow_ttm = _ttm_sum(facts, "operating_cash_flow")
+    # VCI quarterly flow semantics are verified as standalone quarters. KBS is
+    # supported for raw statements and point-in-time balances, but its flow
+    # semantics are deliberately not assumed when producing TTM totals.
+    net_income_ttm = _ttm_sum(facts, "net_income") if selected_source == "vci" else None
+    operating_cash_flow_ttm = (
+        _ttm_sum(facts, "operating_cash_flow") if selected_source == "vci" else None
+    )
 
     lines = [
-        f"# Current VCI fundamentals for {symbol}",
+        f"# Current {selected_source.upper()} fundamentals for {symbol}",
         "",
-        f"- Source: {_SOURCE}",
+        f"- Source: vnstock-{selected_source}",
+        "- Retrieval library: Vnstock; this is not the issuer filing URL.",
         f"- Retrieved at: {fetched_at.isoformat()}",
         "- Statement periods are reported by the source; this fetch timestamp is not their historical publication time.",
         "- This is a current snapshot. It is withheld for historical as-of dates.",
         "",
-        "## Normalized VCI facts",
+        f"## Normalized {selected_source.upper()} facts",
         "",
         "| Metric | Period | Value | Unit |",
         "|---|---|---:|---|",
     ]
+    if errors:
+        failed_sources = ", ".join(source.upper() for source, _ in errors)
+        lines.insert(
+            4,
+            f"- Source fallback: {failed_sources} unavailable; selected {selected_source.upper()}."
+        )
+
     for fact in sorted(facts, key=lambda item: (item.metric, item.period_end, item.period_start)):
         lines.append(
             f"| {fact.metric} | {fact.period_start}..{fact.period_end} | "
@@ -279,11 +374,19 @@ def get_vnstock_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
     if net_income_ttm is not None:
         amount, start, end = net_income_ttm
         lines.append(f"- TTM parent-company net income: {amount:,.0f} VND ({start}..{end}).")
+    elif selected_source == "kbs":
+        lines.append(
+            "- TTM net income: not derived from KBS; standalone-quarter versus cumulative-flow semantics have not been verified."
+        )
     else:
         lines.append("- TTM net income: unavailable; four contiguous standalone quarter facts are required.")
     if operating_cash_flow_ttm is not None:
         amount, start, end = operating_cash_flow_ttm
         lines.append(f"- TTM operating cash flow: {amount:,.0f} VND ({start}..{end}).")
+    elif selected_source == "kbs":
+        lines.append(
+            "- TTM operating cash flow: not derived from KBS; standalone-quarter versus cumulative-flow semantics have not been verified."
+        )
     else:
         lines.append("- TTM operating cash flow: unavailable; four contiguous standalone quarter facts are required.")
     if latest_equity is not None:
@@ -292,14 +395,14 @@ def get_vnstock_fundamentals(ticker: str, as_of_date: str | None = None) -> str:
             f"(period end {latest_equity.period_end})."
         )
     else:
-        lines.append("- Total equity: unavailable from the supported VCI mappings.")
+        lines.append(f"- Total equity: unavailable from the supported {selected_source.upper()} mappings.")
 
     lines.extend(
         [
             "",
             "## Metrics not inferred",
             "",
-            "This VCI mapping does not currently validate shares outstanding, weighted-average "
+            f"This {selected_source.upper()} mapping does not currently validate shares outstanding, weighted-average "
             "shares, or capital expenditure. Therefore it does not claim EPS, P/E, P/B, ROE, "
             "market capitalization, or free cash flow. Add those metrics only after their "
             "semantic IDs, unit/sign conventions, and source coverage are verified.",

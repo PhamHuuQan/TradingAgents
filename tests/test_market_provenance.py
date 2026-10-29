@@ -79,3 +79,102 @@ def test_later_failed_snapshot_does_not_reuse_older_snapshot_metadata():
 
     assert _append_verified_market_provenance(report, messages) == report
 
+def test_model_written_provenance_is_removed_when_no_snapshot_was_called():
+    report = (
+        "## FPT Market Analysis\nClose: 56000\n\n### Market Data Provenance\n"
+        "- Provider: ssi-fastconnect-v3\n- Source URL: https://example.invalid/fake\n"
+        "- Retrieved at: 2026-10-27T12:30:00+07:00"
+    )
+
+    actual = _append_verified_market_provenance(report, [])
+
+    assert "## FPT Market Analysis" in actual
+    assert "Close: 56000" in actual
+    assert "Market Data Provenance" not in actual
+    assert "example.invalid" not in actual
+
+
+def test_model_written_provenance_is_removed_after_failed_snapshot():
+    report = (
+        "## FPT Market Analysis\nClose: 56000\n\n### Market Data Provenance\n"
+        "- Provider: ssi-fastconnect-v3\n- Source URL: https://example.invalid/fake"
+    )
+    messages = [
+        ToolMessage(
+            content="DATA_UNAVAILABLE: no market snapshot",
+            tool_call_id="failed",
+            name="get_verified_market_snapshot",
+        )
+    ]
+
+    actual = _append_verified_market_provenance(report, messages)
+
+    assert "Close: 56000" in actual
+    assert "Market Data Provenance" not in actual
+    assert "example.invalid" not in actual
+
+
+def test_incomplete_snapshot_cannot_validate_model_written_provenance():
+    report = "Market report\n\n### Market Data Provenance\n- Provider: invented-provider"
+    messages = [
+        ToolMessage(
+            content="## Verified market data snapshot for FPT\n- Source: ssi-fastconnect-v3",
+            tool_call_id="incomplete",
+            name="get_verified_market_snapshot",
+        )
+    ]
+
+    actual = _append_verified_market_provenance(report, messages)
+
+    assert actual == "Market report"
+    assert "Market Data Provenance" not in actual
+
+
+
+
+def test_yahoo_snapshot_labels_and_numeric_values_are_preserved_for_generic_tickers():
+    snapshot = """## Verified market data snapshot for AAPL
+
+- Requested analysis date: 2026-10-27
+- Latest trading row used: 2026-10-27
+- Source: Yahoo Finance chart history (yfinance)
+- Source URL: https://finance.yahoo.com/quote/AAPL/history/
+- Retrieved at (UTC): 2026-10-27T12:30:00+00:00
+
+### Latest verified OHLCV row
+
+| Field | Value |
+|---|---:|
+| Open | 199.00 |
+| High | 202.00 |
+| Low | 198.00 |
+| Close | 200.00 |
+| Volume | 1234567 |
+
+### Verified technical indicators (latest row)
+
+| Indicator | Value |
+|---|---:|
+| close_50_sma | 195.25 |
+| rsi | 55.50 |
+| macd | 1.25 |
+"""
+    messages = [
+        ToolMessage(
+            content=snapshot,
+            tool_call_id="snapshot-call",
+            name="get_verified_market_snapshot",
+        )
+    ]
+
+    actual = _append_verified_market_provenance("AAPL market analysis", messages)
+
+    assert "### Market Data Provenance" in actual
+    assert "- Requested as-of date: 2026-10-27" in actual
+    assert "- Latest returned trading row: 2026-10-27" in actual
+    assert "- Provider: Yahoo Finance chart history (yfinance)" in actual
+    assert "### Verified Numeric Evidence" in actual
+    assert "- Verified OHLCV Close: 200.00" in actual
+    assert "- Verified indicator close_50_sma: 195.25" in actual
+    assert "- Verified indicator rsi: 55.50" in actual
+    assert "- Verified indicator macd: 1.25" in actual

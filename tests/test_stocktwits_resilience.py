@@ -140,6 +140,7 @@ def test_missing_stocktwits_message_url_is_explicit_not_invented():
     with patch.object(stocktwits, "urlopen", return_value=_stream("Long NVDA")):
         out = stocktwits.fetch_stocktwits_messages("NVDA")
     assert "Source URL unavailable from the provider" in out
+    assert "Message URL unavailable from the provider" in out
     assert "https://stocktwits.com/user/message/" not in out
 
 

@@ -56,6 +56,18 @@ def bind_structured(llm: Any, schema: type[T], agent_name: str) -> Any | None:
         return None
 
 
+def _provider_capacity_exhausted(exc: BaseException) -> bool:
+    """Detect terminal quota/fallback exhaustion that must not trigger a second LLM call."""
+    message = (type(exc).__name__ + " " + str(exc)).casefold()
+    return any(marker in message for marker in (
+        "daily quota/rate limit was reached for every configured gemini model",
+        "gemini fallback exhausted for this graph step",
+        "all configured gemini model quotas are marked unavailable",
+        "all available gemini fallback models failed",
+        "no additional model requests were sent",
+    ))
+
+
 def invoke_structured(structured_llm: Any | None, prompt: Any, agent_name: str) -> T | None:
     """Run the structured call; ``None`` when there is none or it fails.
 
@@ -74,6 +86,11 @@ def invoke_structured(structured_llm: Any | None, prompt: Any, agent_name: str) 
             raise ValueError("structured output returned no parsed result")
         return result
     except Exception as exc:
+        if _provider_capacity_exhausted(exc):
+            # A quota-exhausted fallback wrapper has already made its bounded
+            # provider attempts. A plain-text retry would be another futile
+            # invocation and can obscure the original quota diagnostic.
+            raise
         logger.warning(
             "%s: structured-output invocation failed (%s); retrying once as free text",
             agent_name, exc,

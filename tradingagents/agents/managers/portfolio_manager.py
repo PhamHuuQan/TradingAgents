@@ -89,6 +89,31 @@ Write these sections, in this order, starting with the rating on its own line:
             final_trade_decision = llm.invoke(prompt).content
             final_rating = parse_rating(final_trade_decision)
 
+        portfolio_context_missing = not (
+            isinstance(state.get("portfolio_context"), str)
+            and state["portfolio_context"].strip()
+        )
+        decision_text_folded = final_trade_decision.casefold()
+        decision_needs_context_disclosure = (
+            decision is not None
+            or str(final_rating or "").casefold() == "hold"
+            or any(
+                token in decision_text_folded
+                for token in (
+                    "price", "stop-loss", "stop loss", "position", "holding",
+                    "allocation", "portfolio", "entry", "target", "vnd", "$",
+                    "cắt lỗ", "vị thế", "tỷ trọng",
+                )
+            )
+            or any(character.isdigit() for character in final_trade_decision)
+        )
+        if portfolio_context_missing and decision_needs_context_disclosure:
+            final_trade_decision = final_trade_decision.rstrip() + (
+                "\n\n**Portfolio Context Limitation**: Current holdings, cost basis, portfolio allocation, "
+                "cash, and personal risk limits were not provided. Any price threshold discussed above "
+                "is a conditional technical review level, not a personalized mandatory stop-loss or order instruction."
+            )
+
         new_risk_debate_state = {
             "history": risk_debate_state["history"],
             "aggressive_history": risk_debate_state["aggressive_history"],

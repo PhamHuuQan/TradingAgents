@@ -1,3 +1,5 @@
+from tradingagents.report_quality import build_decision_evidence_guardrails
+
 from tradingagents.agents.context import (
     get_instrument_context_from_state,
     get_language_instruction,
@@ -26,6 +28,7 @@ def create_aggressive_debator(llm):
         fundamentals_report = report_or_absent(state["fundamentals_report"], "fundamentals")
         instrument_context = get_instrument_context_from_state(state)
         portfolio_context = get_portfolio_context_from_state(state)
+        evidence_guardrails = build_decision_evidence_guardrails(state)
 
         trader_decision = state["trader_investment_plan"]
 
@@ -43,7 +46,7 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here are the last arguments from the conservative analyst: {current_conservative_response} Here are the last arguments from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints yet, present your own argument based on the available data.
 
-Engage actively by addressing any specific concerns raised, refuting the weaknesses in their logic, and asserting the benefits of risk-taking to outpace market norms. Maintain a focus on debating and persuading, not just presenting data. Challenge each counterpoint to underscore why a high-risk approach is optimal. Output conversationally as if you are speaking without any special formatting.""" + get_language_instruction()
+Engage actively by addressing any specific concerns raised, refuting the weaknesses in their logic, and asserting the benefits of risk-taking to outpace market norms. Maintain a focus on debating and persuading, not just presenting data. Challenge each counterpoint to underscore why a high-risk approach is optimal. Output conversationally as if you are speaking without any special formatting.""" + evidence_guardrails + get_language_instruction()
 
         response = llm.invoke(prompt)
 

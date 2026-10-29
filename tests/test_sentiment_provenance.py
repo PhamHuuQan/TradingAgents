@@ -4,21 +4,6 @@ from tradingagents.agents.analysts.sentiment_analyst import (
 )
 
 
-def test_sentiment_prompt_distinguishes_provider_failure_from_zero_results():
-    prompt = _build_system_message(
-        ticker="FPT",
-        start_date="2026-10-20",
-        end_date="2026-10-27",
-        news_block="News unavailable: timeout.",
-        stocktwits_block="StockTwits unavailable: HTTPError.",
-        reddit_block="No Reddit posts found in the requested window.",
-    )
-
-    assert "A provider outage means the data is unavailable" in prompt
-    assert "successful zero-result query means only that no matching posts were returned" in prompt
-    assert "do not infer low retail interest, weak liquidity" in prompt
-
-
 def test_sentiment_report_preserves_fetched_article_and_post_links():
     report = "Overall Sentiment: Neutral (Score: 5.0/10)\nConfidence: Low\nSparse social data."
     news_block = """## FPT News
@@ -138,3 +123,19 @@ def test_partially_linked_stocktwits_feed_still_flags_posts_without_permalinks()
     assert "Message permalink: https://stocktwits.com/user1/message/123" in actual
     assert "Message URL unavailable from the provider" in actual
 
+
+
+
+def test_sentiment_prompt_forbids_inference_from_empty_feeds():
+    prompt = _build_system_message(
+        ticker="FPT",
+        start_date="2026-10-21",
+        end_date="2026-10-28",
+        news_block="No article records could be extracted.",
+        stocktwits_block="No matching messages in the requested window.",
+        reddit_block="No Reddit posts found.",
+    )
+
+    assert "EMPTY-FEED INFERENCE LIMIT" in prompt
+    assert "Do not infer low retail interest" in prompt
+    assert "smart-money accumulation/distribution" in prompt
